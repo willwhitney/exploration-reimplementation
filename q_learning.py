@@ -12,8 +12,8 @@ from flax import nn, optim
 import gridworld
 import replay
 
-profiler.start_server(9999)
-time.sleep(10)
+# profiler.start_server(9999)
+# time.sleep(10)
 
 
 class DenseQNetwork(nn.Module):
@@ -56,6 +56,7 @@ def train_step(q_opt, states, actions, targets):
     return q_opt
 
 
+@jax.partial(jax.profiler.trace_function, name="bellman_train_step")
 @jax.jit
 def bellman_train_step(q_opt, targetq_opt, transitions):
     # transitions should be of form (states, actions, next_states, rewards)
@@ -68,6 +69,7 @@ def predict(q_opt, states, actions):
     return q_opt.target(states, actions)
 
 
+@jax.partial(jax.profiler.trace_function, name="choose_action")
 @jax.jit
 def choose_action(rng, q_opt, state, actions):
     # import ipdb; ipdb.set_trace()
@@ -90,7 +92,7 @@ def choose_action(rng, q_opt, state, actions):
                           lambda _: actions[random_index],
                           lambda _: actions[max_index],
                           None)
-    return action
+    return action.astype(int)
 
 
 if __name__ == '__main__':
@@ -106,17 +108,24 @@ if __name__ == '__main__':
     targetq_opt = q_opt
     buffer = replay.Replay(state_shape, action_shape)
 
+    @jax.profiler.trace_function
     def full_step(rng, q_opt, env):
         s = gridworld.render(env)
         a = choose_action(rng, q_opt, s, actions)
-        env, sp, r = gridworld.step(env, a)
-        buffer.append(s, a, sp, r)
+        # import ipdb; ipdb.set_trace()
+        with profiler.TraceContext("env step"):
+            env, sp, r = gridworld.step(env, int(a))
+        with profiler.TraceContext("replay append"):
+            buffer.append(s, a, sp, r)
 
         if len(buffer) > batch_size:
-            transitions = buffer.sample(batch_size)
-            q_opt = bellman_train_step(q_opt, targetq_opt, transitions)
+            with profiler.TraceContext("replay sample"):
+                transitions = buffer.sample(batch_size)
+            with profiler.TraceContext("bellman step"):
+                q_opt = bellman_train_step(q_opt, targetq_opt, transitions)
         return q_opt, env, r
 
+    @jax.profiler.trace_function
     def run_episode(rngs, q_opt, env):
         env = gridworld.reset(env)
         score = 0
