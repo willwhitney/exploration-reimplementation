@@ -1,15 +1,19 @@
 import copy
 import math
+import time
 import numpy as np
 
 import jax
-from jax import numpy as jnp, random, jit, lax
+from jax import numpy as jnp, random, jit, lax, profiler
 
 import flax
 from flax import nn, optim
 
 import gridworld
 import replay
+
+profiler.start_server(9999)
+time.sleep(10)
 
 
 class DenseQNetwork(nn.Module):
@@ -91,7 +95,7 @@ def choose_action(rng, q_opt, state, actions):
 
 if __name__ == '__main__':
     rng = random.PRNGKey(0)
-    env = gridworld.new(2)
+    env = gridworld.new(10)
     state_shape = (2, env.size)
     action_shape = (1,)
     batch_size = 128
@@ -121,11 +125,14 @@ if __name__ == '__main__':
             score += r
         return q_opt, env, score
 
-    for episode in range(1000):
+    for episode in range(200):
         # with jax.disable_jit():
+        time.sleep(0.1)
         rngs = random.split(rng, max_steps + 1)
         rng = rngs[0]
         q_opt, env, score = run_episode(rngs[1:], q_opt, env)
         print(f"Episode {episode}, Score {score}")
         if episode % 1 == 0:
             targetq_opt = q_opt
+
+    profiler.save_device_memory_profile("memory.prof")
