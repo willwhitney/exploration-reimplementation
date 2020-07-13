@@ -40,7 +40,6 @@ def init_fn(seed, state_shape, action_shape):
     rng = random.PRNGKey(seed)
     q_net = DenseQNetwork.partial(hidden_layers=2,
                                   hidden_dim=512)
-    # import ipdb; ipdb.set_trace()
     _, initial_params = q_net.init_by_shape(
         rng, [(state_shape, jnp.float32), (action_shape, jnp.float32)])
     initial_model = nn.Model(q_net, initial_params)
@@ -69,10 +68,9 @@ def predict(q_opt, states, actions):
     return q_opt.target(states, actions)
 
 
-@jax.partial(jax.profiler.trace_function, name="choose_action")
+@jax.partial(jax.profiler.trace_function, name="sample_action")
 @jax.jit
-def choose_action(rng, q_opt, state, actions):
-    # import ipdb; ipdb.set_trace()
+def sample_action(rng, q_opt, state, actions):
     values = predict(q_opt,
                      jnp.repeat(state.reshape(1, *state.shape),
                                 actions.shape[0], axis=0),
@@ -80,20 +78,70 @@ def choose_action(rng, q_opt, state, actions):
     values = values.reshape(-1)
     boltzmann = False
     if boltzmann:
-        boltzmann_probs = nn.softmax(values)
-        sampled_index = random.categorical(rng, boltzmann_probs)
-        action = actions[sampled_index]
+        action = sample_boltzmann(rng, values, actions)
     else:
-        explore = random.bernoulli(rng, p=0.05)
-        rng = random.split(rng, 1)[0]
-        random_index = random.randint(rng, (1,), 0, actions.shape[0])[0]
-        max_index = jnp.argmax(values, axis=0)
-        action = lax.cond(explore,
-                          lambda _: actions[random_index],
-                          lambda _: actions[max_index],
-                          None)
-    return action.astype(int)
+        action = sample_egreedy(rng, values, actions)
+    return action
+sample_action_n = jax.vmap(sample_action,  # noqa: E305
+                           in_axes=(0, None, None, None))
 
+
+def sample_boltzmann(rng, values, actions, temperature=1):
+    boltzmann_probs = nn.softmax(values / temperature)
+    sampled_index = random.categorical(rng, boltzmann_probs)
+    action = actions[sampled_index]
+    return action
+sample_boltzmann_n = jax.vmap(sample_boltzmann,  # noqa: E305
+                              in_axes=(0, None, None))
+
+
+def sample_egreedy(rng, values, actions, epsilon=0.05):
+    explore = random.bernoulli(rng, p=epsilon)
+    rng = random.split(rng, 1)[0]
+    random_index = random.randint(rng, (1,), 0, actions.shape[0])[0]
+    max_index = jnp.argmax(values, axis=0)
+    action = lax.cond(explore,
+                      lambda _: actions[random_index],
+                      lambda _: actions[max_index],
+                      None)
+    return action
+sample_egreedy_n = jax.vmap(sample_egreedy,  # noqa: E305
+                            in_axes=(0, None, None))
+
+
+# def sample_action(rng, q_opt, state, actions, n=1):
+#     # import ipdb; ipdb.set_trace()
+#     values = predict(q_opt,
+#                      jnp.repeat(state.reshape(1, *state.shape),
+#                                 actions.shape[0], axis=0),
+#                      actions.reshape(4, 1))
+#     values = values.reshape(-1)
+#     boltzmann = False
+#     if boltzmann:
+#         action = sample_boltzmann(rng, values, actions, n=n)
+#     else:
+#         action = sample_egreedy(rng, values, actions, n=n)
+#     return action
+
+
+# def sample_boltzmann(rng, values, actions, temperature=1, n=1):
+#     boltzmann_probs = nn.softmax(values / temperature)
+#     sampled_index = random.categorical(rng, boltzmann_probs, shape=(n,))
+#     action = actions[sampled_index]
+#     return action
+
+
+# def sample_egreedy(rng, values, actions, epsilon=0.05, n=1):
+#     explore = random.bernoulli(rng, p=epsilon, shape=(n,)).astype(jnp.int32)
+#     rng = random.split(rng, 1)[0]
+#     random_index = random.randint(rng, (n,), 0, actions.shape[0])[0]
+#     max_index = jnp.argmax(values, axis=0)
+#     action_index = explore * random_index + (1 - explore) * max_index
+#     action = lax.cond(explore,
+#                       lambda _: actions[random_index],
+#                       lambda _: actions[max_index],
+#                       None)
+#     return action
 
 if __name__ == '__main__':
     rng = random.PRNGKey(0)
@@ -102,16 +150,16 @@ if __name__ == '__main__':
     action_shape = (1,)
     batch_size = 128
     max_steps = 100
-    actions = jnp.arange(4)
 
     q_opt = init_fn(0, (128, *state_shape), (128, *action_shape))
     targetq_opt = q_opt
     buffer = replay.Replay(state_shape, action_shape)
 
-    @jax.profiler.trace_function
+    # @jax.jit
+    # @jax.profiler.trace_function
     def full_step(rng, q_opt, env):
         s = gridworld.render(env)
-        a = choose_action(rng, q_opt, s, actions)
+        a = sample_action(rng, q_opt, s, env.actions)
         # import ipdb; ipdb.set_trace()
         with profiler.TraceContext("env step"):
             env, sp, r = gridworld.step(env, int(a))
@@ -125,7 +173,7 @@ if __name__ == '__main__':
                 q_opt = bellman_train_step(q_opt, targetq_opt, transitions)
         return q_opt, env, r
 
-    @jax.profiler.trace_function
+    # @jax.profiler.trace_function
     def run_episode(rngs, q_opt, env):
         env = gridworld.reset(env)
         score = 0

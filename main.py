@@ -1,5 +1,7 @@
 import math
 import numpy as np
+from dataclasses import dataclass
+from typing import Any
 
 import jax
 from jax import numpy as jnp, random, jit, lax
@@ -7,91 +9,118 @@ from jax import numpy as jnp, random, jit, lax
 import flax
 from flax import nn, optim
 
-
-class ExplorationPolicy:
-    def __init__(self, novelty_q, policy,
-                 n_action_samples=64, temperature=1, seed=0):
-        self.novelty_q = novelty_q
-        self.policy = policy
-        self.n_action_samples = n_action_samples
-        self.temperature = temperature
-        self.rng = random.PRNGKey(seed)
-
-        def _sample_reweighted(novelty_q_state, rng, s, actions):
-            q_values = novelty_q(novelty_q_state, s, actions)
-            logits = q_values / temperature
-            action_index = random.categorical(rng, logits)
-            return actions[action_index]
-
-        def _sample_action(novelty_q_state, policy_state, rng, s):
-            actions = self.policy(policy_state, s, n=self.n_action_samples)
-            return _sample_reweighted(novelty_q_state, rng, s, actions)
-
-        self._sample_actions = jax.vmap(_sample_action,
-                                        in_axes=(None, None, 0, 0))
-
-    def sample_actions(self, novelty_q_state, policy_state, states):
-        new_rngs = random.split(self.rng, states.shape[0] + 1)
-        self.rng = new_rngs[0]
-        actions = self._sample_actions(
-            novelty_q_state, policy_state, new_rngs[1:], states)
-        return actions
+import gridworld
+import replay
+import q_learning
+import density
 
 
-class DensityEstimator:
-    def log_p(self, states, actions):
-        raise NotImplementedError
+# class ExplorationPolicy:
+#     def __init__(self, novelty_q_fn, policy_fn,
+#                  n_action_samples=64, temperature=1, seed=0):
+#         """Construct an ExplorationPolicy.
+#         Arguments:
+#         - novelty_q_fn: a function that takes an internal state, observed
+#             state, and a list of actions and returns a value estimate for each
+#             action
+#         - policy_fn: a function that takes an internal state, an rng, an
+#             observed state, and a number of samples, and returns that many
+#             sampled actions
+#         """
+#         # self.novelty_q_fn = novelty_q_fn
+#         # self.policy_fn = policy_fn
+#         self.n_action_samples = n_action_samples
+#         self.temperature = temperature
+#         self.rng = random.PRNGKey(seed)
 
-    def update(self, states, actions):
-        raise NotImplementedError
+#         def _sample_reweighted(novelty_q_state, rng, s, actions):
+#             q_values = novelty_q_fn(novelty_q_state, s, actions)
+#             logits = q_values / temperature
+#             action_index = random.categorical(rng, logits)
+#             return actions[action_index]
+
+#         def _sample_action(novelty_q_state, policy_state, rng, s):
+#             actions = policy_fn(policy_state, rng, s, n=self.n_action_samples)
+#             rng = random.split(rng, 1)[0]
+#             return _sample_reweighted(novelty_q_state, rng, s, actions)
+
+#         self._sample_action = _sample_action
+#         self._sample_actions = jax.vmap(_sample_action,
+#                                         in_axes=(None, None, 0, 0))
+
+#     def next_rng(self):
+#         return random.split(self.rng, 1)[0]
+
+#     def sample_action(self, novelty_q_state, policy_state, s):
+#         new_rngs = random.split(self.rng, 2)
+#         self.rng = new_rngs[0]
+#         a = self._sample_action(novelty_q_state, policy_state, new_rngs[1], s)
+#         return a
+
+#     def sample_actions(self, novelty_q_state, policy_state, states):
+#         new_rngs = random.split(self.rng, states.shape[0] + 1)
+#         self.rng = new_rngs[0]
+#         actions = self._sample_actions(
+#             novelty_q_state, policy_state, new_rngs[1:], states)
+#         return actions
+
+@dataclass
+class AgentState():
+    q_opt: Any
+    targetq_opt: Any
+    novq_opt: Any
 
 
-class DenseQNetwork(nn.Module):
-    def apply(self, s, a, hidden_layers, hidden_dim):
-        s = jnp.reshape(s, (s.shape[0], -1))
-        x = jnp.concatenate([s, a], axis=1)
-        for layer in range(hidden_layers):
-            x = nn.Dense(x, hidden_dim, name=f'fc{layer}')
-            x = nn.relu(x)
-        q = nn.Dense(1, hidden_dim, name=f'fc{hidden_layers}')
-        return q
 
+def full_step(rng, q_opt, novq_opt, env):
+    s = gridworld.render(env)
+    a = choose_action(rng, q_opt, s, env.actions)
+    # import ipdb; ipdb.set_trace()
+    with profiler.TraceContext("env step"):
+        env, sp, r = gridworld.step(env, int(a))
+    with profiler.TraceContext("replay append"):
+        buffer.append(s, a, sp, r)
 
-def batch_to_jax(batch):
-    return (jnp.array(batch[0]), jnp.array(batch[1]))
+    if len(buffer) > batch_size:
+        with profiler.TraceContext("replay sample"):
+            transitions = buffer.sample(batch_size)
+        with profiler.TraceContext("bellman step"):
+            q_opt = bellman_train_step(q_opt, targetq_opt, transitions)
+    return q_opt, env, r
 
+# @jax.profiler.trace_function
+def run_episode(rngs, q_opt, env):
+    env = gridworld.reset(env)
+    score = 0
+    for i in range(max_steps):
+        q_opt, env, r = full_step(rngs[i], q_opt, env)
+        score += r
+    return q_opt, env, score
 
-def loss_fn(model, batch):
-    preds = model(batch[0])
-    loss = jnp.mean((preds - batch[1])**2)
-    return loss
-
-
-grad_loss_fn = jax.grad(loss_fn)
-
-
-def init_fn(seed):
-    rng = random.PRNGKey(seed)
-    q_net = DenseQNetwork.partial(hidden_layers=2,
-                                  hidden_dim=512)
-    _, initial_params = q_net.init_by_shape(rng, [(128, 784)])
-    initial_model = nn.Model(q_net, initial_params)
-    optimizer = optim.Adam(1e-3).create(initial_model)
-    return optimizer
-
-
-@jax.jit
-def train_step(optimizer, batch):
-    batch = batch_to_jax(batch)
-    grad = grad_loss_fn(optimizer.target, batch)
-    optimizer = optimizer.apply_gradient(grad)
-    return optimizer
-
-
-def eval_fn(optimizer, batch):
-    batch = batch_to_jax(batch)
-    return loss_fn(optimizer.target, batch)
+for episode in range(200):
+    # with jax.disable_jit():
+    time.sleep(0.1)
+    rngs = random.split(rng, max_steps + 1)
+    rng = rngs[0]
+    q_opt, env, score = run_episode(rngs[1:], q_opt, env)
+    print(f"Episode {episode}, Score {score}")
+    if episode % 1 == 0:
+        targetq_opt = q_opt
 
 
 if __name__ == '__main__':
-    pass
+    rng = random.PRNGKey(0)
+    env = gridworld.new(10)
+    state_shape = (2, env.size)
+    action_shape = (1,)
+    batch_size = 128
+    max_steps = 100
+
+    q_opt = q_learning.init_fn(0, (128, *state_shape), (128, *action_shape))
+    targetq_opt = q_opt
+    novq_opt = q_learning.init_fn(0, (128, *state_shape), (128, *action_shape))
+
+    density_est = density.TabularDensity()
+    buffer = replay.Replay(state_shape, action_shape)
+
+

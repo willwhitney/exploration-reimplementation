@@ -25,6 +25,7 @@ class GridWorld:
     size: int
     render: types.FunctionType = struct.field(pytree_node=False)
     agent: jnp.ndarray = jnp.array((0, 0), dtype=DTYPE)
+    actions: jnp.ndarray = jnp.arange(4)
 
 
 def goal(s):
