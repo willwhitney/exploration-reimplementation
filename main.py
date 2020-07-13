@@ -7,12 +7,12 @@ import jax
 from jax import numpy as jnp, random, jit, lax
 
 import flax
-from flax import nn, optim
+from flax import nn, optim, struct
 
 import gridworld
-import replay
+import replay_buffer
 import q_learning
-import density
+import density_estimation
 
 
 # class ExplorationPolicy:
@@ -64,16 +64,35 @@ import density
 #             novelty_q_state, policy_state, new_rngs[1:], states)
 #         return actions
 
-@dataclass
+@struct.dataclass
 class AgentState():
-    q_opt: Any
-    targetq_opt: Any
+    # q_opt: Any
+    # targetq_opt: Any
     novq_opt: Any
+    replay: Any
+    density: Any
+    policy_state: Any = struct.field(pytree_node=False)
 
 
+def update_exploration(agent_state, transitions):
+    # add transitions to replay
+    pass
 
-def full_step(rng, q_opt, novq_opt, env):
+    # update density on new observations
+    pass
+
+    # update exploration Q to consistency with new density
+    pass
+
+
+def select_action(agent_state, env_state, candidate_actions):
+    # can probably reuse the function from q_learning.py
+    raise NotImplementedError
+
+
+def full_step(agent_state, env):
     s = gridworld.render(env)
+    candidate_actions =
     a = choose_action(rng, q_opt, s, env.actions)
     # import ipdb; ipdb.set_trace()
     with profiler.TraceContext("env step"):

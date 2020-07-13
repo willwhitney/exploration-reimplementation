@@ -2,18 +2,31 @@ import copy
 import math
 import time
 import numpy as np
+from typing import Any
 
 import jax
 from jax import numpy as jnp, random, jit, lax, profiler
 
 import flax
-from flax import nn, optim
+from flax import nn, optim, struct
 
 import gridworld
-import replay
+import replay_buffer
 
-# profiler.start_server(9999)
-# time.sleep(10)
+
+@struct.dataclass
+class QLearnerState():
+    optimizer: Any
+    rng: jnp.ndarray = random.PRNGKey(0)
+
+    @property
+    def model(self):
+        return self.optimizer.target
+
+
+def step_rng(q_state: QLearnerState):
+    next_rng = random.split(q_state.rng, 1)[0]
+    return q_state.replace(rng=next_rng)
 
 
 class DenseQNetwork(nn.Module):
@@ -31,9 +44,7 @@ def loss_fn(model, states, actions, targets):
     preds = model(states, actions)
     loss = jnp.mean((preds - targets)**2)
     return loss
-
-
-grad_loss_fn = jax.grad(loss_fn)
+grad_loss_fn = jax.grad(loss_fn)  # noqa: E305
 
 
 def init_fn(seed, state_shape, action_shape):
@@ -42,41 +53,44 @@ def init_fn(seed, state_shape, action_shape):
                                   hidden_dim=512)
     _, initial_params = q_net.init_by_shape(
         rng, [(state_shape, jnp.float32), (action_shape, jnp.float32)])
+    rng = random.split(rng, 1)[0]
     initial_model = nn.Model(q_net, initial_params)
     q_opt = optim.Adam(1e-3).create(initial_model)
-    return q_opt
+    return QLearnerState(q_opt, rng)
 
 
 @jax.jit
-def train_step(q_opt, states, actions, targets):
+def train_step(q_state: QLearnerState, states, actions, targets):
     # batch should be of form (states, actions, targets)
-    grad = grad_loss_fn(q_opt.target, states, actions, targets)
-    q_opt = q_opt.apply_gradient(grad)
-    return q_opt
+    grad = grad_loss_fn(q_state.model, states, actions, targets)
+    q_state = q_state.replace(optimizer=q_state.optimizer.apply_gradient(grad))
+    return q_state
 
 
 @jax.partial(jax.profiler.trace_function, name="bellman_train_step")
 @jax.jit
-def bellman_train_step(q_opt, targetq_opt, transitions):
+def bellman_train_step(q_state: QLearnerState,
+                       targetq_state: QLearnerState,
+                       transitions):
     # transitions should be of form (states, actions, next_states, rewards)
-    targetq_preds = targetq_opt.target(transitions[0], transitions[1])
+    targetq_preds = targetq_state.model(transitions[0], transitions[1])
     q_targets = transitions[3] + 0.99 * targetq_preds
-    return train_step(q_opt, transitions[0], transitions[1], q_targets)
+    return train_step(q_state, transitions[0], transitions[1], q_targets)
 
 
-def predict(q_opt, states, actions):
-    return q_opt.target(states, actions)
+def predict(q_state: QLearnerState, states, actions):
+    return q_state.model(states, actions)
 
 
 @jax.partial(jax.profiler.trace_function, name="sample_action")
 @jax.jit
-def sample_action(rng, q_opt, state, actions):
-    values = predict(q_opt,
+def sample_action(q_state: QLearnerState, rng, state, actions):
+    values = predict(q_state,
                      jnp.repeat(state.reshape(1, *state.shape),
                                 actions.shape[0], axis=0),
                      actions.reshape(4, 1))
     values = values.reshape(-1)
-    boltzmann = False
+    boltzmann = True
     if boltzmann:
         action = sample_boltzmann(rng, values, actions)
     else:
@@ -109,87 +123,50 @@ sample_egreedy_n = jax.vmap(sample_egreedy,  # noqa: E305
                             in_axes=(0, None, None))
 
 
-# def sample_action(rng, q_opt, state, actions, n=1):
-#     # import ipdb; ipdb.set_trace()
-#     values = predict(q_opt,
-#                      jnp.repeat(state.reshape(1, *state.shape),
-#                                 actions.shape[0], axis=0),
-#                      actions.reshape(4, 1))
-#     values = values.reshape(-1)
-#     boltzmann = False
-#     if boltzmann:
-#         action = sample_boltzmann(rng, values, actions, n=n)
-#     else:
-#         action = sample_egreedy(rng, values, actions, n=n)
-#     return action
-
-
-# def sample_boltzmann(rng, values, actions, temperature=1, n=1):
-#     boltzmann_probs = nn.softmax(values / temperature)
-#     sampled_index = random.categorical(rng, boltzmann_probs, shape=(n,))
-#     action = actions[sampled_index]
-#     return action
-
-
-# def sample_egreedy(rng, values, actions, epsilon=0.05, n=1):
-#     explore = random.bernoulli(rng, p=epsilon, shape=(n,)).astype(jnp.int32)
-#     rng = random.split(rng, 1)[0]
-#     random_index = random.randint(rng, (n,), 0, actions.shape[0])[0]
-#     max_index = jnp.argmax(values, axis=0)
-#     action_index = explore * random_index + (1 - explore) * max_index
-#     action = lax.cond(explore,
-#                       lambda _: actions[random_index],
-#                       lambda _: actions[max_index],
-#                       None)
-#     return action
-
 if __name__ == '__main__':
     rng = random.PRNGKey(0)
-    env = gridworld.new(10)
+    env = gridworld.new(5)
     state_shape = (2, env.size)
     action_shape = (1,)
     batch_size = 128
     max_steps = 100
 
-    q_opt = init_fn(0, (128, *state_shape), (128, *action_shape))
-    targetq_opt = q_opt
-    buffer = replay.Replay(state_shape, action_shape)
+    q_state = init_fn(0, (128, *state_shape), (128, *action_shape))
+    targetq_state = q_state
+    replay = replay_buffer.Replay(state_shape, action_shape)
 
     # @jax.jit
     # @jax.profiler.trace_function
-    def full_step(rng, q_opt, env):
+    def full_step(q_state, rng, env):
         s = gridworld.render(env)
-        a = sample_action(rng, q_opt, s, env.actions)
-        # import ipdb; ipdb.set_trace()
-        with profiler.TraceContext("env step"):
-            env, sp, r = gridworld.step(env, int(a))
-        with profiler.TraceContext("replay append"):
-            buffer.append(s, a, sp, r)
+        a = sample_action(q_state, rng, s, env.actions)
+        # with profiler.TraceContext("env step"):
+        env, sp, r = gridworld.step(env, int(a))
+        # with profiler.TraceContext("replay append"):
+        replay.append(s, a, sp, r)
 
-        if len(buffer) > batch_size:
-            with profiler.TraceContext("replay sample"):
-                transitions = buffer.sample(batch_size)
-            with profiler.TraceContext("bellman step"):
-                q_opt = bellman_train_step(q_opt, targetq_opt, transitions)
-        return q_opt, env, r
+        if len(replay) > batch_size:
+            # with profiler.TraceContext("replay sample"):
+            transitions = replay.sample(batch_size)
+            # with profiler.TraceContext("bellman step"):
+            q_state = bellman_train_step(q_state, targetq_state, transitions)
+        return q_state, env, r
 
     # @jax.profiler.trace_function
-    def run_episode(rngs, q_opt, env):
+    def run_episode(rngs, q_state, env):
         env = gridworld.reset(env)
         score = 0
         for i in range(max_steps):
-            q_opt, env, r = full_step(rngs[i], q_opt, env)
+            q_state, env, r = full_step(q_state, rngs[i], env)
             score += r
-        return q_opt, env, score
+        return q_state, env, score
 
     for episode in range(200):
-        # with jax.disable_jit():
-        time.sleep(0.1)
         rngs = random.split(rng, max_steps + 1)
         rng = rngs[0]
-        q_opt, env, score = run_episode(rngs[1:], q_opt, env)
+        q_state, env, score = run_episode(rngs[1:], q_state, env)
         print(f"Episode {episode}, Score {score}")
         if episode % 1 == 0:
-            targetq_opt = q_opt
+            targetq_state = q_state
 
     profiler.save_device_memory_profile("memory.prof")
