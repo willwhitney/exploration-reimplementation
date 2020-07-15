@@ -7,20 +7,6 @@ from jax.lib import pytree
 def one_hot(x, k, dtype=jnp.int16):
     """Create a one-hot encoding of x of size k."""
     return jnp.array(x[:, None] == jnp.arange(k), dtype)
-# # one_hot = jax.jit(one_hot, static_argnums=(1, 2))  # noqa: E305
-# # one_hot_10 = jax.partial(one_hot, k=10)  # noqa: E305
-
-# one_hot_10 = lambda x: one_hot(x, 10)
-
-# if __name__ == "__main__":
-#     print(one_hot(jnp.array((2,)), 10))
-#     # one_hot_batch = jax.vmap(one_hot)
-#     # print(one_hot_batch(jnp.array([[2, 3, 4]]), jnp.array([[10, 10, 10]])))
-
-#     # one_hot_batch = jax.vmap(one_hot_10)
-#     # print(one_hot_batch(jnp.array([[2, 3, 4]])))
-#     one_hot_batch = jax.vmap(one_hot_10)
-#     print(one_hot_batch(jnp.array([[2, 3, 4]])))
 
 
 def tree_stack(trees):
@@ -59,6 +45,11 @@ def tree_unstack(tree):
             new_leaves[i].append(leaf[i])
     new_trees = [treedef.unflatten(l) for l in new_leaves]
     return new_trees
+
+
+# def all_pairs(a, b):
+#     grid = jnp.stack(jnp.meshgrid(a, b))
+#     return grid.transpose().reshape(-1, 2).astype(DTYPE)
 
 
 if __name__ == "__main__":

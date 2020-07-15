@@ -107,6 +107,7 @@ def full_step(agent_state, env):
             q_opt = bellman_train_step(q_opt, targetq_opt, transitions)
     return q_opt, env, r
 
+
 # @jax.profiler.trace_function
 def run_episode(rngs, q_opt, env):
     env = gridworld.reset(env)
@@ -115,6 +116,7 @@ def run_episode(rngs, q_opt, env):
         q_opt, env, r = full_step(rngs[i], q_opt, env)
         score += r
     return q_opt, env, score
+
 
 for episode in range(200):
     # with jax.disable_jit():

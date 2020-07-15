@@ -13,10 +13,10 @@ SIZE = 10
 one_hot_10 = jax.partial(utils.one_hot, k=SIZE)
 
 ACTION_MAP = jnp.stack([
-    jnp.array((1, 0), dtype=DTYPE),
-    jnp.array((0, 1), dtype=DTYPE),
-    jnp.array((-1, 0), dtype=DTYPE),
-    jnp.array((0, -1), dtype=DTYPE),
+    jnp.array((1, 0), dtype=DTYPE),   # visually DOWN
+    jnp.array((0, 1), dtype=DTYPE),   # visually RIGHT
+    jnp.array((-1, 0), dtype=DTYPE),  # visually UP
+    jnp.array((0, -1), dtype=DTYPE),  # visually LEFT
 ])
 
 
@@ -32,8 +32,11 @@ def goal(s):
     return jnp.array((s - 1, s - 1), dtype=DTYPE)
 
 
-def new(size):
-    _render = jax.partial(utils.one_hot, k=size)
+def new(size, render_onehot=True):
+    if render_onehot:
+        _render = jax.partial(utils.one_hot, k=size)
+    else:
+        _render = lambda x: x
     return GridWorld(size, _render)
 
 
@@ -59,6 +62,12 @@ def step(gridworld, action):
     return gridworld, render(gridworld), reward
 step = jax.jit(step, static_argnums=(1,))  # noqa: E305
 step_batch = jax.vmap(step)
+
+
+def all_coords(size):
+    grid = jnp.stack(jnp.meshgrid(jnp.linspace(0, size - 1, size),
+                                  jnp.linspace(0, size - 1, size)))
+    return grid.transpose().reshape(-1, 2).astype(DTYPE)
 
 
 if __name__ == "__main__":
