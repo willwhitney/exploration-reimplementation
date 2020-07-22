@@ -1,6 +1,6 @@
-import copy
-import math
-import time
+# import copy
+# import math
+# import time
 import numpy as np
 from typing import Any
 import matplotlib.pyplot as plt
@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import jax
 from jax import numpy as jnp, random, lax, profiler
 
-import flax
+# import flax
 from flax import nn, optim, struct
 
 import gridworld
@@ -19,16 +19,16 @@ import utils
 @struct.dataclass
 class QLearnerState():
     optimizer: Any
-    rng: jnp.ndarray = random.PRNGKey(0)
+    # rng: jnp.ndarray = random.PRNGKey(0)
 
     @property
     def model(self):
         return self.optimizer.target
 
 
-def step_rng(q_state: QLearnerState):
-    next_rng = random.split(q_state.rng, 1)[0]
-    return q_state.replace(rng=next_rng)
+# def step_rng(q_state: QLearnerState):
+#     next_rng = random.split(q_state.rng, 1)[0]
+#     return q_state.replace(rng=next_rng)
 
 
 class DenseQNetwork(nn.Module):
@@ -45,14 +45,13 @@ class DenseQNetwork(nn.Module):
 class TabularQ(nn.Module):
     def apply(self, s, a, env_size):
         def init(key, shape, dtype=jnp.float32):
-            return jnp.full(shape, 97, dtype=dtype)
+            return jnp.full(shape, 0, dtype=dtype)
 
         table = self.param('table', (env_size, env_size, 4), init)
 
         def lookup(table, s, a):
             x, y = s.argmax(axis=1)
             a = a.astype(jnp.int16)
-            # a = a.reshape(-1)
             return table[x][y][a]
         batched_lookup = jax.vmap(lookup, in_axes=(None, 0, 0))
         return batched_lookup(table, s, a)
@@ -70,7 +69,7 @@ def init_fn(seed, state_shape, action_shape, tabular=False, env_size=None):
     rng = random.split(rng, 1)[0]
     initial_model = nn.Model(q_net, initial_params)
     q_opt = optim.Adam(1e-2).create(initial_model)
-    return QLearnerState(q_opt, rng)
+    return QLearnerState(q_opt)
 
 
 def loss_fn(model, states, actions, targets):
@@ -118,19 +117,14 @@ def tabular_train_step(q_state: QLearnerState,
     value_preds = predict_action_values_batch(
         q_state, transitions[2], candidate_actions)
     value_preds = value_preds.max(axis=-1).reshape(transitions[3].shape)
-
-    # the next line is wrong because rewards are (128, 1) and preds are (128,)
-    # raise NotImplementedError
     q_targets = transitions[3] + discount * value_preds
 
-    # import ipdb; ipdb.set_trace()
     state_coords = transitions[0].argmax(axis=-1)
     a_s = transitions[1].astype(jnp.int16)
     for coord, a, t in zip(state_coords, a_s, q_targets):
         x, y = coord
         a = a[0]
         t = t[0]
-        # import ipdb; ipdb.set_trace()
         new_table = jax.ops.index_update(q_state.model.params['table'],
                                          jax.ops.index[x, y, a],
                                          t)
@@ -179,11 +173,12 @@ sample_action_egreedy_n = jax.vmap(sample_action_egreedy,  # noqa: E305
 @jax.jit
 def sample_action_boltzmann(q_state: QLearnerState, rng, state, actions, temp):
     values = predict_action_values(q_state, state, actions)
-    action = sample_boltzmann(rng, values, actions)
+    action = sample_boltzmann(rng, values, actions, temp)
     return action, values
 sample_action_boltzmann_n = jax.vmap(sample_action_boltzmann,  # noqa: E305
                                      in_axes=(None, 0, None, None, None))
-
+sample_action_boltzmann_n_batch = jax.vmap(sample_action_boltzmann_n,
+                                           in_axes=(None, 0, 0, None, None))
 
 @jax.jit
 def sample_boltzmann(rng, values, actions, temp=1):
@@ -247,7 +242,7 @@ def main(args):
     max_steps = 100
 
     if args.boltzmann:
-        sample_action = jax.partial(sample_action_boltzmann, temp=1)
+        sample_action = jax.partial(sample_action_boltzmann, temp=0.1)
     else:
         sample_action = jax.partial(sample_action_egreedy, epsilon=0.5)
 
@@ -293,15 +288,17 @@ def main(args):
     for episode in range(1000):
         rngs = random.split(rng, max_steps + 1)
         rng = rngs[0]
-        q_state, env, score = run_episode(rngs[1:], targetq_state, q_state, env)
+        q_state, env, score = run_episode(
+            rngs[1:], targetq_state, q_state, env)
 
-        rngs = random.split(rng, max_steps + 1)
-        rng = rngs[0]
-        _, _, test_score = run_episode(rngs[1:], targetq_state, q_state, env,
-                                       train=False)
-        print((f"Episode {episode:4d}"
-               f", Train score {score:3d}"
-               f", Test score {test_score:3d}"))
+        if episode % 10 == 0:
+            rngs = random.split(rng, max_steps + 1)
+            rng = rngs[0]
+            _, _, test_score = run_episode(
+                rngs[1:], targetq_state, q_state, env, train=False)
+            print((f"Episode {episode:4d}"
+                f", Train score {score:3d}"
+                f", Test score {test_score:3d}"))
         if episode % 50 == 0:
             print("\nQ network values")
             display_value_map(q_state, env)
@@ -310,7 +307,6 @@ def main(args):
             # display_value_map(targetq_state, env)
         if episode % 1 == 0:
             targetq_state = q_state
-
 
 
 if __name__ == '__main__':

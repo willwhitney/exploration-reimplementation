@@ -25,7 +25,7 @@ class TabularDensity():
     def _flatten(self, s, a):
         return np.concatenate([s.flatten(), a.flatten()])
 
-    def observe(self, states, actions):
+    def update(self, states, actions):
         for s, a in zip(states, actions):
             self.observations[self._flatten(s, a)] += 1
             self.total += 1
@@ -36,3 +36,6 @@ class TabularDensity():
             obs = self._flatten(s, a)
             counts[i] = self.observations[obs]
         return np.log(counts / self.observations + self.eps)
+
+    def count(self, states, actions):
+        return self.log_p(states, actions).exp() * self.total
