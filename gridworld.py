@@ -79,4 +79,4 @@ if __name__ == "__main__":
 
     gws = new_batch(3, 10)
     print(gws)
-    gws, _, _ = step_batch(gws, jnp.array(range(3)))
+    gws, obss, rs = step_batch(gws, jnp.array(range(3)))

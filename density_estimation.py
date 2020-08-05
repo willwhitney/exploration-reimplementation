@@ -35,7 +35,7 @@ class TabularDensity():
         for i, (s, a) in enumerate(zip(states, actions)):
             obs = self._flatten(s, a)
             counts[i] = self.observations[obs]
-        return np.log(counts / self.observations + self.eps)
+        return np.log(counts / self.total + self.eps)
 
     def count(self, states, actions):
         return self.log_p(states, actions).exp() * self.total

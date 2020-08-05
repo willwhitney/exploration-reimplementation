@@ -34,6 +34,7 @@ class QLearnerState():
 class DenseQNetwork(nn.Module):
     def apply(self, s, a, hidden_layers, hidden_dim):
         s = jnp.reshape(s, (s.shape[0], -1))
+        a = jnp.reshape(a, (a.shape[0], -1))
         x = jnp.concatenate([s, a], axis=1)
         for layer in range(hidden_layers):
             x = nn.Dense(x, hidden_dim, name=f'fc{layer}')
@@ -178,7 +179,12 @@ def sample_action_boltzmann(q_state: QLearnerState, rng, state, actions, temp):
 sample_action_boltzmann_n = jax.vmap(sample_action_boltzmann,  # noqa: E305
                                      in_axes=(None, 0, None, None, None))
 sample_action_boltzmann_n_batch = jax.vmap(sample_action_boltzmann_n,
-                                           in_axes=(None, 0, 0, None, None))
+                                           in_axes=(None, 0, 0, 0, None))
+sample_action_boltzmann_batch = jax.vmap(sample_action_boltzmann,
+                                         in_axes=(None, 0, 0, 0, None))
+sample_action_boltzmann_batch_n = jax.vmap(sample_action_boltzmann,
+                                           in_axes=(None, 0, None, None, None))
+
 
 @jax.jit
 def sample_boltzmann(rng, values, actions, temp=1):
