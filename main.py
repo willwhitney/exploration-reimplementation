@@ -19,40 +19,37 @@ R_MAX = 100
 
 
 @struct.dataclass
-class AgentState():
-    # q_opt: Any
-    # targetq_opt: Any
+class ExplorationState():
+    """The pure-JAX components that can be jitted/vmapped.
+    """
     novq_state: q_learning.QLearnerState
-    # replay: Any = struct.field(pytree_node=False)
     density_state: density.DensityState
+
+
+@struct.dataclass
+class AgentState():
+    """A container for the entire state; not jittable.
+    """
+    exploration_state: ExplorationState
     policy_state: Any = struct.field(pytree_node=False)
     policy_action_fn: Any = struct.field(pytree_node=False)
     policy_update_fn: Any = struct.field(pytree_node=False)
 
 
-# @jax.jit
-# def compute_novelty_reward(agent_state, states, actions):
-#     counts = density.get_count_batch(
-#         agent_state.density_state, states, actions)
-#     # counts = agent_state.density.count(states, actions)
-#     return (counts + 1e-8) ** (-0.5)
-
-
 @jax.jit
-def compute_novelty_reward(density_state, states, actions):
+def compute_novelty_reward(exploration_state, states, actions):
     counts = density.get_count_batch(
-        density_state, states, actions)
-    # counts = agent_state.density.count(states, actions)
+        exploration_state.density_state, states, actions)
     return (counts + 1e-8) ** (-0.5)
 
 
-# @jax.jit
-def optimistic_train_step_candidates(agent_state,
+@jax.jit
+def optimistic_train_step_candidates(exploration_state,
                                      transitions,
                                      candidate_next_actions):
     states, actions, next_states, rewards = transitions
     optimistic_next_values = predict_optimistic_values_batch(
-        agent_state, next_states, candidate_next_actions)
+        exploration_state, next_states, candidate_next_actions)
 
     # optimistic_next_values should be (bsize x 64)
     expected_next_values = optimistic_next_values.mean(axis=1)
@@ -60,16 +57,16 @@ def optimistic_train_step_candidates(agent_state,
     # the current version looks more like policy iteration, where the next
     # policy step happens on the next episode
 
-    # novelty_reward = stupid_novelty_reward(
-    #     agent_state.density_state, states, actions)
-    # novelty_reward = density.stupid_fn(agent_state.density_state, states, actions)
     novelty_reward = compute_novelty_reward(
-        agent_state.density_state, states, actions)
+        exploration_state, states, actions)
     target_values = novelty_reward + 0.99 * expected_next_values
 
     novq_state = q_learning.train_step(
-        agent_state.novq_state, states, actions, target_values)
-    return agent_state.replace(novq_state=novq_state)
+        agent_state.exploration_state.novq_state,
+        states, actions, target_values)
+    exploration_state = agent_state.exploration_state.replace(
+        novq_state=novq_state)
+    return agent_state.replace(exploration_state=exploration_state)
 
 
 def optimistic_train_step(agent_state, transitions):
@@ -77,18 +74,15 @@ def optimistic_train_step(agent_state, transitions):
 
     policy_state, candidate_next_actions = agent_state.policy_action_fn(
         agent_state.policy_state, next_states, 64, True)
-    # TODO: put this back
-    # agent_state = agent_state.replace(policy_state=policy_state)
+    agent_state = agent_state.replace(policy_state=policy_state)
 
     # candidate actions should be (bsize x 64 x *action_shape)
     agent_state = optimistic_train_step_candidates(
-        agent_state, transitions, candidate_next_actions)
+        agent_state.exploration_state, transitions, candidate_next_actions)
     return agent_state
 
 
 def update_novelty_q(agent_state, replay, rng):
-    # novq_state = agent_state.novq_state
-    # TODO: change to a lax.scan once replay is in JAX
     for _ in range(10):
         transitions = tuple((jnp.array(el) for el in replay.sample(batch_size)))
         agent_state = optimistic_train_step(agent_state, transitions)
@@ -99,12 +93,12 @@ def update_exploration(agent_state, replay, rng, transition):
     s, a, sp, r = transition
 
     # update density on new observations
-    density_state = density.update_batch(agent_state.density_state,
+    exploration_state = agent_state.exploration_state
+    density_state = density.update_batch(exploration_state.density_state,
                                          jnp.expand_dims(s, axis=0),
                                          jnp.expand_dims(a, axis=0))
-    # agent_state.density.update(jnp.expand_dims(s, axis=0),
-    #                            jnp.expand_dims(a, axis=0))
-    agent_state = agent_state.replace(density_state=density_state)
+    exploration_state = exploration_state.replace(density_state=density_state)
+    agent_state = agent_state.replace(exploration_state=exploration_state)
 
     # update exploration Q to consistency with new density
     rng, novq_rng = random.split(rng)
@@ -119,14 +113,15 @@ def compute_weight(count):
 
 
 @jax.jit
-def predict_optimistic_values(agent_state: AgentState, state, actions):
+def predict_optimistic_values(exploration_state: ExplorationState,
+                              state, actions):
     expanded_state = jnp.expand_dims(state, axis=0)
     repeated_state = expanded_state.repeat(len(actions), axis=0)
     predicted_values = q_learning.predict_value(
-        agent_state.novq_state, repeated_state, actions).reshape(-1)
+        exploration_state.novq_state, repeated_state, actions).reshape(-1)
 
     counts = density.get_count_batch(
-        agent_state.density_state, repeated_state, actions)
+        exploration_state.density_state, repeated_state, actions)
     weights = compute_weight(counts)
     optimistic_value = weights * predicted_values + (1 - weights) * R_MAX
     return optimistic_value
@@ -137,22 +132,9 @@ predict_optimistic_values_batch = jax.vmap(  # noqa: E305
 
 
 @jax.jit
-def stupid_fn(agent_state, state, actions):
-    return actions + state.sum()
-
-
-called_agent_states = []
-called_states = []
-called_actions = []
-
-def select_action(agent_state, rng, state, candidate_actions, temp=0.1):
-    # optimistic_values = predict_optimistic_values(
-    #     agent_state, state, candidate_actions).reshape(-1)
-    optimistic_values = stupid_fn(agent_state, state, candidate_actions)
-
-    called_agent_states.append(agent_state)
-    called_states.append(state)
-    called_actions.append(candidate_actions)
+def select_action(exploration_state, rng, state, candidate_actions, temp=0.1):
+    optimistic_values = predict_optimistic_values(
+        exploration_state, state, candidate_actions).reshape(-1)
 
     return q_learning.sample_boltzmann(
         rng, optimistic_values, candidate_actions, temp)
@@ -170,12 +152,12 @@ def full_step(agent_state: AgentState, replay, rng, env, train=True):
 
     # policy_action_fn deals with batches and we only have one element
     candidate_actions = candidate_actions[0]
-    # TODO: put this back
-    # agent_state = agent_state.replace(policy_state=policy_state)
+    agent_state = agent_state.replace(policy_state=policy_state)
 
     # sample a behavior action from the candidates
     rng, action_rng = random.split(rng)
-    a = select_action(agent_state, action_rng, s, candidate_actions)
+    a = select_action(agent_state.exploration_state,
+                      action_rng, s, candidate_actions)
 
     # take action and observe outcome
     env, sp, r = gridworld.step(env, int(a))
@@ -200,10 +182,6 @@ def run_episode(agent_state: AgentState, replay, rngs, env, train=True):
             agent_state, replay, rngs[i], env, train=train)
         score += r
     return agent_state, env, score
-
-
-# def init_fn(policy_state, policy_sample_fn, policy_train_fn):
-#     raise NotImplementedError
 
 
 if __name__ == '__main__':
@@ -257,9 +235,9 @@ if __name__ == '__main__':
     density_state = density.new([env.size, env.size], [len(env.actions)])
     replay = replay_buffer.Replay(state_shape, action_shape)
 
-    agent_state = AgentState(novq_state=novq_state,
-                             # replay=replay,
-                             density_state=density_state,
+    exploration_state = ExplorationState(novq_state=novq_state,
+                                         density_state=density_state)
+    agent_state = AgentState(exploration_state=exploration_state,
                              policy_state=(q_state, targetq_state, policy_rng),
                              policy_action_fn=policy_action_fn,
                              policy_update_fn=policy_update_fn)
@@ -306,9 +284,8 @@ if __name__ == '__main__':
                    f", Test score {test_score:3d}"))
         if episode % 50 == 0:
             print("\nQ network values")
-            q_learning.display_value_map(agent_state.novq_state, env)
+            q_learning.display_value_map(
+                agent_state.exploration_state.novq_state, env)
             print("\nCount map:")
-            density.display_density_map(agent_state.density_state, env)
-
-        if episode % 1 == 0:
-            targetq_state = q_state
+            density.display_density_map(
+                agent_state.exploration_state.density_state, env)
