@@ -22,6 +22,7 @@ def init_fn(seed, state_shape, action_shape, actions, **kwargs):
     q_state = q_functions.init_fn(seed,
                                   (128, *state_shape),
                                   (128, *action_shape),
+                                  discount=0.99,
                                   **kwargs)
     targetq_state = q_state
     rng = random.PRNGKey(seed)

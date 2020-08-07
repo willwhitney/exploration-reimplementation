@@ -1,4 +1,5 @@
 import types
+import numpy as np
 
 import jax
 from jax import numpy as jnp
@@ -44,22 +45,22 @@ def new_batch(n, size):
     return utils.tree_stack(new(size) for _ in range(n))
 
 
-def reset(gridworld):
-    return gridworld.replace(agent=jnp.array((0, 0), dtype=DTYPE))
+def reset(env):
+    return env.replace(agent=jnp.array((0, 0), dtype=DTYPE))
 reset_batch = jax.vmap(reset)  # noqa: E305
 
 
-def render(gridworld):
-    return gridworld.render(gridworld.agent)
+def render(env):
+    return env.render(env.agent)
 render_batch = jax.vmap(render)  # noqa: E305
 
 
-def step(gridworld, action):
-    new_agent = gridworld.agent + ACTION_MAP[action]
-    new_agent = jnp.clip(new_agent, 0, gridworld.size - 1)
-    gridworld = gridworld.replace(agent=new_agent)
-    reward = (gridworld.agent == goal(gridworld.size)).all()
-    return gridworld, render(gridworld), reward
+def step(env, action):
+    new_agent = env.agent + ACTION_MAP[action]
+    new_agent = jnp.clip(new_agent, 0, env.size - 1)
+    env = env.replace(agent=new_agent)
+    reward = (env.agent == goal(env.size)).all()
+    return env, render(env), reward
 step = jax.jit(step, static_argnums=(1,))  # noqa: E305
 step_batch = jax.vmap(step)
 
@@ -70,13 +71,41 @@ def all_coords(size):
     return grid.transpose().reshape(-1, 2).astype(DTYPE)
 
 
+def render_function(fn, env, reduction=jnp.max):
+    """Renders a given function at every state in the gridworld.
+
+    Arguments:
+    - fn: a function that takes (batch of states, batch of actions) as its
+        arguments
+    - env: a GridWorld instance
+    - reduction: a function mapping from jnp.ndarray -> float. maps from the
+        vector of values for each action at a particular state to a single
+        value which will represent that state.
+    """
+    locations = all_coords(env.size)
+    render_locations = jax.vmap(env.render)
+    states = render_locations(locations)
+    repeated_states = states.repeat(len(env.actions), axis=0)
+
+    actions = env.actions
+    tiled_actions = jnp.tile(actions, (len(states),)).reshape((-1, 1))
+
+    values = fn(repeated_states, tiled_actions)
+    sa_values = values.reshape((len(states), len(actions)))
+
+    rendered_values = np.zeros((env.size, env.size))
+    for (location, action_values) in zip(locations, sa_values):
+        rendered_values[location[0], location[1]] = reduction(action_values)
+    return rendered_values
+
+
 if __name__ == "__main__":
     import random
-    gw = new(10)
+    env = new(10)
     for i in range(10):
-        gw, obs, r = step(gw, random.randint(0, 3))
+        env, obs, r = step(env, random.randint(0, 3))
         print(obs)
 
-    gws = new_batch(3, 10)
-    print(gws)
-    gws, obss, rs = step_batch(gws, jnp.array(range(3)))
+    envs = new_batch(3, 10)
+    print(envs)
+    envs, obss, rs = step_batch(envs, jnp.array(range(3)))

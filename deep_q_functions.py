@@ -18,7 +18,7 @@ class DenseQNetwork(nn.Module):
         return q
 
 
-def init_fn(seed, state_shape, action_shape, **kwargs):
+def init_fn(seed, state_shape, action_shape, discount, **kwargs):
     rng = random.PRNGKey(seed)
     q_net = DenseQNetwork.partial(hidden_layers=2,
                                   hidden_dim=512)
@@ -27,7 +27,7 @@ def init_fn(seed, state_shape, action_shape, **kwargs):
     rng = random.split(rng, 1)[0]
     initial_model = nn.Model(q_net, initial_params)
     q_opt = optim.Adam(1e-2).create(initial_model)
-    return q_learning.QLearnerState(q_opt)
+    return q_learning.QLearnerState(q_opt, discount)
 
 
 def loss_fn(model, states, actions, targets):
@@ -49,8 +49,7 @@ def train_step(q_state: q_learning.QLearnerState, states, actions, targets):
 def bellman_train_step(q_state: q_learning.QLearnerState,
                        targetq_state: q_learning.QLearnerState,
                        transitions,
-                       candidate_actions,
-                       discount=0.99):
+                       candidate_actions):
     # transitions should be of form (states, actions, next_states, rewards)
     # candidate_actions should be of form bsize x n_cands x *action_dim
     bsize, n_candidates = candidate_actions.shape[:2]
@@ -61,6 +60,6 @@ def bellman_train_step(q_state: q_learning.QLearnerState,
     targetq_preds = targetq_preds.max(axis=-1).reshape(transitions[3].shape)
 
     # compute targets and update
-    q_targets = transitions[3] + discount * targetq_preds
+    q_targets = transitions[3] + q_state.discount * targetq_preds
     return q_learning.train_step(
         q_state, transitions[0], transitions[1], q_targets)

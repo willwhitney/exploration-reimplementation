@@ -21,7 +21,7 @@ class TabularQ(nn.Module):
         return batched_lookup(table, s, a)
 
 
-def init_fn(seed, state_shape, action_shape, **kwargs):
+def init_fn(seed, state_shape, action_shape, discount, **kwargs):
     rng = random.PRNGKey(seed)
     q_net = TabularQ.partial(env_size=kwargs['env_size'])
     _, initial_params = q_net.init_by_shape(
@@ -29,7 +29,7 @@ def init_fn(seed, state_shape, action_shape, **kwargs):
     rng = random.split(rng, 1)[0]
     initial_model = nn.Model(q_net, initial_params)
     q_opt = optim.Adam(1e-2).create(initial_model)
-    return q_learning.QLearnerState(q_opt)
+    return q_learning.QLearnerState(q_opt, discount)
 
 
 @jax.jit
@@ -52,12 +52,11 @@ def train_step(q_state: q_learning.QLearnerState, states, actions, targets):
 def bellman_train_step(q_state: q_learning.QLearnerState,
                        targetq_state: q_learning.QLearnerState,
                        transitions,
-                       candidate_actions,
-                       discount=0.99):
+                       candidate_actions):
     value_preds = q_learning.predict_action_values_batch(
         q_state, transitions[2], candidate_actions)
     value_preds = value_preds.max(axis=-1).reshape(transitions[3].shape)
-    q_targets = transitions[3] + discount * value_preds
+    q_targets = transitions[3] + q_state.discount * value_preds
 
     states = transitions[0]
     actions = transitions[1].astype(jnp.int16)

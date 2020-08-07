@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Any
+import typing
 import matplotlib.pyplot as plt
 
 import jax
@@ -12,14 +12,15 @@ import gridworld
 
 @struct.dataclass
 class QLearnerState():
-    optimizer: Any
-    # rng: jnp.ndarray = random.PRNGKey(0)
+    optimizer: typing.Any
+    discount: float
 
     @property
     def model(self):
         return self.optimizer.target
 
 
+@jax.jit
 def predict_value(q_state: QLearnerState, states, actions):
     """Takes a batch of states and actions and returns the predicted value.
     Returns:
@@ -29,6 +30,7 @@ def predict_value(q_state: QLearnerState, states, actions):
     return q_state.model(states, actions)
 
 
+@jax.jit
 def predict_action_values(q_state, state, actions):
     """Predict the value of each of the given `actions` in `state`.
     Returns:
@@ -97,21 +99,28 @@ sample_egreedy_n = jax.vmap(sample_egreedy,  # noqa: E305
 
 
 # ---------- Utilities for gridworlds --------------
-def location_value(q_state: QLearnerState, env: gridworld.GridWorld, location):
-    env = env.replace(agent=jnp.array(location))
-    s = env.render(env.agent)
-    values = predict_action_values(q_state, s, env.actions)
-    return jnp.max(values)
-location_value_batch = jax.vmap(location_value,  # noqa: E305
-                                in_axes=(None, None, 0))
+# def location_value(q_state: QLearnerState, env: gridworld.GridWorld, location):
+#     env = env.replace(agent=jnp.array(location))
+#     s = env.render(env.agent)
+#     values = predict_action_values(q_state, s, env.actions)
+#     return jnp.max(values)
+# location_value_batch = jax.vmap(location_value,  # noqa: E305
+#                                 in_axes=(None, None, 0))
+
+
+# def render_value_map(q_state: QLearnerState, env: gridworld.GridWorld):
+#     locations = gridworld.all_coords(env.size)
+#     location_values = location_value_batch(q_state, env, locations)
+#     value_map = np.zeros((env.size, env.size))
+#     for location, value in zip(locations, location_values):
+#         value_map[location[0], location[1]] = value
+#     return value_map
 
 
 def render_value_map(q_state: QLearnerState, env: gridworld.GridWorld):
-    locations = gridworld.all_coords(env.size)
-    location_values = location_value_batch(q_state, env, locations)
-    value_map = np.zeros((env.size, env.size))
-    for location, value in zip(locations, location_values):
-        value_map[location[0], location[1]] = value
+    value_map = gridworld.render_function(
+        jax.partial(predict_value, q_state),
+        env, reduction=jnp.max)
     return value_map
 
 

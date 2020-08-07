@@ -51,7 +51,6 @@ def get_count(density_state: DensityState, state, action):
 @jax.jit
 def get_count_batch(density_state: DensityState, states, actions):
     keys = _make_key_gridworld_batch(states, actions)
-    # return lax.dynamic_index_in_dim(density_state.observations, keys, axis=0)
     return density_state.observations[keys]
 
 
@@ -80,33 +79,42 @@ def _flatten(s, a):
     return jnp.concatenate([s.flatten(), a.flatten()])
 
 
-def get_state_count(density_state: DensityState, state, actions):
-    state_repeat = jnp.repeat(jnp.expand_dims(state, axis=0),
-                              len(actions),
-                              axis=0)
-    counts = get_count_batch(density_state, state_repeat, actions)
-    return jnp.sum(counts)
-get_state_count_batch = jax.vmap(get_state_count,  # noqa: E305
-                                 in_axes=(None, 0, None))
+# -------- Visualization tools for gridworld -------------------------------
+# def get_state_count(density_state: DensityState, state, actions):
+#     state_repeat = jnp.repeat(jnp.expand_dims(state, axis=0),
+#                               len(actions),
+#                               axis=0)
+#     counts = get_count_batch(density_state, state_repeat, actions)
+#     return jnp.min(counts)
+# get_state_count_batch = jax.vmap(get_state_count,  # noqa: E305
+#                                  in_axes=(None, 0, None))
 
 
-def get_location_count(density_state: DensityState,
-                       env: gridworld.GridWorld, location):
-    env = env.replace(agent=jnp.array(location))
-    s = env.render(env.agent)
-    return get_state_count(density_state, s, env.actions)
-get_location_count_batch = jax.vmap(get_location_count,  # noqa: E305
-                                 in_axes=(None, None, 0))
+# def get_location_count(density_state: DensityState,
+#                        env: gridworld.GridWorld, location):
+#     env = env.replace(agent=jnp.array(location))
+#     s = env.render(env.agent)
+#     return get_state_count(density_state, s, env.actions)
+# get_location_count_batch = jax.vmap(get_location_count,  # noqa: E305
+#                                  in_axes=(None, None, 0))
+
+
+# def render_density_map(density_state: DensityState,
+#                        env: gridworld.GridWorld):
+#     locations = gridworld.all_coords(env.size)
+#     location_counts = get_location_count_batch(
+#         density_state, env, locations)
+#     count_map = np.zeros((env.size, env.size))
+#     for location, count in zip(locations, location_counts):
+#         count_map[location[0], location[1]] = count
+#     return count_map
 
 
 def render_density_map(density_state: DensityState,
                        env: gridworld.GridWorld):
-    locations = gridworld.all_coords(env.size)
-    location_counts = get_location_count_batch(
-        density_state, env, locations)
-    count_map = np.zeros((env.size, env.size))
-    for location, count in zip(locations, location_counts):
-        count_map[location[0], location[1]] = count
+    count_map = gridworld.render_function(
+        jax.partial(get_count_batch, density_state),
+        env, reduction=jnp.min)
     return count_map
 
 
@@ -116,9 +124,10 @@ def display_density_map(density_state: DensityState,
     fig, ax = plt.subplots()
     img = ax.imshow(density_map)
     fig.colorbar(img, ax=ax)
-    ax.set_title("State visitation counts")
+    ax.set_title("State visitation counts (min)")
     fig.show()
     plt.close(fig)
+# ----------------------------------------------------------------------
 
 
 if __name__ == "__main__":

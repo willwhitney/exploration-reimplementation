@@ -1,6 +1,7 @@
 import collections
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class Replay:
@@ -82,6 +83,30 @@ class LowPrecisionTracingReplay(TracingReplay):
 
     def predecessors(self, state):
         return self.trace[self.discretize(state)]
+
+
+# ----- Visualizations for gridworld ---------------------------------
+def render_trajectory(replay, n, env):
+    end = replay.next_slot
+    start = max(0, end - n)
+    transitions = replay[start:end]
+    states = transitions[0]
+    render = np.zeros((env.size, env.size))
+    for state in states:
+        loc = state.argmax(axis=1)
+        render[loc[0], loc[1]] += 1
+    return render
+
+
+def display_trajectory(*args):
+    trajectory = render_trajectory(*args)
+    fig, ax = plt.subplots()
+    img = ax.imshow(trajectory)
+    fig.colorbar(img, ax=ax)
+    ax.set_title("Last trajectory")
+    fig.show()
+    plt.close(fig)
+# -------------------------------------------------------------------
 
 
 if __name__ == "__main__":
