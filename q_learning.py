@@ -99,24 +99,6 @@ sample_egreedy_n = jax.vmap(sample_egreedy,  # noqa: E305
 
 
 # ---------- Utilities for gridworlds --------------
-# def location_value(q_state: QLearnerState, env: gridworld.GridWorld, location):
-#     env = env.replace(agent=jnp.array(location))
-#     s = env.render(env.agent)
-#     values = predict_action_values(q_state, s, env.actions)
-#     return jnp.max(values)
-# location_value_batch = jax.vmap(location_value,  # noqa: E305
-#                                 in_axes=(None, None, 0))
-
-
-# def render_value_map(q_state: QLearnerState, env: gridworld.GridWorld):
-#     locations = gridworld.all_coords(env.size)
-#     location_values = location_value_batch(q_state, env, locations)
-#     value_map = np.zeros((env.size, env.size))
-#     for location, value in zip(locations, location_values):
-#         value_map[location[0], location[1]] = value
-#     return value_map
-
-
 def render_value_map(q_state: QLearnerState, env: gridworld.GridWorld):
     value_map = gridworld.render_function(
         jax.partial(predict_value, q_state),

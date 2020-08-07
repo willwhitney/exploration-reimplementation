@@ -128,23 +128,6 @@ predict_optimistic_value_batch = jax.vmap(  # noqa: E305
     predict_optimistic_value, in_axes=(None, 0, 0))
 predict_optimistic_values = jax.vmap(
     predict_optimistic_value, in_axes=(None, None, 0))
-
-
-# @jax.jit
-# def predict_optimistic_values(exploration_state: ExplorationState,
-#                               state, actions):
-#     expanded_state = jnp.expand_dims(state, axis=0)
-#     repeated_state = expanded_state.repeat(len(actions), axis=0)
-#     predicted_values = q_learning.predict_value(
-#         exploration_state.novq_state, repeated_state, actions).reshape(-1)
-
-#     counts = density.get_count_batch(
-#         exploration_state.density_state, repeated_state, actions)
-#     weights = compute_weight(counts)
-#     optimistic_value = weights * predicted_values + (1 - weights) * R_MAX
-#     return optimistic_value
-# predict_optimistic_value_n = jax.vmap(  # noqa: E305
-#     predict_optimistic_value, in_axes=(None, None, 0))
 predict_optimistic_values_batch = jax.vmap(  # noqa: E305
     predict_optimistic_values, in_axes=(None, 0, 0))
 
@@ -204,29 +187,6 @@ def run_episode(agent_state: AgentState, replay, rngs, env,
 
 
 # ----- Visualizations for gridworld ---------------------------------
-# def predict_optimistic_location_value(exploration_state: ExplorationState,
-#                                       env: gridworld.GridWorld,
-#                                       location):
-#     env = env.replace(agent=jnp.array(location))
-#     s = env.render(env.agent)
-#     values = predict_optimistic_values(exploration_state, s, env.actions)
-#     return jnp.max(values)
-# predict_optimistic_location_value_batch = jax.vmap(  # noqa: E305
-#     predict_optimistic_location_value,
-#     in_axes=(None, None, 0))
-
-
-# def render_optimistic_value_map(exploration_state: ExplorationState,
-#                                 env: gridworld.GridWorld):
-#     locations = gridworld.all_coords(env.size)
-#     location_values = predict_optimistic_location_value_batch(
-#         exploration_state, env, locations)
-#     value_map = np.zeros((env.size, env.size))
-#     for location, value in zip(locations, location_values):
-#         value_map[location[0], location[1]] = value
-#     return value_map
-
-
 def display_state(agent_state: AgentState, replay, env, max_steps=100):
     exploration_state = agent_state.exploration_state
     policy_state = agent_state.policy_state
@@ -332,16 +292,8 @@ def main(args):
             print((f"Episode {episode:4d}"
                    f", Train score {score:3d}"
                    f", Test score {test_score:3d}"))
-        # if episode % 1 == 0:
             if args.vis:
                 display_state(agent_state, replay, env, max_steps=max_steps)
-            # q_learning.display_value_map(
-            #     agent_state.exploration_state.novq_state, env)
-            # density.display_density_map(
-            #     agent_state.exploration_state.density_state, env)
-            # replay_buffer.display_trajectory(
-            #     replay, max_steps, env.size)
-            # time.sleep(5)
 
 
 if __name__ == '__main__':

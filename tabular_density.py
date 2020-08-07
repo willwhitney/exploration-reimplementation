@@ -80,36 +80,6 @@ def _flatten(s, a):
 
 
 # -------- Visualization tools for gridworld -------------------------------
-# def get_state_count(density_state: DensityState, state, actions):
-#     state_repeat = jnp.repeat(jnp.expand_dims(state, axis=0),
-#                               len(actions),
-#                               axis=0)
-#     counts = get_count_batch(density_state, state_repeat, actions)
-#     return jnp.min(counts)
-# get_state_count_batch = jax.vmap(get_state_count,  # noqa: E305
-#                                  in_axes=(None, 0, None))
-
-
-# def get_location_count(density_state: DensityState,
-#                        env: gridworld.GridWorld, location):
-#     env = env.replace(agent=jnp.array(location))
-#     s = env.render(env.agent)
-#     return get_state_count(density_state, s, env.actions)
-# get_location_count_batch = jax.vmap(get_location_count,  # noqa: E305
-#                                  in_axes=(None, None, 0))
-
-
-# def render_density_map(density_state: DensityState,
-#                        env: gridworld.GridWorld):
-#     locations = gridworld.all_coords(env.size)
-#     location_counts = get_location_count_batch(
-#         density_state, env, locations)
-#     count_map = np.zeros((env.size, env.size))
-#     for location, count in zip(locations, location_counts):
-#         count_map[location[0], location[1]] = count
-#     return count_map
-
-
 def render_density_map(density_state: DensityState,
                        env: gridworld.GridWorld):
     count_map = gridworld.render_function(
