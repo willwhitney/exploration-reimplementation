@@ -5,11 +5,16 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "main.py tabular",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
-            "console": "internalConsole"
+            "program": "main.py",
+            "console": "internalConsole",
+            "args": [
+                "--env_size", "15",
+                "--tabular",
+                "--debug",
+            ]
         }
     ]
 }

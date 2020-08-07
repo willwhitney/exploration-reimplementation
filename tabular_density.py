@@ -116,15 +116,9 @@ def display_density_map(density_state: DensityState,
     fig, ax = plt.subplots()
     img = ax.imshow(density_map)
     fig.colorbar(img, ax=ax)
+    ax.set_title("State visitation counts")
     fig.show()
     plt.close(fig)
-
-
-@jax.jit
-def stupid_fn(density_state, states, actions):
-    counts = get_count_batch(density_state, states, actions)
-    # counts = agent_state.density.count(states, actions)
-    return (counts + 1e-8) ** (-0.5)
 
 
 if __name__ == "__main__":
@@ -140,15 +134,3 @@ if __name__ == "__main__":
                                      jnp.expand_dims(obs, axis=0),
                                      jnp.expand_dims(a, axis=0))
     display_density_map(density_state, gw)
-
-    batched_obs = jnp.expand_dims(obs, axis=0)
-    batched_obs = batched_obs.repeat(4, axis=0)
-    batched_a = jnp.zeros((4, 1))
-    print(get_count_batch(density_state, batched_obs, batched_a))
-    print(get_count_batch(density_state, batched_obs, batched_a))
-
-    print(stupid_fn(density_state, batched_obs, batched_a))
-    batched_obs = jnp.expand_dims(obs, axis=0)
-    batched_obs = batched_obs.repeat(128, axis=0)
-    batched_a = jnp.zeros((128, 1))
-    print(stupid_fn(density_state, batched_obs, batched_a))

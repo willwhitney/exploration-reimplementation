@@ -1,10 +1,10 @@
-import math
-import numpy as np
-from dataclasses import dataclass
+import time
+# import math
+# import numpy as np
 from typing import Any
 
 import jax
-from jax import numpy as jnp, random, jit, lax
+from jax import numpy as jnp, random, lax
 
 import flax
 from flax import nn, optim, struct
@@ -61,12 +61,10 @@ def optimistic_train_step_candidates(exploration_state,
         exploration_state, states, actions)
     target_values = novelty_reward + 0.99 * expected_next_values
 
-    novq_state = q_learning.train_step(
-        agent_state.exploration_state.novq_state,
+    novq_state = q_functions.train_step(
+        exploration_state.novq_state,
         states, actions, target_values)
-    exploration_state = agent_state.exploration_state.replace(
-        novq_state=novq_state)
-    return agent_state.replace(exploration_state=exploration_state)
+    return exploration_state.replace(novq_state=novq_state)
 
 
 def optimistic_train_step(agent_state, transitions):
@@ -77,14 +75,14 @@ def optimistic_train_step(agent_state, transitions):
     agent_state = agent_state.replace(policy_state=policy_state)
 
     # candidate actions should be (bsize x 64 x *action_shape)
-    agent_state = optimistic_train_step_candidates(
+    exploration_state = optimistic_train_step_candidates(
         agent_state.exploration_state, transitions, candidate_next_actions)
-    return agent_state
+    return agent_state.replace(exploration_state=exploration_state)
 
 
 def update_novelty_q(agent_state, replay, rng):
     for _ in range(10):
-        transitions = tuple((jnp.array(el) for el in replay.sample(batch_size)))
+        transitions = tuple((jnp.array(el) for el in replay.sample(128)))
         agent_state = optimistic_train_step(agent_state, transitions)
     return agent_state
 
@@ -165,16 +163,21 @@ def full_step(agent_state: AgentState, replay, rng, env, train=True):
     # add transition to replay
     replay.append(s, a, sp, r)
 
-    if train and len(replay) >= 128:
+    if train:
         # update the exploration policy with the observed transition
         rng, update_rng = random.split(rng)
         agent_state = update_exploration(
             agent_state, replay, update_rng, (s, a, sp, r))
 
+    # density.display_density_map(
+    #     agent_state.exploration_state.density_state, env)
+    # time.sleep(0.5)
+
     return agent_state, env, r
 
 
-def run_episode(agent_state: AgentState, replay, rngs, env, train=True):
+def run_episode(agent_state: AgentState, replay, rngs, env,
+                train=True, max_steps=100):
     env = gridworld.reset(env)
     score = 0
     for i in range(max_steps):
@@ -184,81 +187,41 @@ def run_episode(agent_state: AgentState, replay, rngs, env, train=True):
     return agent_state, env, score
 
 
-if __name__ == '__main__':
-    rng = random.PRNGKey(0)
-    env = gridworld.new(10)
+def main(args):
+    rng = random.PRNGKey(args.seed)
+    env = gridworld.new(args.env_size)
     state_shape = (2, env.size)
     action_shape = (1,)
     batch_size = 128
     max_steps = 100
 
-    # ---------- creating the task policy --------------------
-    q_state = q_learning.init_fn(0,
-                                 (128, *state_shape),
-                                 (128, *action_shape))
-    targetq_state = q_state
-    novq_state = q_learning.init_fn(1,
-                                    (128, *state_shape),
-                                    (128, *action_shape))
-    rng, policy_rng = random.split(rng, 2)
-
-    # should take in a (bsize x *state_shape) of states and return a
-    # (bsize x n x *action_shape) of candidate actions
-    @jax.partial(jax.jit, static_argnums=(2, 3))
-    def policy_action_fn(policy_state, s, n=1, explore=True):
-        bsize = s.shape[0]
-        q_state, targetq_state, policy_rng = policy_state
-        rngs = random.split(policy_rng, bsize * n + 1)
-        policy_rng = rngs[0]
-        action_rngs = rngs[1:].reshape((bsize, n, -1))
-        temp = 1e-1 if explore else 1e-4
-
-        candidate_actions = jnp.expand_dims(env.actions, 0)
-        candidate_actions = candidate_actions.repeat(bsize, axis=0)
-        # import ipdb; ipdb.set_trace()
-        actions, values = q_learning.sample_action_boltzmann_n_batch(
-            q_state, action_rngs, s, candidate_actions, temp)
-        return (q_state, targetq_state, policy_rng), actions
-
-    @jax.jit
-    def policy_update_fn(policy_state, transitions):
-        bsize = len(transitions[0])
-        q_state, targetq_state, rng = policy_state
-        candidate_actions = jnp.expand_dims(env.actions, 0)
-        candidate_actions = candidate_actions.repeat(bsize, axis=0)
-
-        q_state = q_learning.bellman_train_step(
-            q_state, targetq_state, transitions, candidate_actions)
-        return (q_state, targetq_state, rng)
-    # --------------------------------------------------------
+    novq_state = q_functions.init_fn(args.seed,
+                                     (128, *state_shape),
+                                     (128, *action_shape),
+                                     env_size=env.size)
 
     density_state = density.new([env.size, env.size], [len(env.actions)])
     replay = replay_buffer.Replay(state_shape, action_shape)
 
+    policy_state = policy.init_fn(args.seed,
+                                  state_shape, action_shape,
+                                  env.actions, env_size=env.size)
+
     exploration_state = ExplorationState(novq_state=novq_state,
                                          density_state=density_state)
     agent_state = AgentState(exploration_state=exploration_state,
-                             policy_state=(q_state, targetq_state, policy_rng),
-                             policy_action_fn=policy_action_fn,
-                             policy_update_fn=policy_update_fn)
+                             policy_state=policy_state,
+                             policy_action_fn=policy.action_fn,
+                             policy_update_fn=policy.update_fn)
 
-    for episode in range(1000):
+    for episode in range(100000):
         # run an episode
         rngs = random.split(rng, max_steps + 1)
         rng = rngs[0]
 
-        # -----------------------------------
-        # TODO: remove this
-        # new_q_state = q_learning.init_fn(
-        #     episode, (128, *state_shape), (128, *action_shape))
-
-        # policy_state = agent_state.policy_state
-        # policy_state = (new_q_state, policy_state[0], policy_state[2])
-        # agent_state = agent_state.replace(policy_state=policy_state)
-        # -----------------------------------
-
         agent_state, env, score = run_episode(
-            agent_state, replay, rngs[1:], env)
+            agent_state, replay, rngs[1:], env,
+            train=True, max_steps=max_steps)
 
         # update the task policy
         # TODO: pull this loop inside the policy_update_fn
@@ -269,23 +232,44 @@ if __name__ == '__main__':
             policy_state = agent_state.policy_update_fn(policy_state,
                                                         transitions)
         # hacky reset of targetq to q
-        # TODO: put this back
-        policy_state = (policy_state[0], policy_state[0], policy_state[2])
+        policy_state = policy_state.replace(targetq_state=policy_state.q_state)
         agent_state = agent_state.replace(policy_state=policy_state)
 
         # output / visualize
-        if episode % 1 == 0:
+        if episode % 10 == 0:
             rngs = random.split(rng, max_steps + 1)
             rng = rngs[0]
-            _, _, test_score = run_episode(
-                agent_state, replay, rngs[1:], env, train=False)
+            _, _, test_score = run_episode(agent_state, replay, rngs[1:], env,
+                                           train=False, max_steps=max_steps)
             print((f"Episode {episode:4d}"
                    f", Train score {score:3d}"
                    f", Test score {test_score:3d}"))
-        if episode % 50 == 0:
-            print("\nQ network values")
+        if episode % 1 == 0:
             q_learning.display_value_map(
                 agent_state.exploration_state.novq_state, env)
-            print("\nCount map:")
             density.display_density_map(
                 agent_state.exploration_state.density_state, env)
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--seed', default=0)
+    parser.add_argument('--tabular', action='store_true', default=False)
+    parser.add_argument('--env_size', type=int, default=5)
+    parser.add_argument('--debug', action='store_true', default=False)
+    args = parser.parse_args()
+
+    if args.tabular:
+        import tabular_q_functions as q_functions
+        import policies.tabular_q_policy as policy
+    else:
+        import deep_q_functions as q_functions
+        import policies.deep_q_policy as policy
+
+    jit = not args.debug
+    if jit:
+        main(args)
+    else:
+        with jax.disable_jit():
+            main(args)
