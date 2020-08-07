@@ -163,10 +163,10 @@ def full_step(agent_state: AgentState, replay, rng, env, train=True):
     # take action and observe outcome
     env, sp, r = gridworld.step(env, int(a))
 
-    # add transition to replay
-    replay.append(s, a, sp, r)
-
     if train:
+        # add transition to replay
+        replay.append(s, a, sp, r)
+
         # update the exploration policy with the observed transition
         rng, update_rng = random.split(rng)
         agent_state = update_exploration(
@@ -194,9 +194,9 @@ def display_state(agent_state: AgentState, replay, env, max_steps=100):
     min_count_map = gridworld.render_function(
         jax.partial(density.get_count_batch, exploration_state.density_state),
         env, reduction=jnp.min)
-    # sum_count_map = gridworld.render_function(
-    #     jax.partial(density.get_count_batch, exploration_state.density_state),
-    #     env, reduction=jnp.sum)
+    sum_count_map = gridworld.render_function(
+        jax.partial(density.get_count_batch, exploration_state.density_state),
+        env, reduction=jnp.sum)
     novq_map = gridworld.render_function(
         jax.partial(q_learning.predict_value, exploration_state.novq_state),
         env, reduction=jnp.max)
@@ -213,7 +213,7 @@ def display_state(agent_state: AgentState, replay, env, max_steps=100):
 
     subfigs = [
         (min_count_map, "Visit count (min)"),
-        # (sum_count_map, "Visit count (sum)"),
+        (sum_count_map, "Visit count (sum)"),
         (novq_map, "Novelty value (max)"),
         (optimistic_novq_map, "Optimistic novelty value (max)"),
         (taskq_map, "Task value (max)"),
@@ -240,7 +240,7 @@ def main(args):
     state_shape = (2, env.size)
     action_shape = (1,)
     batch_size = 128
-    max_steps = 100
+    max_steps = 5
 
     novq_state = q_functions.init_fn(args.seed,
                                      (128, *state_shape),

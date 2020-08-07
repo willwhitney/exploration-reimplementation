@@ -1,12 +1,11 @@
-import typing
-import numpy as np
 import matplotlib.pyplot as plt
 
 import jax
-from jax import numpy as jnp, jit, lax
+from jax import numpy as jnp
 from flax import struct
 
 import gridworld
+
 
 @struct.dataclass
 class DensityState():
@@ -45,7 +44,6 @@ def update_batch(density_state: DensityState, states, actions):
 def get_count(density_state: DensityState, state, action):
     key = _make_key_gridworld(state, action)
     return density_state.observations[key]
-# get_count_batch = jax.vmap(get_count, in_axes=(None, 0, 0))  # noqa: E305
 
 
 @jax.jit

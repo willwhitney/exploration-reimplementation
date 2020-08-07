@@ -5,6 +5,7 @@
     "version": "0.2.0",
     "configurations": [
 
+
         {
             "name": "main.py tabular",
             "type": "python",
@@ -15,7 +16,7 @@
                 "--env_size", "15",
                 "--tabular",
                 "--debug",
-                "--no_vis"
+                // "--no_vis"
             ],
             "env": {"CUDA_VISIBLE_DEVICES": "3"}
         }
