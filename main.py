@@ -39,9 +39,15 @@ class AgentState():
 
 @jax.jit
 def compute_novelty_reward(exploration_state, states, actions):
+    """Returns a novelty reward in [0, 1] for each (s, a) pair."""
     counts = density.get_count_batch(
         exploration_state.density_state, states, actions)
-    return (counts + 1) ** (-0.5)
+    ones = jnp.ones(jnp.array(counts).shape)
+    rewards = (counts + 1e-8) ** (-0.5)
+    options = jnp.stack([ones, rewards], axis=1)
+
+    # Clip rewards to be at most 1 (when count is 0)
+    return jnp.min(options, axis=1)
 
 
 @jax.jit
@@ -191,9 +197,9 @@ def display_state(agent_state: AgentState, replay, env, max_steps=100):
     exploration_state = agent_state.exploration_state
     policy_state = agent_state.policy_state
 
-    min_count_map = gridworld.render_function(
-        jax.partial(density.get_count_batch, exploration_state.density_state),
-        env, reduction=jnp.min)
+    # min_count_map = gridworld.render_function(
+    #     jax.partial(density.get_count_batch, exploration_state.density_state),
+    #     env, reduction=jnp.min)
     sum_count_map = gridworld.render_function(
         jax.partial(density.get_count_batch, exploration_state.density_state),
         env, reduction=jnp.sum)
@@ -203,20 +209,20 @@ def display_state(agent_state: AgentState, replay, env, max_steps=100):
     optimistic_novq_map = gridworld.render_function(
         jax.partial(predict_optimistic_value_batch, exploration_state),
         env, reduction=jnp.max)
-    taskq_map = gridworld.render_function(
-        jax.partial(q_learning.predict_value, policy_state.q_state),
-        env, reduction=jnp.max)
+    # taskq_map = gridworld.render_function(
+        # jax.partial(q_learning.predict_value, policy_state.q_state),
+        # env, reduction=jnp.max)
     novelty_reward_map = gridworld.render_function(
         jax.partial(compute_novelty_reward, exploration_state),
         env, reduction=jnp.max)
     traj_map = replay_buffer.render_trajectory(replay, max_steps, env)
 
     subfigs = [
-        (min_count_map, "Visit count (min)"),
+        # (min_count_map, "Visit count (min)"),
         (sum_count_map, "Visit count (sum)"),
         (novq_map, "Novelty value (max)"),
         (optimistic_novq_map, "Optimistic novelty value (max)"),
-        (taskq_map, "Task value (max)"),
+        # (taskq_map, "Task value (max)"),
         (novelty_reward_map, "Novelty reward (max)"),
         (traj_map, "Last trajectory"),
     ]
@@ -240,7 +246,7 @@ def main(args):
     state_shape = (2, env.size)
     action_shape = (1,)
     batch_size = 128
-    max_steps = 5
+    max_steps = 10
 
     novq_state = q_functions.init_fn(args.seed,
                                      (128, *state_shape),
