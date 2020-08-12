@@ -50,11 +50,13 @@ def reset(env):
 reset_batch = jax.vmap(reset)  # noqa: E305
 
 
+# @jax.profiler.trace_function
 def render(env):
     return env.render(env.agent)
 render_batch = jax.vmap(render)  # noqa: E305
 
 
+# @jax.profiler.trace_function
 def step(env, action):
     new_agent = env.agent + ACTION_MAP[action]
     new_agent = jnp.clip(new_agent, 0, env.size - 1)

@@ -61,5 +61,5 @@ def bellman_train_step(q_state: q_learning.QLearnerState,
 
     # compute targets and update
     q_targets = transitions[3] + q_state.discount * targetq_preds
-    return q_learning.train_step(
+    return train_step(
         q_state, transitions[0], transitions[1], q_targets)

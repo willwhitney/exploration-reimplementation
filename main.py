@@ -52,6 +52,7 @@ def compute_novelty_reward(exploration_state, states, actions):
     return jnp.min(options, axis=1)
 
 
+@jax.profiler.trace_function
 @jax.jit
 def optimistic_train_step_candidates(exploration_state,
                                      transitions,
@@ -61,7 +62,10 @@ def optimistic_train_step_candidates(exploration_state,
         exploration_state, next_states, candidate_next_actions)
 
     # optimistic_next_values should be (bsize x 64)
-    expected_next_values = optimistic_next_values.mean(axis=1)
+    temp = exploration_state.temperature
+    next_value_probs = nn.softmax(optimistic_next_values / temp, axis=1)
+    next_value_elements = (next_value_probs * optimistic_next_values)
+    expected_next_values = next_value_elements.sum(axis=1)
     # TODO: try out using maxQ or a lower temp instead of EQ
     # the current version looks more like policy iteration, where the next
     # policy step happens on the next episode
@@ -77,6 +81,7 @@ def optimistic_train_step_candidates(exploration_state,
     return exploration_state.replace(novq_state=novq_state)
 
 
+@jax.profiler.trace_function
 def optimistic_train_step(agent_state, transitions):
     states, actions, next_states, rewards = transitions
 
@@ -100,6 +105,7 @@ def update_novelty_q(agent_state, replay, rng):
     return agent_state
 
 
+@jax.profiler.trace_function
 def update_exploration(agent_state, replay, rng, transition):
     s, a, sp, r = transition
 
@@ -123,6 +129,7 @@ def compute_weight(count):
     return root_count / (root_count + root_prior_count)
 
 
+@jax.profiler.trace_function
 @jax.jit
 def predict_optimistic_value(exploration_state: ExplorationState,
                              state, action):
@@ -144,6 +151,7 @@ predict_optimistic_values_batch = jax.vmap(  # noqa: E305
     predict_optimistic_values, in_axes=(None, 0, 0))
 
 
+@jax.profiler.trace_function
 @jax.jit
 def select_action(exploration_state, rng, state, candidate_actions):
     optimistic_values = predict_optimistic_values(
@@ -156,31 +164,37 @@ def select_action(exploration_state, rng, state, candidate_actions):
     #     rng, optimistic_values, candidate_actions, exploration_state.temp)
 
 
+@jax.profiler.trace_function
 def full_step(agent_state: AgentState, replay, rng, env, train=True):
     # get env state
-    s = gridworld.render(env)
+    with jax.profiler.TraceContext("env render"):
+        s = gridworld.render(env)
     n = agent_state.n_candidates if train else 1
 
     # get candidate actions
-    s_batch = jnp.expand_dims(s, axis=0)
-    policy_state, candidate_actions = agent_state.policy_action_fn(
-        agent_state.policy_state, s_batch, n, train)
+    with jax.profiler.TraceContext("get action candidates"):
+        s_batch = jnp.expand_dims(s, axis=0)
+        policy_state, candidate_actions = agent_state.policy_action_fn(
+            agent_state.policy_state, s_batch, n, train)
 
     # policy_action_fn deals with batches and we only have one element
     candidate_actions = candidate_actions[0]
     agent_state = agent_state.replace(policy_state=policy_state)
 
     # sample a behavior action from the candidates
-    rng, action_rng = random.split(rng)
-    a = select_action(agent_state.exploration_state,
-                      action_rng, s, candidate_actions)
+    with jax.profiler.TraceContext("select action"):
+        rng, action_rng = random.split(rng)
+        a = select_action(agent_state.exploration_state,
+                        action_rng, s, candidate_actions)
 
     # take action and observe outcome
-    env, sp, r = gridworld.step(env, int(a))
+    with jax.profiler.TraceContext("env step"):
+        env, sp, r = gridworld.step(env, int(a))
 
     if train:
         # add transition to replay
-        replay.append(s, a, sp, r)
+        with jax.profiler.TraceContext("replay append"):
+            replay.append(s, a, sp, r)
 
         # update the exploration policy with the observed transition
         rng, update_rng = random.split(rng)
@@ -301,7 +315,7 @@ def main(args):
         agent_state = agent_state.replace(policy_state=policy_state)
 
         # output / visualize
-        if episode % args.eval_every == args.eval_every:
+        if episode % args.eval_every == 0:
             rngs = random.split(rng, args.max_steps + 1)
             rng = rngs[0]
             _, _, test_score = run_episode(

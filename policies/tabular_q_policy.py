@@ -32,6 +32,7 @@ def init_fn(seed, state_shape, action_shape, actions, **kwargs):
 
 # should take in a (bsize x *state_shape) of states and return a
 # (bsize x n x *action_shape) of candidate actions
+@jax.profiler.trace_function
 @jax.partial(jax.jit, static_argnums=(2, 3))
 def action_fn(policy_state, s, n=1, explore=True):
     bsize = s.shape[0]
