@@ -6,6 +6,7 @@
     "configurations": [
 
 
+
         {
             "name": "main.py tabular",
             "type": "python",
@@ -13,7 +14,7 @@
             "program": "main.py",
             "console": "internalConsole",
             "args": [
-                "--env_size", "15",
+                "--env_size", "2",
                 "--tabular",
                 "--debug",
                 // "--no_vis"

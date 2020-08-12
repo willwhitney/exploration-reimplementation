@@ -38,12 +38,15 @@ def action_fn(policy_state, s, n=1, explore=True):
     rngs = random.split(policy_state.rng, bsize * n + 1)
     policy_rng = rngs[0]
     action_rngs = rngs[1:].reshape((bsize, n, -1))
-    temp = 5e-2 if explore else 1e-4
 
     candidate_actions = jnp.expand_dims(policy_state.actions, 0)
     candidate_actions = candidate_actions.repeat(bsize, axis=0)
-    actions, values = q_learning.sample_action_boltzmann_n_batch(
-        policy_state.q_state, action_rngs, s, candidate_actions, temp)
+    if explore:
+        actions, values = q_learning.sample_action_boltzmann_n_batch(
+            policy_state.q_state, action_rngs, s, candidate_actions, 5e-2)
+    else:
+        actions, values = q_learning.sample_action_egreedy_n_batch(
+            policy_state.q_state, action_rngs, s, candidate_actions, 0.01)
     policy_state = policy_state.replace(rng=policy_rng)
     return policy_state, actions
 

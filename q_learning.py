@@ -56,6 +56,8 @@ def sample_action_egreedy(q_state: QLearnerState, rng, state, actions, epsilon):
     return action, values
 sample_action_egreedy_n = jax.vmap(sample_action_egreedy,  # noqa: E305
                                    in_axes=(None, 0, None, None, None))
+sample_action_egreedy_n_batch = jax.vmap(sample_action_egreedy_n,
+                                         in_axes=(None, 0, 0, 0, None))
 
 
 @jax.jit
