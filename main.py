@@ -305,7 +305,7 @@ def main(args):
         # update the task policy
         # TODO: pull this loop inside the policy_update_fn
         policy_state = agent_state.policy_state
-        for _ in range(1):
+        for _ in range(10):
             transitions = tuple((jnp.array(el)
                                  for el in replay.sample(batch_size)))
             policy_state = agent_state.policy_update_fn(policy_state,
