@@ -157,11 +157,12 @@ def select_action(exploration_state, rng, state, candidate_actions):
     optimistic_values = predict_optimistic_values(
         exploration_state, state, candidate_actions).reshape(-1)
 
-    return q_learning.sample_egreedy(
-        rng, optimistic_values, candidate_actions, 0.0)
+    # return q_learning.sample_egreedy(
+    #     rng, optimistic_values, candidate_actions, 0.0)
 
-    # return q_learning.sample_boltzmann(
-    #     rng, optimistic_values, candidate_actions, exploration_state.temp)
+    return q_learning.sample_boltzmann(
+        rng, optimistic_values, candidate_actions,
+        exploration_state.temperature)
 
 
 @jax.profiler.trace_function
@@ -185,7 +186,7 @@ def full_step(agent_state: AgentState, replay, rng, env, train=True):
     with jax.profiler.TraceContext("select action"):
         rng, action_rng = random.split(rng)
         a = select_action(agent_state.exploration_state,
-                        action_rng, s, candidate_actions)
+                          action_rng, s, candidate_actions)
 
     # take action and observe outcome
     with jax.profiler.TraceContext("env step"):
@@ -286,7 +287,7 @@ def main(args):
 
     exploration_state = ExplorationState(novq_state=novq_state,
                                          density_state=density_state,
-                                         temperature=1e-3)
+                                         temperature=args.temperature)
     agent_state = AgentState(exploration_state=exploration_state,
                              policy_state=policy_state,
                              policy_action_fn=policy.action_fn,
@@ -338,7 +339,8 @@ if __name__ == '__main__':
     parser.add_argument('--max_steps', type=int, default=100)
     parser.add_argument('--debug', action='store_true', default=False)
     parser.add_argument('--no_vis', action='store_true', default=False)
-    parser.add_argument('--eval_every', default=10)
+    parser.add_argument('--eval_every', type=int, default=10)
+    parser.add_argument('--temperature', type=float, default=1e-3)
     args = parser.parse_args()
     args.vis = not args.no_vis
 

@@ -44,7 +44,7 @@ def action_fn(policy_state, s, n=1, explore=True):
     candidate_actions = candidate_actions.repeat(bsize, axis=0)
     if explore:
         actions, values = q_learning.sample_action_boltzmann_n_batch(
-            policy_state.q_state, action_rngs, s, candidate_actions, 5e-2)
+            policy_state.q_state, action_rngs, s, candidate_actions, 1)
     else:
         actions, values = q_learning.sample_action_egreedy_n_batch(
             policy_state.q_state, action_rngs, s, candidate_actions, 0.01)

@@ -78,8 +78,7 @@ sample_action_boltzmann_batch_n = jax.vmap(sample_action_boltzmann,
 @jax.jit
 def sample_boltzmann(rng, values, actions, temp=1):
     boltzmann_probs = nn.softmax(values / temp)
-    sampled_index = random.categorical(rng, boltzmann_probs)
-    action = actions[sampled_index]
+    action = random.choice(rng, actions, p=boltzmann_probs)
     return action
 sample_boltzmann_n = jax.vmap(sample_boltzmann,  # noqa: E305
                               in_axes=(0, None, None, None))
