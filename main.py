@@ -1,5 +1,5 @@
 import time
-# import math
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Any
@@ -37,6 +37,7 @@ class AgentState():
     policy_action_fn: Any = struct.field(pytree_node=False)
     policy_update_fn: Any = struct.field(pytree_node=False)
     n_candidates: int
+    n_update_candidates: int
 
 
 @jax.jit
@@ -67,8 +68,9 @@ def optimistic_train_step_candidates(exploration_state,
     next_value_elements = (next_value_probs * optimistic_next_values)
     expected_next_values = next_value_elements.sum(axis=1)
     # TODO: try out using maxQ or a lower temp instead of EQ
+    #   (and many candidates in the update)
     # the current version looks more like policy iteration, where the next
-    # policy step happens on the next episode
+    #   policy step happens on the next episode
 
     discount = exploration_state.novq_state.discount
     novelty_reward = compute_novelty_reward(
@@ -87,7 +89,7 @@ def optimistic_train_step(agent_state, transitions):
 
     policy_state, candidate_next_actions = agent_state.policy_action_fn(
         agent_state.policy_state, next_states,
-        agent_state.n_candidates, True)
+        agent_state.n_update_candidates, True)
     agent_state = agent_state.replace(policy_state=policy_state)
 
     # candidate actions should be (bsize x 64 x *action_shape)
@@ -166,10 +168,12 @@ def select_action(exploration_state, rng, state, candidate_actions):
 
 
 @jax.profiler.trace_function
-def full_step(agent_state: AgentState, replay, rng, env, train=True):
+def full_step(agent_state: AgentState, replay, rng, env,
+              train=True):
     # get env state
     with jax.profiler.TraceContext("env render"):
         s = gridworld.render(env)
+
     n = agent_state.n_candidates if train else 1
 
     # get candidate actions
@@ -206,7 +210,7 @@ def full_step(agent_state: AgentState, replay, rng, env, train=True):
 
 
 def run_episode(agent_state: AgentState, replay, rngs, env,
-                train=True, max_steps=100):
+                train=True, max_steps=100, use_exploration=True):
     env = gridworld.reset(env)
     score = 0
     for i in range(max_steps):
@@ -217,7 +221,8 @@ def run_episode(agent_state: AgentState, replay, rngs, env,
 
 
 # ----- Visualizations for gridworld ---------------------------------
-def display_state(agent_state: AgentState, replay, env, max_steps=100):
+def display_state(agent_state: AgentState, replay, env,
+                  max_steps=100, rendering='local', savepath=None):
     exploration_state = agent_state.exploration_state
     policy_state = agent_state.policy_state
 
@@ -258,10 +263,18 @@ def display_state(agent_state: AgentState, replay, env, max_steps=100):
         fig.colorbar(img, ax=ax)
         ax.set_title(title)
     fig.set_size_inches(4 * len(subfigs), 3)
-    fig.show()
-    plt.show(fig)
-    # plt.close(fig)
-    # time.sleep(3)
+
+    if rendering == 'local':
+        plt.show(fig)
+    elif rendering == 'remote':
+        plt.show(fig)
+        plt.close(fig)
+        time.sleep(3)
+    elif rendering == 'disk':
+        os.makedirs(os.path.dirname(savepath), exist_ok=True)
+        fig.savefig(savepath)
+    else:
+        raise ValueError(f"Value of `{rendering}` for `args.vis` is not valid.")
 # -------------------------------------------------------------------
 
 
@@ -271,6 +284,10 @@ def main(args):
     state_shape = (2, env.size)
     action_shape = (1,)
     batch_size = 128
+
+    # drawing only one candidate action sample from the policy
+    # will result in following the policy directly
+    n_candidates = 64 if args.use_exploration else 1
 
     novq_state = q_functions.init_fn(args.seed,
                                      (128, *state_shape),
@@ -292,7 +309,8 @@ def main(args):
                              policy_state=policy_state,
                              policy_action_fn=policy.action_fn,
                              policy_update_fn=policy.update_fn,
-                             n_candidates=64)
+                             n_candidates=n_candidates,
+                             n_update_candidates=args.n_update_candidates)
 
     for episode in range(1, 100000):
         # run an episode
@@ -325,24 +343,30 @@ def main(args):
             print((f"Episode {episode:4d}"
                    f", Train score {score:3d}"
                    f", Test score {test_score:3d}"))
-            if args.vis:
+            if args.vis != 'none':
+                savepath = f"results/{args.name}/{episode}.png"
                 display_state(agent_state, replay, env,
-                              max_steps=args.max_steps)
+                              max_steps=args.max_steps, rendering=args.vis,
+                              savepath=savepath)
 
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument('--name', default='default')
     parser.add_argument('--seed', default=0)
     parser.add_argument('--tabular', action='store_true', default=False)
     parser.add_argument('--env_size', type=int, default=5)
     parser.add_argument('--max_steps', type=int, default=100)
     parser.add_argument('--debug', action='store_true', default=False)
-    parser.add_argument('--no_vis', action='store_true', default=False)
+    parser.add_argument('--vis', default='local')
     parser.add_argument('--eval_every', type=int, default=10)
-    parser.add_argument('--temperature', type=float, default=1e-3)
+    parser.add_argument('--temperature', type=float, default=1)
+    parser.add_argument('--n_update_candidates', type=int, default=64)
+
+    parser.add_argument('--no_exploration', dest='use_exploration',
+                        action='store_false', default=True)
     args = parser.parse_args()
-    args.vis = not args.no_vis
 
     if args.tabular:
         import tabular_q_functions as q_functions

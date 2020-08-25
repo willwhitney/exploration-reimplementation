@@ -113,8 +113,9 @@ def display_value_map(q_state, env):
     img = ax.imshow(value_map)
     fig.colorbar(img, ax=ax)
     ax.set_title("State values")
-    fig.show()
-    plt.close(fig)
+    # fig.show()
+    plt.show(fig)
+    # plt.close(fig)
 # --------------------------------------------------
 
 
@@ -135,14 +136,15 @@ def main(args):
     max_steps = 100
 
     if args.boltzmann:
-        sample_action = jax.partial(sample_action_boltzmann, temp=0.1)
+        sample_action = jax.partial(sample_action_boltzmann, temp=1)
     else:
         sample_action = jax.partial(sample_action_egreedy, epsilon=0.5)
 
     q_state = q_functions.init_fn(0,
                                   (batch_size, *state_shape),
                                   (batch_size, *action_shape),
-                                  env_size=args.env_size)
+                                  env_size=args.env_size,
+                                  discount=0.99)
     targetq_state = q_state
     replay = replay_buffer.Replay(state_shape, action_shape)
     candidate_actions = jnp.tile(jnp.expand_dims(env.actions, 0),
@@ -191,7 +193,7 @@ def main(args):
             print((f"Episode {episode:4d}"
                    f", Train score {score:3d}"
                    f", Test score {test_score:3d}"))
-        if episode % 1 == 0:
+        if episode % 50 == 0:
             display_value_map(q_state, env)
             import time; time.sleep(5)
         if episode % 1 == 0:
