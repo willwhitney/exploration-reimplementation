@@ -26,6 +26,7 @@ class ExplorationState():
     novq_state: q_learning.QLearnerState
     density_state: density.DensityState
     temperature: float
+    prior_count: float
 
 
 @struct.dataclass
@@ -101,7 +102,7 @@ def optimistic_train_step(agent_state, transitions):
 def update_novelty_q(agent_state, replay, rng):
     # if len(replay) > 100:
     #     display_state(agent_state, replay, gridworld.new(2))
-    for _ in range(10):
+    for _ in range(1):
         transitions = tuple((jnp.array(el) for el in replay.sample(128)))
         agent_state = optimistic_train_step(agent_state, transitions)
     return agent_state
@@ -125,9 +126,9 @@ def update_exploration(agent_state, replay, rng, transition):
     return agent_state
 
 
-def compute_weight(count):
+def compute_weight(exploration_state: ExplorationState, count):
     root_count = count ** 0.5
-    root_prior_count = 1e-3 ** 0.5
+    root_prior_count = exploration_state.prior_count ** 0.5
     return root_count / (root_count + root_prior_count)
 
 
@@ -142,7 +143,7 @@ def predict_optimistic_value(exploration_state: ExplorationState,
     predicted_value = predicted_value.reshape(tuple())
     count = density.get_count(exploration_state.density_state,
                               state, action)
-    weight = compute_weight(count)
+    weight = compute_weight(exploration_state, count)
     optimistic_value = weight * predicted_value + (1 - weight) * R_MAX
     return optimistic_value
 predict_optimistic_value_batch = jax.vmap(  # noqa: E305
@@ -273,6 +274,7 @@ def display_state(agent_state: AgentState, replay, env,
     elif rendering == 'disk':
         os.makedirs(os.path.dirname(savepath), exist_ok=True)
         fig.savefig(savepath)
+        plt.close(fig)
     else:
         raise ValueError(f"Value of `{rendering}` for `args.vis` is not valid.")
 # -------------------------------------------------------------------
@@ -304,7 +306,8 @@ def main(args):
 
     exploration_state = ExplorationState(novq_state=novq_state,
                                          density_state=density_state,
-                                         temperature=args.temperature)
+                                         temperature=args.temperature,
+                                         prior_count=args.prior_count)
     agent_state = AgentState(exploration_state=exploration_state,
                              policy_state=policy_state,
                              policy_action_fn=policy.action_fn,
@@ -362,6 +365,7 @@ if __name__ == '__main__':
     parser.add_argument('--vis', default='local')
     parser.add_argument('--eval_every', type=int, default=10)
     parser.add_argument('--temperature', type=float, default=1)
+    parser.add_argument('--prior_count', type=float, default=1)
     parser.add_argument('--n_update_candidates', type=int, default=64)
 
     parser.add_argument('--no_exploration', dest='use_exploration',
@@ -372,7 +376,8 @@ if __name__ == '__main__':
         import tabular_q_functions as q_functions
         import policies.tabular_q_policy as policy
     else:
-        import deep_q_functions as q_functions
+        # import deep_q_functions as q_functions
+        import fullonehot_deep_q_functions as q_functions
         import policies.deep_q_policy as policy
 
     jit = not args.debug

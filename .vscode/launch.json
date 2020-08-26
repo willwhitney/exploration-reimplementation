@@ -5,6 +5,27 @@
     "version": "0.2.0",
     "configurations": [
 
+        {
+            "name": "main.py deep",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "console": "internalConsole",
+            "args": [
+                "--env_size",
+                "10",
+                "--debug",
+                "--vis",
+                "disk",
+                "--name",
+                "debug",
+                // "--no_vis"
+            ],
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "3"
+            }
+        },
+
 
 
 
