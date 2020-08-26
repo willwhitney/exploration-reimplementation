@@ -14,6 +14,7 @@ import gridworld
 import replay_buffer
 import q_learning
 import tabular_density as density
+import utils
 
 
 R_MAX = 100
@@ -24,6 +25,7 @@ class ExplorationState():
     """The pure-JAX components that can be jitted/vmapped.
     """
     novq_state: q_learning.QLearnerState
+    target_novq_state: q_learning.QLearnerState
     density_state: density.DensityState
     temperature: float
     prior_count: float
@@ -61,7 +63,10 @@ def optimistic_train_step_candidates(exploration_state,
                                      candidate_next_actions):
     states, actions, next_states, rewards = transitions
     optimistic_next_values = predict_optimistic_values_batch(
-        exploration_state, next_states, candidate_next_actions)
+        exploration_state.target_novq_state,
+        exploration_state.density_state,
+        exploration_state.prior_count,
+        next_states, candidate_next_actions)
 
     # optimistic_next_values should be (bsize x 64)
     temp = exploration_state.temperature
@@ -99,12 +104,19 @@ def optimistic_train_step(agent_state, transitions):
     return agent_state.replace(exploration_state=exploration_state)
 
 
+def update_target_q(agent_state: AgentState):
+    exploration_state = agent_state.exploration_state.replace(
+        target_novq_state=agent_state.exploration_state.novq_state)
+    return agent_state.replace(exploration_state=exploration_state)
+
+
 def update_novelty_q(agent_state, replay, rng):
     # if len(replay) > 100:
     #     display_state(agent_state, replay, gridworld.new(2))
     for _ in range(1):
         transitions = tuple((jnp.array(el) for el in replay.sample(128)))
         agent_state = optimistic_train_step(agent_state, transitions)
+    # agent_state = update_target_q(agent_state)
     return agent_state
 
 
@@ -126,39 +138,43 @@ def update_exploration(agent_state, replay, rng, transition):
     return agent_state
 
 
-def compute_weight(exploration_state: ExplorationState, count):
+def compute_weight(prior_count, count):
     root_count = count ** 0.5
-    root_prior_count = exploration_state.prior_count ** 0.5
+    root_prior_count = prior_count ** 0.5
     return root_count / (root_count + root_prior_count)
 
 
 @jax.profiler.trace_function
 @jax.jit
-def predict_optimistic_value(exploration_state: ExplorationState,
+def predict_optimistic_value(novq_state, density_state, prior_count,
+                            #  exploration_state: ExplorationState,
                              state, action):
     expanded_state = jnp.expand_dims(state, axis=0)
     expanded_action = jnp.expand_dims(action, axis=0)
-    predicted_value = q_learning.predict_value(exploration_state.novq_state,
+    predicted_value = q_learning.predict_value(novq_state,
                                                expanded_state, expanded_action)
     predicted_value = predicted_value.reshape(tuple())
-    count = density.get_count(exploration_state.density_state,
+    count = density.get_count(density_state,
                               state, action)
-    weight = compute_weight(exploration_state, count)
+    weight = compute_weight(prior_count, count)
     optimistic_value = weight * predicted_value + (1 - weight) * R_MAX
     return optimistic_value
 predict_optimistic_value_batch = jax.vmap(  # noqa: E305
-    predict_optimistic_value, in_axes=(None, 0, 0))
+    predict_optimistic_value, in_axes=(None, None, None, 0, 0))
 predict_optimistic_values = jax.vmap(
-    predict_optimistic_value, in_axes=(None, None, 0))
+    predict_optimistic_value, in_axes=(None, None, None, None, 0))
 predict_optimistic_values_batch = jax.vmap(  # noqa: E305
-    predict_optimistic_values, in_axes=(None, 0, 0))
+    predict_optimistic_values, in_axes=(None, None, None, 0, 0))
 
 
 @jax.profiler.trace_function
 @jax.jit
 def select_action(exploration_state, rng, state, candidate_actions):
     optimistic_values = predict_optimistic_values(
-        exploration_state, state, candidate_actions).reshape(-1)
+        exploration_state.novq_state,
+        exploration_state.density_state,
+        exploration_state.prior_count,
+        state, candidate_actions).reshape(-1)
 
     # return q_learning.sample_egreedy(
     #     rng, optimistic_values, candidate_actions, 0.0)
@@ -237,7 +253,10 @@ def display_state(agent_state: AgentState, replay, env,
         jax.partial(q_learning.predict_value, exploration_state.novq_state),
         env, reduction=jnp.max)
     optimistic_novq_map = gridworld.render_function(
-        jax.partial(predict_optimistic_value_batch, exploration_state),
+        jax.partial(predict_optimistic_value_batch,
+                    exploration_state.novq_state,
+                    exploration_state.density_state,
+                    exploration_state.prior_count),
         env, reduction=jnp.max)
     taskq_map = gridworld.render_function(
         jax.partial(q_learning.predict_value, policy_state.q_state),
@@ -265,18 +284,7 @@ def display_state(agent_state: AgentState, replay, env,
         ax.set_title(title)
     fig.set_size_inches(4 * len(subfigs), 3)
 
-    if rendering == 'local':
-        plt.show(fig)
-    elif rendering == 'remote':
-        plt.show(fig)
-        plt.close(fig)
-        time.sleep(3)
-    elif rendering == 'disk':
-        os.makedirs(os.path.dirname(savepath), exist_ok=True)
-        fig.savefig(savepath)
-        plt.close(fig)
-    else:
-        raise ValueError(f"Value of `{rendering}` for `args.vis` is not valid.")
+    utils.display_figure(fig, rendering, savepath=savepath)
 # -------------------------------------------------------------------
 
 
@@ -305,6 +313,7 @@ def main(args):
                                   env.actions, env_size=env.size)
 
     exploration_state = ExplorationState(novq_state=novq_state,
+                                         target_novq_state=novq_state,
                                          density_state=density_state,
                                          temperature=args.temperature,
                                          prior_count=args.prior_count)
@@ -336,6 +345,9 @@ def main(args):
         policy_state = policy_state.replace(targetq_state=policy_state.q_state)
         agent_state = agent_state.replace(policy_state=policy_state)
 
+        # update the target novelty Q function
+        agent_state = update_target_q(agent_state)
+
         # output / visualize
         if episode % args.eval_every == 0:
             rngs = random.split(rng, args.max_steps + 1)
@@ -347,7 +359,7 @@ def main(args):
                    f", Train score {score:3d}"
                    f", Test score {test_score:3d}"))
             if args.vis != 'none':
-                savepath = f"results/{args.name}/{episode}.png"
+                savepath = f"results/exploration/{args.name}/{episode}.png"
                 display_state(agent_state, replay, env,
                               max_steps=args.max_steps, rendering=args.vis,
                               savepath=savepath)
