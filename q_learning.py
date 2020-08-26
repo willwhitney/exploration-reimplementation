@@ -8,6 +8,7 @@ from jax import numpy as jnp, random, lax, profiler
 from flax import nn, struct
 
 import gridworld
+import utils
 
 
 @struct.dataclass
@@ -100,22 +101,15 @@ sample_egreedy_n = jax.vmap(sample_egreedy,  # noqa: E305
 
 
 # ---------- Utilities for gridworlds --------------
-def render_value_map(q_state: QLearnerState, env: gridworld.GridWorld):
-    value_map = gridworld.render_function(
+def display_state(q_state: QLearnerState, env: gridworld.GridWorld,
+                  rendering='disk', savepath=None):
+    q_map = gridworld.render_function(
         jax.partial(predict_value, q_state),
         env, reduction=jnp.max)
-    return value_map
-
-
-def display_value_map(q_state, env):
-    value_map = render_value_map(q_state, env)
-    fig, ax = plt.subplots()
-    img = ax.imshow(value_map)
-    fig.colorbar(img, ax=ax)
-    ax.set_title("State values")
-    # fig.show()
-    plt.show(fig)
-    # plt.close(fig)
+    subfigs = [
+        (q_map, "State values"),
+    ]
+    utils.display_subfigures(subfigs, rendering, savepath)
 # --------------------------------------------------
 
 
@@ -193,9 +187,11 @@ def main(args):
             print((f"Episode {episode:4d}"
                    f", Train score {score:3d}"
                    f", Test score {test_score:3d}"))
-        if episode % 50 == 0:
-            display_value_map(q_state, env)
-            import time; time.sleep(5)
+        if episode % 1 == 0:
+            savepath = f"results/q_learning/{args.name}/{episode}.png"
+            display_state(q_state, env, rendering='disk', savepath=savepath)
+            # display_value_map(q_state, env)
+            # import time; time.sleep(5)
         if episode % 1 == 0:
             targetq_state = q_state
 

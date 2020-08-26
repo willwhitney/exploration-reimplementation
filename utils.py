@@ -1,4 +1,7 @@
+import os
+import time
 import numpy as np
+import matplotlib.pyplot as plt
 
 from jax import numpy as jnp
 from jax.lib import pytree
@@ -47,9 +50,41 @@ def tree_unstack(tree):
     return new_trees
 
 
-# def all_pairs(a, b):
-#     grid = jnp.stack(jnp.meshgrid(a, b))
-#     return grid.transpose().reshape(-1, 2).astype(DTYPE)
+def display_figure(fig, rendering, savepath=None):
+    if rendering == 'local':
+        plt.show(fig)
+    elif rendering == 'remote':
+        plt.show(fig)
+        plt.close(fig)
+        time.sleep(3)
+    elif rendering == 'disk':
+        os.makedirs(os.path.dirname(savepath), exist_ok=True)
+        fig.savefig(savepath)
+        plt.close(fig)
+    else:
+        raise ValueError((f"Value of `{rendering}` for `display_figure`"
+                          f"is not valid."))
+
+
+def display_subfigures(subfigs_with_names, rendering='disk', savepath=None):
+    fig, axs = plt.subplots(1, len(subfigs_with_names))
+
+    def make_subfig(ax, subfig):
+        render, title = subfig
+        img = ax.imshow(render)
+        fig.colorbar(img, ax=ax)
+        ax.set_title(title)
+
+    if len(subfigs_with_names) > 1:
+        for ax, subfig in zip(axs, subfigs_with_names):
+            make_subfig(ax, subfig)
+    else:
+        ax = axs
+        make_subfig(ax, subfigs_with_names[0])
+
+    fig.set_size_inches(4 * len(subfigs_with_names), 3)
+    display_figure(fig, rendering, savepath=savepath)
+
 
 
 if __name__ == "__main__":

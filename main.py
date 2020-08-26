@@ -14,6 +14,7 @@ import gridworld
 import replay_buffer
 import q_learning
 import tabular_density as density
+import utils
 
 
 R_MAX = 100
@@ -265,18 +266,7 @@ def display_state(agent_state: AgentState, replay, env,
         ax.set_title(title)
     fig.set_size_inches(4 * len(subfigs), 3)
 
-    if rendering == 'local':
-        plt.show(fig)
-    elif rendering == 'remote':
-        plt.show(fig)
-        plt.close(fig)
-        time.sleep(3)
-    elif rendering == 'disk':
-        os.makedirs(os.path.dirname(savepath), exist_ok=True)
-        fig.savefig(savepath)
-        plt.close(fig)
-    else:
-        raise ValueError(f"Value of `{rendering}` for `args.vis` is not valid.")
+    utils.display_figure(fig, rendering, savepath=savepath)
 # -------------------------------------------------------------------
 
 
@@ -347,7 +337,7 @@ def main(args):
                    f", Train score {score:3d}"
                    f", Test score {test_score:3d}"))
             if args.vis != 'none':
-                savepath = f"results/{args.name}/{episode}.png"
+                savepath = f"results/exploration/{args.name}/{episode}.png"
                 display_state(agent_state, replay, env,
                               max_steps=args.max_steps, rendering=args.vis,
                               savepath=savepath)
