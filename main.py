@@ -29,6 +29,8 @@ class ExplorationState():
     density_state: density.DensityState
     temperature: float
     prior_count: float
+    optimistic_updates: bool
+    target_network: bool
 
 
 @struct.dataclass
@@ -56,36 +58,233 @@ def compute_novelty_reward(exploration_state, states, actions):
     return jnp.min(options, axis=1)
 
 
+# def compute_gridworld_reward(exploration_state, state, action):
+#     x, y = state.argmax(axis=1)
+#     reward = 1 * (x == 9).astype(int) * (y == 9).astype(int)
+#     return reward
+# compute_novelty_reward = jax.vmap(compute_gridworld_reward,  # noqa: E305
+#                                   in_axes=(None, 0, 0))
+
+
 @jax.profiler.trace_function
 @jax.jit
-def optimistic_train_step_candidates(exploration_state,
+def optimistic_train_step_candidates(exploration_state: ExplorationState,
                                      transitions,
                                      candidate_next_actions):
+    """The jittable component of the optimistic training step."""
     states, actions, next_states, rewards = transitions
+    discount = exploration_state.novq_state.discount
+
+    # if exploration_state.target_network:
+    #     target_q_state = exploration_state.target_novq_state
+    # else:
+    #     target_q_state = exploration_state.novq_state
+
+    # if exploration_state.optimistic_updates:
+    #     next_values = predict_optimistic_values_batch(
+    #         target_q_state,
+    #         exploration_state.density_state,
+    #         exploration_state.prior_count,
+    #         next_states, candidate_next_actions)
+    # else:
+    #     next_values = q_learning.predict_action_values_batch(
+    #         target_q_state,
+    #         next_states,
+    #         candidate_next_actions)
+
+    # next_value_probs = nn.softmax(next_values / temp, axis=1)
+    # next_value_elements = (next_value_probs * next_values)
+    # expected_next_values = next_value_elements.sum(axis=1)
+    # expected_next_values = expected_next_values.reshape(rewards.shape)
+
+    # # compute targets and update
+    # novelty_reward = compute_novelty_reward(
+    #     exploration_state, states, actions).reshape(rewards.shape)
+    # q_targets = novelty_reward + discount * expected_next_values
+
+    # novq_state = q_functions.train_step(
+    #     exploration_state.novq_state,
+    #     states, actions, q_targets)
+
+
+    # ------ not working: non-optimistic max novelty updates w/o targets
+    # (diverges)
+    # bsize, n_candidates = candidate_next_actions.shape[:2]
+    # discount = exploration_state.novq_state.discount
+
+    # # compute max_a' Q_t (s', a')
+    # next_values = q_learning.predict_action_values_batch(
+    #     exploration_state.novq_state,
+    #     next_states,
+    #     candidate_next_actions)
+
+    # next_values = next_values.max(axis=-1).reshape(rewards.shape)
+
+    # # compute targets and update
+    # novelty_reward = compute_novelty_reward(
+    #     exploration_state, states, actions).reshape(rewards.shape)
+    # q_targets = novelty_reward + discount * next_values
+
+    # novq_state = q_functions.train_step(
+    #     exploration_state.novq_state,
+    #     states, actions, q_targets)
+
+
+    # ------ not working: non-optimistic boltzmann novelty updates w/o targets
+    # (diverges)
+    # bsize, n_candidates = candidate_next_actions.shape[:2]
+    # discount = exploration_state.novq_state.discount
+    # temp = exploration_state.temperature
+
+    # # compute max_a' Q_t (s', a')
+    # next_values = q_learning.predict_action_values_batch(
+    #     exploration_state.novq_state,
+    #     next_states,
+    #     candidate_next_actions)
+
+    # next_value_probs = nn.softmax(next_values / temp, axis=1)
+    # next_value_elements = (next_value_probs * next_values)
+    # expected_next_values = next_value_elements.sum(axis=1)
+    # expected_next_values = expected_next_values.reshape(rewards.shape)
+
+    # # compute targets and update
+    # novelty_reward = compute_novelty_reward(
+    #     exploration_state, states, actions).reshape(rewards.shape)
+    # q_targets = novelty_reward + discount * expected_next_values
+
+    # novq_state = q_functions.train_step(
+    #     exploration_state.novq_state,
+    #     states, actions, q_targets)
+
+
+    # ------ working: optimistic boltzmann novelty updates w/o targets -----
+    bsize, n_candidates = candidate_next_actions.shape[:2]
+    discount = exploration_state.novq_state.discount
+    temp = exploration_state.temperature
+
+    # compute max_a' Q_t (s', a')
     optimistic_next_values = predict_optimistic_values_batch(
-        exploration_state.target_novq_state,
+        exploration_state.novq_state,
         exploration_state.density_state,
         exploration_state.prior_count,
         next_states, candidate_next_actions)
 
-    # optimistic_next_values should be (bsize x 64)
-    temp = exploration_state.temperature
     next_value_probs = nn.softmax(optimistic_next_values / temp, axis=1)
     next_value_elements = (next_value_probs * optimistic_next_values)
     expected_next_values = next_value_elements.sum(axis=1)
-    # TODO: try out using maxQ or a lower temp instead of EQ
-    #   (and many candidates in the update)
-    # the current version looks more like policy iteration, where the next
-    #   policy step happens on the next episode
+    expected_next_values = expected_next_values.reshape(rewards.shape)
 
-    discount = exploration_state.novq_state.discount
+    # compute targets and update
     novelty_reward = compute_novelty_reward(
-        exploration_state, states, actions)
-    target_values = novelty_reward + discount * expected_next_values
+        exploration_state, states, actions).reshape(rewards.shape)
+    q_targets = novelty_reward + discount * expected_next_values
 
     novq_state = q_functions.train_step(
         exploration_state.novq_state,
-        states, actions, target_values)
+        states, actions, q_targets)
+
+
+    # ------ working: optimistic boltzmann novelty updates --------
+    # bsize, n_candidates = candidate_next_actions.shape[:2]
+    # discount = exploration_state.novq_state.discount
+    # temp = exploration_state.temperature
+
+    # # compute max_a' Q_t (s', a')
+    # optimistic_next_values = predict_optimistic_values_batch(
+    #     exploration_state.target_novq_state,
+    #     exploration_state.density_state,
+    #     exploration_state.prior_count,
+    #     next_states, candidate_next_actions)
+
+    # next_value_probs = nn.softmax(optimistic_next_values / temp, axis=1)
+    # next_value_elements = (next_value_probs * optimistic_next_values)
+    # expected_next_values = next_value_elements.sum(axis=1)
+    # expected_next_values = expected_next_values.reshape(rewards.shape)
+
+    # # compute targets and update
+    # novelty_reward = compute_novelty_reward(
+    #     exploration_state, states, actions).reshape(rewards.shape)
+    # q_targets = novelty_reward + discount * expected_next_values
+
+    # novq_state = q_functions.train_step(
+    #     exploration_state.novq_state,
+    #     states, actions, q_targets)
+
+
+    # ------ working: boltzmann novelty updates --------
+    # bsize, n_candidates = candidate_next_actions.shape[:2]
+    # discount = exploration_state.novq_state.discount
+    # temp = exploration_state.temperature
+
+    # # compute max_a' Q_t (s', a')
+    # targetq_preds = q_learning.predict_action_values_batch(
+    #     exploration_state.target_novq_state,
+    #     next_states,
+    #     candidate_next_actions)
+
+    # next_value_probs = nn.softmax(targetq_preds / temp, axis=1)
+    # next_value_elements = (next_value_probs * targetq_preds)
+    # expected_next_values = next_value_elements.sum(axis=1)
+    # expected_next_values = expected_next_values.reshape(rewards.shape)
+
+    # # compute targets and update
+    # novelty_reward = compute_novelty_reward(
+    #     exploration_state, states, actions).reshape(rewards.shape)
+    # q_targets = novelty_reward + discount * expected_next_values
+
+    # novq_state = q_functions.train_step(
+    #     exploration_state.novq_state,
+    #     states, actions, q_targets)
+
+
+
+    # ------ working: boltzmann updates --------
+    # bsize, n_candidates = candidate_next_actions.shape[:2]
+    # discount = exploration_state.novq_state.discount
+    # temp = exploration_state.temperature
+
+    # # compute max_a' Q_t (s', a')
+    # targetq_preds = q_learning.predict_action_values_batch(
+    #     exploration_state.target_novq_state,
+    #     next_states,
+    #     candidate_next_actions)
+
+    # next_value_probs = nn.softmax(targetq_preds / temp, axis=1)
+    # next_value_elements = (next_value_probs * targetq_preds)
+    # expected_next_values = next_value_elements.sum(axis=1)
+    # expected_next_values = expected_next_values.reshape(rewards.shape)
+
+    # # compute targets and update
+    # q_targets = rewards + discount * expected_next_values
+
+    # novq_state = q_functions.train_step(
+    #     exploration_state.novq_state,
+    #     states, actions, q_targets)
+
+
+    # ------ working: bellman updates written out -------------
+    # bsize, n_candidates = candidate_next_actions.shape[:2]
+    # discount = exploration_state.novq_state.discount
+
+    # # compute max_a' Q_t (s', a')
+    # targetq_preds = q_learning.predict_action_values_batch(
+    #     exploration_state.target_novq_state,
+    #     next_states, candidate_next_actions)
+    # targetq_preds = targetq_preds.max(axis=-1).reshape(rewards.shape)
+
+    # # compute targets and update
+    # q_targets = rewards + discount * targetq_preds
+    # novq_state = q_functions.train_step(
+    #     exploration_state.novq_state,
+    #     states, actions, q_targets)
+
+
+    # ------ working: bellman updates ------------------------
+    # novq_state = q_functions.bellman_train_step(
+    #     exploration_state.novq_state,
+    #     # exploration_state.novq_state,
+    #     exploration_state.target_novq_state,
+    #     transitions, candidate_next_actions)
     return exploration_state.replace(novq_state=novq_state)
 
 
@@ -312,11 +511,14 @@ def main(args):
                                   state_shape, action_shape,
                                   env.actions, env_size=env.size)
 
-    exploration_state = ExplorationState(novq_state=novq_state,
-                                         target_novq_state=novq_state,
-                                         density_state=density_state,
-                                         temperature=args.temperature,
-                                         prior_count=args.prior_count)
+    exploration_state = ExplorationState(
+        novq_state=novq_state,
+        target_novq_state=novq_state,
+        density_state=density_state,
+        temperature=args.temperature,
+        prior_count=args.prior_count,
+        optimistic_updates=args.optimistic_updates,
+        target_network=args.target_network)
     agent_state = AgentState(exploration_state=exploration_state,
                              policy_state=policy_state,
                              policy_action_fn=policy.action_fn,
@@ -370,15 +572,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', default='default')
     parser.add_argument('--seed', default=0)
-    parser.add_argument('--tabular', action='store_true', default=False)
     parser.add_argument('--env_size', type=int, default=5)
     parser.add_argument('--max_steps', type=int, default=100)
+
     parser.add_argument('--debug', action='store_true', default=False)
     parser.add_argument('--vis', default='local')
     parser.add_argument('--eval_every', type=int, default=10)
+
+    parser.add_argument('--tabular', action='store_true', default=False)
     parser.add_argument('--temperature', type=float, default=1)
     parser.add_argument('--prior_count', type=float, default=1)
     parser.add_argument('--n_update_candidates', type=int, default=64)
+    parser.add_argument('--no_optimistic_updates', dest='optimistic_updates',
+                        action='store_false', default=True)
+    parser.add_argument('--target_network', action='store_true', default=False)
 
     parser.add_argument('--no_exploration', dest='use_exploration',
                         action='store_false', default=True)
