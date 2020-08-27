@@ -25,9 +25,12 @@ class ExplorationState():
     """The pure-JAX components that can be jitted/vmapped.
     """
     novq_state: q_learning.QLearnerState
+    target_novq_state: q_learning.QLearnerState
     density_state: density.DensityState
     temperature: float
     prior_count: float
+    optimistic_updates: bool
+    target_network: bool
 
 
 @struct.dataclass
@@ -56,54 +59,82 @@ def compute_novelty_reward(exploration_state, states, actions):
 
 
 @jax.profiler.trace_function
-@jax.jit
-def optimistic_train_step_candidates(exploration_state,
+@jax.partial(jax.jit, static_argnums=(3, 4))
+def optimistic_train_step_candidates(exploration_state: ExplorationState,
                                      transitions,
-                                     candidate_next_actions):
+                                     candidate_next_actions,
+                                     target_network,
+                                     optimistic_updates):
+    """The jittable component of the optimistic training step."""
     states, actions, next_states, rewards = transitions
-    optimistic_next_values = predict_optimistic_values_batch(
-        exploration_state, next_states, candidate_next_actions)
-
-    # optimistic_next_values should be (bsize x 64)
-    temp = exploration_state.temperature
-    next_value_probs = nn.softmax(optimistic_next_values / temp, axis=1)
-    next_value_elements = (next_value_probs * optimistic_next_values)
-    expected_next_values = next_value_elements.sum(axis=1)
-    # TODO: try out using maxQ or a lower temp instead of EQ
-    #   (and many candidates in the update)
-    # the current version looks more like policy iteration, where the next
-    #   policy step happens on the next episode
-
     discount = exploration_state.novq_state.discount
+    temp = exploration_state.temperature
+
+    if target_network:
+        target_q_state = exploration_state.target_novq_state
+    else:
+        target_q_state = exploration_state.novq_state
+
+    if optimistic_updates:
+        next_values = predict_optimistic_values_batch(
+            target_q_state,
+            exploration_state.density_state,
+            exploration_state.prior_count,
+            next_states, candidate_next_actions)
+    else:
+        next_values = q_learning.predict_action_values_batch(
+            target_q_state,
+            next_states,
+            candidate_next_actions)
+
+    next_value_probs = nn.softmax(next_values / temp, axis=1)
+    next_value_elements = (next_value_probs * next_values)
+    expected_next_values = next_value_elements.sum(axis=1)
+    expected_next_values = expected_next_values.reshape(rewards.shape)
+
+    # compute targets and update
     novelty_reward = compute_novelty_reward(
-        exploration_state, states, actions)
-    target_values = novelty_reward + discount * expected_next_values
+        exploration_state, states, actions).reshape(rewards.shape)
+    q_targets = novelty_reward + discount * expected_next_values
 
     novq_state = q_functions.train_step(
         exploration_state.novq_state,
-        states, actions, target_values)
+        states, actions, q_targets)
+
     return exploration_state.replace(novq_state=novq_state)
 
 
 @jax.profiler.trace_function
 def optimistic_train_step(agent_state, transitions):
+    """A full optimistic training step."""
     states, actions, next_states, rewards = transitions
 
+    # candidate actions should be (bsize x 64 x *action_shape)
     policy_state, candidate_next_actions = agent_state.policy_action_fn(
         agent_state.policy_state, next_states,
         agent_state.n_update_candidates, True)
     agent_state = agent_state.replace(policy_state=policy_state)
 
-    # candidate actions should be (bsize x 64 x *action_shape)
+    # somehow if I don't cast these to bool JAX will recompile the jitted
+    # function optimistic_train_step_candidates on every call...
+    # print(f"Updating with target_network={agent_state.exploration_state.target_network} and optimistic_updates={agent_state.exploration_state.optimistic_updates}")
     exploration_state = optimistic_train_step_candidates(
-        agent_state.exploration_state, transitions, candidate_next_actions)
+        agent_state.exploration_state,
+        transitions,
+        candidate_next_actions,
+        bool(agent_state.exploration_state.target_network),
+        bool(agent_state.exploration_state.optimistic_updates))
+    return agent_state.replace(exploration_state=exploration_state)
+
+
+def update_target_q(agent_state: AgentState):
+    exploration_state = agent_state.exploration_state.replace(
+        target_novq_state=agent_state.exploration_state.novq_state)
     return agent_state.replace(exploration_state=exploration_state)
 
 
 def update_novelty_q(agent_state, replay, rng):
-    # if len(replay) > 100:
-    #     display_state(agent_state, replay, gridworld.new(2))
-    for _ in range(1):
+    for _ in range(10):
         transitions = tuple((jnp.array(el) for el in replay.sample(128)))
         agent_state = optimistic_train_step(agent_state, transitions)
     return agent_state
@@ -127,42 +158,43 @@ def update_exploration(agent_state, replay, rng, transition):
     return agent_state
 
 
-def compute_weight(exploration_state: ExplorationState, count):
+def compute_weight(prior_count, count):
     root_count = count ** 0.5
-    root_prior_count = exploration_state.prior_count ** 0.5
+    root_prior_count = prior_count ** 0.5
     return root_count / (root_count + root_prior_count)
 
 
 @jax.profiler.trace_function
 @jax.jit
-def predict_optimistic_value(exploration_state: ExplorationState,
+def predict_optimistic_value(novq_state, density_state, prior_count,
                              state, action):
     expanded_state = jnp.expand_dims(state, axis=0)
     expanded_action = jnp.expand_dims(action, axis=0)
-    predicted_value = q_learning.predict_value(exploration_state.novq_state,
-                                               expanded_state, expanded_action)
+    predicted_value = q_learning.predict_value(novq_state,
+                                               expanded_state,
+                                               expanded_action)
     predicted_value = predicted_value.reshape(tuple())
-    count = density.get_count(exploration_state.density_state,
+    count = density.get_count(density_state,
                               state, action)
-    weight = compute_weight(exploration_state, count)
+    weight = compute_weight(prior_count, count)
     optimistic_value = weight * predicted_value + (1 - weight) * R_MAX
     return optimistic_value
 predict_optimistic_value_batch = jax.vmap(  # noqa: E305
-    predict_optimistic_value, in_axes=(None, 0, 0))
+    predict_optimistic_value, in_axes=(None, None, None, 0, 0))
 predict_optimistic_values = jax.vmap(
-    predict_optimistic_value, in_axes=(None, None, 0))
+    predict_optimistic_value, in_axes=(None, None, None, None, 0))
 predict_optimistic_values_batch = jax.vmap(  # noqa: E305
-    predict_optimistic_values, in_axes=(None, 0, 0))
+    predict_optimistic_values, in_axes=(None, None, None, 0, 0))
 
 
 @jax.profiler.trace_function
 @jax.jit
 def select_action(exploration_state, rng, state, candidate_actions):
     optimistic_values = predict_optimistic_values(
-        exploration_state, state, candidate_actions).reshape(-1)
-
-    # return q_learning.sample_egreedy(
-    #     rng, optimistic_values, candidate_actions, 0.0)
+        exploration_state.novq_state,
+        exploration_state.density_state,
+        exploration_state.prior_count,
+        state, candidate_actions).reshape(-1)
 
     return q_learning.sample_boltzmann(
         rng, optimistic_values, candidate_actions,
@@ -198,6 +230,10 @@ def full_step(agent_state: AgentState, replay, rng, env,
     with jax.profiler.TraceContext("env step"):
         env, sp, r = gridworld.step(env, int(a))
 
+    novelty_reward = compute_novelty_reward(agent_state.exploration_state,
+                                            jnp.expand_dims(s, axis=0),
+                                            jnp.expand_dims(a, axis=0))
+    novelty_reward = float(novelty_reward)
     if train:
         # add transition to replay
         with jax.profiler.TraceContext("replay append"):
@@ -205,21 +241,25 @@ def full_step(agent_state: AgentState, replay, rng, env,
 
         # update the exploration policy with the observed transition
         rng, update_rng = random.split(rng)
-        agent_state = update_exploration(
-            agent_state, replay, update_rng, (s, a, sp, r))
 
-    return agent_state, env, r
+        if len(replay) > 128:
+            agent_state = update_exploration(
+                agent_state, replay, update_rng, (s, a, sp, r))
+
+    return agent_state, env, r, novelty_reward
 
 
 def run_episode(agent_state: AgentState, replay, rngs, env,
                 train=True, max_steps=100, use_exploration=True):
     env = gridworld.reset(env)
     score = 0
+    novelty_score = 0
     for i in range(max_steps):
-        agent_state, env, r = full_step(
+        agent_state, env, r, novelty_r = full_step(
             agent_state, replay, rngs[i], env, train=train)
         score += r
-    return agent_state, env, score
+        novelty_score += novelty_r
+    return agent_state, env, score, novelty_score
 
 
 # ----- Visualizations for gridworld ---------------------------------
@@ -238,7 +278,10 @@ def display_state(agent_state: AgentState, replay, env,
         jax.partial(q_learning.predict_value, exploration_state.novq_state),
         env, reduction=jnp.max)
     optimistic_novq_map = gridworld.render_function(
-        jax.partial(predict_optimistic_value_batch, exploration_state),
+        jax.partial(predict_optimistic_value_batch,
+                    exploration_state.novq_state,
+                    exploration_state.density_state,
+                    exploration_state.prior_count),
         env, reduction=jnp.max)
     taskq_map = gridworld.render_function(
         jax.partial(q_learning.predict_value, policy_state.q_state),
@@ -247,6 +290,8 @@ def display_state(agent_state: AgentState, replay, env,
         jax.partial(compute_novelty_reward, exploration_state),
         env, reduction=jnp.max)
     traj_map = replay_buffer.render_trajectory(replay, max_steps, env)
+
+    # print(f"Max novelty value: {novq_map.max() :.2f}")
 
     subfigs = [
         # (min_count_map, "Visit count (min)"),
@@ -294,10 +339,14 @@ def main(args):
                                   state_shape, action_shape,
                                   env.actions, env_size=env.size)
 
-    exploration_state = ExplorationState(novq_state=novq_state,
-                                         density_state=density_state,
-                                         temperature=args.temperature,
-                                         prior_count=args.prior_count)
+    exploration_state = ExplorationState(
+        novq_state=novq_state,
+        target_novq_state=novq_state,
+        density_state=density_state,
+        temperature=args.temperature,
+        prior_count=args.prior_count,
+        optimistic_updates=args.optimistic_updates,
+        target_network=args.target_network)
     agent_state = AgentState(exploration_state=exploration_state,
                              policy_state=policy_state,
                              policy_action_fn=policy.action_fn,
@@ -310,7 +359,7 @@ def main(args):
         rngs = random.split(rng, args.max_steps + 1)
         rng = rngs[0]
 
-        agent_state, env, score = run_episode(
+        agent_state, env, score, novelty_score = run_episode(
             agent_state, replay, rngs[1:], env,
             train=True, max_steps=args.max_steps)
 
@@ -322,20 +371,29 @@ def main(args):
                                  for el in replay.sample(batch_size)))
             policy_state = agent_state.policy_update_fn(policy_state,
                                                         transitions)
-        # hacky reset of targetq to q
-        policy_state = policy_state.replace(targetq_state=policy_state.q_state)
         agent_state = agent_state.replace(policy_state=policy_state)
+
+        # hacky reset of targetq to q
+        if episode % 5 == 0:
+            policy_state = agent_state.policy_state.replace(
+                targetq_state=policy_state.q_state)
+            agent_state = agent_state.replace(policy_state=policy_state)
+
+        # update the target novelty Q function
+        agent_state = update_target_q(agent_state)
 
         # output / visualize
         if episode % args.eval_every == 0:
             rngs = random.split(rng, args.max_steps + 1)
             rng = rngs[0]
-            _, _, test_score = run_episode(
+            _, _, test_score, test_novelty_score = run_episode(
                 agent_state, replay, rngs[1:], env,
                 train=False, max_steps=args.max_steps)
             print((f"Episode {episode:4d}"
                    f", Train score {score:3d}"
-                   f", Test score {test_score:3d}"))
+                   f", Train novelty score {novelty_score:3.0f}"
+                   f", Test score {test_score:3d}"
+                   f", Test novelty score {test_novelty_score:3.0f}"))
             if args.vis != 'none':
                 savepath = f"results/exploration/{args.name}/{episode}.png"
                 display_state(agent_state, replay, env,
@@ -347,16 +405,21 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', default='default')
-    parser.add_argument('--seed', default=0)
-    parser.add_argument('--tabular', action='store_true', default=False)
+    parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--env_size', type=int, default=5)
     parser.add_argument('--max_steps', type=int, default=100)
+
     parser.add_argument('--debug', action='store_true', default=False)
     parser.add_argument('--vis', default='local')
     parser.add_argument('--eval_every', type=int, default=10)
+
+    parser.add_argument('--tabular', action='store_true', default=False)
     parser.add_argument('--temperature', type=float, default=1)
     parser.add_argument('--prior_count', type=float, default=1)
     parser.add_argument('--n_update_candidates', type=int, default=64)
+    parser.add_argument('--no_optimistic_updates', dest='optimistic_updates',
+                        action='store_false', default=True)
+    parser.add_argument('--target_network', action='store_true', default=False)
 
     parser.add_argument('--no_exploration', dest='use_exploration',
                         action='store_false', default=True)

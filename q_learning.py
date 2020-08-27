@@ -120,7 +120,8 @@ def main(args):
     if args.tabular:
         import tabular_q_functions as q_functions
     else:
-        import deep_q_functions as q_functions
+        # import deep_q_functions as q_functions
+        import fullonehot_deep_q_functions as q_functions
 
     rng = random.PRNGKey(0)
     env = gridworld.new(args.env_size)
@@ -157,8 +158,11 @@ def main(args):
             replay.append(s, a, sp, r)
             if len(replay) > batch_size:
                 transitions = replay.sample(batch_size)
+
+                # TODO: change this back
                 q_state = q_functions.bellman_train_step(
                     q_state, targetq_state,
+                    # q_state, q_state,
                     transitions, candidate_actions)
 
         return q_state, env, r
@@ -199,6 +203,7 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument('--name', default="default")
     parser.add_argument('--tabular', action='store_true', default=False)
     parser.add_argument('--env_size', type=int, default=5)
     parser.add_argument('--debug', action='store_true', default=False)
