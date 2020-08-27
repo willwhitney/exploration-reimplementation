@@ -117,6 +117,7 @@ def optimistic_train_step(agent_state, transitions):
 
     # somehow if I don't cast these to bool JAX will recompile the jitted
     # function optimistic_train_step_candidates on every call...
+    # print(f"Updating with target_network={agent_state.exploration_state.target_network} and optimistic_updates={agent_state.exploration_state.optimistic_updates}")
     exploration_state = optimistic_train_step_candidates(
         agent_state.exploration_state,
         transitions,
@@ -170,7 +171,8 @@ def predict_optimistic_value(novq_state, density_state, prior_count,
     expanded_state = jnp.expand_dims(state, axis=0)
     expanded_action = jnp.expand_dims(action, axis=0)
     predicted_value = q_learning.predict_value(novq_state,
-                                               expanded_state, expanded_action)
+                                               expanded_state,
+                                               expanded_action)
     predicted_value = predicted_value.reshape(tuple())
     count = density.get_count(density_state,
                               state, action)
@@ -228,6 +230,10 @@ def full_step(agent_state: AgentState, replay, rng, env,
     with jax.profiler.TraceContext("env step"):
         env, sp, r = gridworld.step(env, int(a))
 
+    novelty_reward = compute_novelty_reward(agent_state.exploration_state,
+                                            jnp.expand_dims(s, axis=0),
+                                            jnp.expand_dims(a, axis=0))
+    novelty_reward = float(novelty_reward)
     if train:
         # add transition to replay
         with jax.profiler.TraceContext("replay append"):
@@ -235,21 +241,25 @@ def full_step(agent_state: AgentState, replay, rng, env,
 
         # update the exploration policy with the observed transition
         rng, update_rng = random.split(rng)
-        agent_state = update_exploration(
-            agent_state, replay, update_rng, (s, a, sp, r))
 
-    return agent_state, env, r
+        if len(replay) > 128:
+            agent_state = update_exploration(
+                agent_state, replay, update_rng, (s, a, sp, r))
+
+    return agent_state, env, r, novelty_reward
 
 
 def run_episode(agent_state: AgentState, replay, rngs, env,
                 train=True, max_steps=100, use_exploration=True):
     env = gridworld.reset(env)
     score = 0
+    novelty_score = 0
     for i in range(max_steps):
-        agent_state, env, r = full_step(
+        agent_state, env, r, novelty_r = full_step(
             agent_state, replay, rngs[i], env, train=train)
         score += r
-    return agent_state, env, score
+        novelty_score += novelty_r
+    return agent_state, env, score, novelty_score
 
 
 # ----- Visualizations for gridworld ---------------------------------
@@ -280,6 +290,8 @@ def display_state(agent_state: AgentState, replay, env,
         jax.partial(compute_novelty_reward, exploration_state),
         env, reduction=jnp.max)
     traj_map = replay_buffer.render_trajectory(replay, max_steps, env)
+
+    # print(f"Max novelty value: {novq_map.max() :.2f}")
 
     subfigs = [
         # (min_count_map, "Visit count (min)"),
@@ -347,7 +359,7 @@ def main(args):
         rngs = random.split(rng, args.max_steps + 1)
         rng = rngs[0]
 
-        agent_state, env, score = run_episode(
+        agent_state, env, score, novelty_score = run_episode(
             agent_state, replay, rngs[1:], env,
             train=True, max_steps=args.max_steps)
 
@@ -359,10 +371,11 @@ def main(args):
                                  for el in replay.sample(batch_size)))
             policy_state = agent_state.policy_update_fn(policy_state,
                                                         transitions)
+        agent_state = agent_state.replace(policy_state=policy_state)
 
+        # hacky reset of targetq to q
         if episode % 5 == 0:
-            # hacky reset of targetq to q
-            policy_state = policy_state.replace(
+            policy_state = agent_state.policy_state.replace(
                 targetq_state=policy_state.q_state)
             agent_state = agent_state.replace(policy_state=policy_state)
 
@@ -373,12 +386,14 @@ def main(args):
         if episode % args.eval_every == 0:
             rngs = random.split(rng, args.max_steps + 1)
             rng = rngs[0]
-            _, _, test_score = run_episode(
+            _, _, test_score, test_novelty_score = run_episode(
                 agent_state, replay, rngs[1:], env,
                 train=False, max_steps=args.max_steps)
             print((f"Episode {episode:4d}"
                    f", Train score {score:3d}"
-                   f", Test score {test_score:3d}"))
+                   f", Train novelty score {novelty_score:3.0f}"
+                   f", Test score {test_score:3d}"
+                   f", Test novelty score {test_novelty_score:3.0f}"))
             if args.vis != 'none':
                 savepath = f"results/exploration/{args.name}/{episode}.png"
                 display_state(agent_state, replay, env,
@@ -390,7 +405,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', default='default')
-    parser.add_argument('--seed', default=0)
+    parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--env_size', type=int, default=5)
     parser.add_argument('--max_steps', type=int, default=100)
 
