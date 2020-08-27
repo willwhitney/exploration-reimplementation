@@ -58,119 +58,37 @@ def compute_novelty_reward(exploration_state, states, actions):
     return jnp.min(options, axis=1)
 
 
-# def compute_gridworld_reward(exploration_state, state, action):
-#     x, y = state.argmax(axis=1)
-#     reward = 1 * (x == 9).astype(int) * (y == 9).astype(int)
-#     return reward
-# compute_novelty_reward = jax.vmap(compute_gridworld_reward,  # noqa: E305
-#                                   in_axes=(None, 0, 0))
-
-
 @jax.profiler.trace_function
-@jax.jit
+@jax.partial(jax.jit, static_argnums=(3, 4))
 def optimistic_train_step_candidates(exploration_state: ExplorationState,
                                      transitions,
-                                     candidate_next_actions):
+                                     candidate_next_actions,
+                                     target_network,
+                                     optimistic_updates):
     """The jittable component of the optimistic training step."""
     states, actions, next_states, rewards = transitions
     discount = exploration_state.novq_state.discount
-
-    # if exploration_state.target_network:
-    #     target_q_state = exploration_state.target_novq_state
-    # else:
-    #     target_q_state = exploration_state.novq_state
-
-    # if exploration_state.optimistic_updates:
-    #     next_values = predict_optimistic_values_batch(
-    #         target_q_state,
-    #         exploration_state.density_state,
-    #         exploration_state.prior_count,
-    #         next_states, candidate_next_actions)
-    # else:
-    #     next_values = q_learning.predict_action_values_batch(
-    #         target_q_state,
-    #         next_states,
-    #         candidate_next_actions)
-
-    # next_value_probs = nn.softmax(next_values / temp, axis=1)
-    # next_value_elements = (next_value_probs * next_values)
-    # expected_next_values = next_value_elements.sum(axis=1)
-    # expected_next_values = expected_next_values.reshape(rewards.shape)
-
-    # # compute targets and update
-    # novelty_reward = compute_novelty_reward(
-    #     exploration_state, states, actions).reshape(rewards.shape)
-    # q_targets = novelty_reward + discount * expected_next_values
-
-    # novq_state = q_functions.train_step(
-    #     exploration_state.novq_state,
-    #     states, actions, q_targets)
-
-
-    # ------ not working: non-optimistic max novelty updates w/o targets
-    # (diverges)
-    # bsize, n_candidates = candidate_next_actions.shape[:2]
-    # discount = exploration_state.novq_state.discount
-
-    # # compute max_a' Q_t (s', a')
-    # next_values = q_learning.predict_action_values_batch(
-    #     exploration_state.novq_state,
-    #     next_states,
-    #     candidate_next_actions)
-
-    # next_values = next_values.max(axis=-1).reshape(rewards.shape)
-
-    # # compute targets and update
-    # novelty_reward = compute_novelty_reward(
-    #     exploration_state, states, actions).reshape(rewards.shape)
-    # q_targets = novelty_reward + discount * next_values
-
-    # novq_state = q_functions.train_step(
-    #     exploration_state.novq_state,
-    #     states, actions, q_targets)
-
-
-    # ------ not working: non-optimistic boltzmann novelty updates w/o targets
-    # (diverges)
-    # bsize, n_candidates = candidate_next_actions.shape[:2]
-    # discount = exploration_state.novq_state.discount
-    # temp = exploration_state.temperature
-
-    # # compute max_a' Q_t (s', a')
-    # next_values = q_learning.predict_action_values_batch(
-    #     exploration_state.novq_state,
-    #     next_states,
-    #     candidate_next_actions)
-
-    # next_value_probs = nn.softmax(next_values / temp, axis=1)
-    # next_value_elements = (next_value_probs * next_values)
-    # expected_next_values = next_value_elements.sum(axis=1)
-    # expected_next_values = expected_next_values.reshape(rewards.shape)
-
-    # # compute targets and update
-    # novelty_reward = compute_novelty_reward(
-    #     exploration_state, states, actions).reshape(rewards.shape)
-    # q_targets = novelty_reward + discount * expected_next_values
-
-    # novq_state = q_functions.train_step(
-    #     exploration_state.novq_state,
-    #     states, actions, q_targets)
-
-
-    # ------ working: optimistic boltzmann novelty updates w/o targets -----
-    bsize, n_candidates = candidate_next_actions.shape[:2]
-    discount = exploration_state.novq_state.discount
     temp = exploration_state.temperature
 
-    # compute max_a' Q_t (s', a')
-    optimistic_next_values = predict_optimistic_values_batch(
-        exploration_state.novq_state,
-        exploration_state.density_state,
-        exploration_state.prior_count,
-        next_states, candidate_next_actions)
+    if target_network:
+        target_q_state = exploration_state.target_novq_state
+    else:
+        target_q_state = exploration_state.novq_state
 
-    next_value_probs = nn.softmax(optimistic_next_values / temp, axis=1)
-    next_value_elements = (next_value_probs * optimistic_next_values)
+    if optimistic_updates:
+        next_values = predict_optimistic_values_batch(
+            target_q_state,
+            exploration_state.density_state,
+            exploration_state.prior_count,
+            next_states, candidate_next_actions)
+    else:
+        next_values = q_learning.predict_action_values_batch(
+            target_q_state,
+            next_states,
+            candidate_next_actions)
+
+    next_value_probs = nn.softmax(next_values / temp, axis=1)
+    next_value_elements = (next_value_probs * next_values)
     expected_next_values = next_value_elements.sum(axis=1)
     expected_next_values = expected_next_values.reshape(rewards.shape)
 
@@ -183,123 +101,28 @@ def optimistic_train_step_candidates(exploration_state: ExplorationState,
         exploration_state.novq_state,
         states, actions, q_targets)
 
-
-    # ------ working: optimistic boltzmann novelty updates --------
-    # bsize, n_candidates = candidate_next_actions.shape[:2]
-    # discount = exploration_state.novq_state.discount
-    # temp = exploration_state.temperature
-
-    # # compute max_a' Q_t (s', a')
-    # optimistic_next_values = predict_optimistic_values_batch(
-    #     exploration_state.target_novq_state,
-    #     exploration_state.density_state,
-    #     exploration_state.prior_count,
-    #     next_states, candidate_next_actions)
-
-    # next_value_probs = nn.softmax(optimistic_next_values / temp, axis=1)
-    # next_value_elements = (next_value_probs * optimistic_next_values)
-    # expected_next_values = next_value_elements.sum(axis=1)
-    # expected_next_values = expected_next_values.reshape(rewards.shape)
-
-    # # compute targets and update
-    # novelty_reward = compute_novelty_reward(
-    #     exploration_state, states, actions).reshape(rewards.shape)
-    # q_targets = novelty_reward + discount * expected_next_values
-
-    # novq_state = q_functions.train_step(
-    #     exploration_state.novq_state,
-    #     states, actions, q_targets)
-
-
-    # ------ working: boltzmann novelty updates --------
-    # bsize, n_candidates = candidate_next_actions.shape[:2]
-    # discount = exploration_state.novq_state.discount
-    # temp = exploration_state.temperature
-
-    # # compute max_a' Q_t (s', a')
-    # targetq_preds = q_learning.predict_action_values_batch(
-    #     exploration_state.target_novq_state,
-    #     next_states,
-    #     candidate_next_actions)
-
-    # next_value_probs = nn.softmax(targetq_preds / temp, axis=1)
-    # next_value_elements = (next_value_probs * targetq_preds)
-    # expected_next_values = next_value_elements.sum(axis=1)
-    # expected_next_values = expected_next_values.reshape(rewards.shape)
-
-    # # compute targets and update
-    # novelty_reward = compute_novelty_reward(
-    #     exploration_state, states, actions).reshape(rewards.shape)
-    # q_targets = novelty_reward + discount * expected_next_values
-
-    # novq_state = q_functions.train_step(
-    #     exploration_state.novq_state,
-    #     states, actions, q_targets)
-
-
-
-    # ------ working: boltzmann updates --------
-    # bsize, n_candidates = candidate_next_actions.shape[:2]
-    # discount = exploration_state.novq_state.discount
-    # temp = exploration_state.temperature
-
-    # # compute max_a' Q_t (s', a')
-    # targetq_preds = q_learning.predict_action_values_batch(
-    #     exploration_state.target_novq_state,
-    #     next_states,
-    #     candidate_next_actions)
-
-    # next_value_probs = nn.softmax(targetq_preds / temp, axis=1)
-    # next_value_elements = (next_value_probs * targetq_preds)
-    # expected_next_values = next_value_elements.sum(axis=1)
-    # expected_next_values = expected_next_values.reshape(rewards.shape)
-
-    # # compute targets and update
-    # q_targets = rewards + discount * expected_next_values
-
-    # novq_state = q_functions.train_step(
-    #     exploration_state.novq_state,
-    #     states, actions, q_targets)
-
-
-    # ------ working: bellman updates written out -------------
-    # bsize, n_candidates = candidate_next_actions.shape[:2]
-    # discount = exploration_state.novq_state.discount
-
-    # # compute max_a' Q_t (s', a')
-    # targetq_preds = q_learning.predict_action_values_batch(
-    #     exploration_state.target_novq_state,
-    #     next_states, candidate_next_actions)
-    # targetq_preds = targetq_preds.max(axis=-1).reshape(rewards.shape)
-
-    # # compute targets and update
-    # q_targets = rewards + discount * targetq_preds
-    # novq_state = q_functions.train_step(
-    #     exploration_state.novq_state,
-    #     states, actions, q_targets)
-
-
-    # ------ working: bellman updates ------------------------
-    # novq_state = q_functions.bellman_train_step(
-    #     exploration_state.novq_state,
-    #     # exploration_state.novq_state,
-    #     exploration_state.target_novq_state,
-    #     transitions, candidate_next_actions)
     return exploration_state.replace(novq_state=novq_state)
 
 
 @jax.profiler.trace_function
 def optimistic_train_step(agent_state, transitions):
+    """A full optimistic training step."""
     states, actions, next_states, rewards = transitions
 
+    # candidate actions should be (bsize x 64 x *action_shape)
     policy_state, candidate_next_actions = agent_state.policy_action_fn(
         agent_state.policy_state, next_states,
         agent_state.n_update_candidates, True)
     agent_state = agent_state.replace(policy_state=policy_state)
 
-    # candidate actions should be (bsize x 64 x *action_shape)
+    # somehow if I don't cast these to bool JAX will recompile the jitted
+    # function optimistic_train_step_candidates on every call...
     exploration_state = optimistic_train_step_candidates(
-        agent_state.exploration_state, transitions, candidate_next_actions)
+        agent_state.exploration_state,
+        transitions,
+        candidate_next_actions,
+        bool(agent_state.exploration_state.target_network),
+        bool(agent_state.exploration_state.optimistic_updates))
     return agent_state.replace(exploration_state=exploration_state)
 
 
@@ -310,12 +133,9 @@ def update_target_q(agent_state: AgentState):
 
 
 def update_novelty_q(agent_state, replay, rng):
-    # if len(replay) > 100:
-    #     display_state(agent_state, replay, gridworld.new(2))
-    for _ in range(1):
+    for _ in range(10):
         transitions = tuple((jnp.array(el) for el in replay.sample(128)))
         agent_state = optimistic_train_step(agent_state, transitions)
-    # agent_state = update_target_q(agent_state)
     return agent_state
 
 
@@ -346,7 +166,6 @@ def compute_weight(prior_count, count):
 @jax.profiler.trace_function
 @jax.jit
 def predict_optimistic_value(novq_state, density_state, prior_count,
-                            #  exploration_state: ExplorationState,
                              state, action):
     expanded_state = jnp.expand_dims(state, axis=0)
     expanded_action = jnp.expand_dims(action, axis=0)
@@ -374,9 +193,6 @@ def select_action(exploration_state, rng, state, candidate_actions):
         exploration_state.density_state,
         exploration_state.prior_count,
         state, candidate_actions).reshape(-1)
-
-    # return q_learning.sample_egreedy(
-    #     rng, optimistic_values, candidate_actions, 0.0)
 
     return q_learning.sample_boltzmann(
         rng, optimistic_values, candidate_actions,
@@ -543,9 +359,12 @@ def main(args):
                                  for el in replay.sample(batch_size)))
             policy_state = agent_state.policy_update_fn(policy_state,
                                                         transitions)
-        # hacky reset of targetq to q
-        policy_state = policy_state.replace(targetq_state=policy_state.q_state)
-        agent_state = agent_state.replace(policy_state=policy_state)
+
+        if episode % 5 == 0:
+            # hacky reset of targetq to q
+            policy_state = policy_state.replace(
+                targetq_state=policy_state.q_state)
+            agent_state = agent_state.replace(policy_state=policy_state)
 
         # update the target novelty Q function
         agent_state = update_target_q(agent_state)
