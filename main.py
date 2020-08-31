@@ -58,11 +58,11 @@ def compute_novelty_reward(exploration_state, states, actions):
 
 @jax.profiler.trace_function
 @jax.partial(jax.jit, static_argnums=(3, 4))
-def optimistic_train_step_candidates(exploration_state: ExplorationState,
-                                     transitions,
-                                     candidate_next_actions,
-                                     target_network,
-                                     optimistic_updates):
+def train_step_candidates(exploration_state: ExplorationState,
+                          transitions,
+                          candidate_next_actions,
+                          target_network,
+                          optimistic_updates):
     """The jittable component of the optimistic training step."""
     states, actions, next_states, rewards = transitions
     discount = exploration_state.novq_state.discount
@@ -103,8 +103,8 @@ def optimistic_train_step_candidates(exploration_state: ExplorationState,
 
 
 @jax.profiler.trace_function
-def optimistic_train_step(agent_state, transitions):
-    """A full optimistic training step."""
+def train_step(agent_state, transitions):
+    """A full (optimistic) training step."""
     states, actions, next_states, rewards = transitions
 
     # candidate actions should be (bsize x 64 x *action_shape)
@@ -114,9 +114,8 @@ def optimistic_train_step(agent_state, transitions):
     agent_state = agent_state.replace(policy_state=policy_state)
 
     # somehow if I don't cast these to bool JAX will recompile the jitted
-    # function optimistic_train_step_candidates on every call...
-    # print(f"Updating with target_network={agent_state.exploration_state.target_network} and optimistic_updates={agent_state.exploration_state.optimistic_updates}")
-    exploration_state = optimistic_train_step_candidates(
+    # function train_step_candidates on every call...
+    exploration_state = train_step_candidates(
         agent_state.exploration_state,
         transitions,
         candidate_next_actions,
@@ -134,7 +133,7 @@ def update_target_q(agent_state: AgentState):
 def update_novelty_q(agent_state, replay, rng):
     for _ in range(10):
         transitions = tuple((jnp.array(el) for el in replay.sample(128)))
-        agent_state = optimistic_train_step(agent_state, transitions)
+        agent_state = train_step(agent_state, transitions)
     return agent_state
 
 
