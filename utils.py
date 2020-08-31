@@ -86,7 +86,6 @@ def display_subfigures(subfigs_with_names, rendering='disk', savepath=None):
     display_figure(fig, rendering, savepath=savepath)
 
 
-
 if __name__ == "__main__":
     def make_tree():
         sizes = ((1, 2), (3, 1), (3,))

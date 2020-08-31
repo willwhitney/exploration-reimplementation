@@ -39,8 +39,6 @@ class AgentState():
     """
     exploration_state: ExplorationState
     policy_state: Any = struct.field(pytree_node=False)
-    policy_action_fn: Any = struct.field(pytree_node=False)
-    policy_update_fn: Any = struct.field(pytree_node=False)
     n_candidates: int
     n_update_candidates: int
 
@@ -110,7 +108,7 @@ def optimistic_train_step(agent_state, transitions):
     states, actions, next_states, rewards = transitions
 
     # candidate actions should be (bsize x 64 x *action_shape)
-    policy_state, candidate_next_actions = agent_state.policy_action_fn(
+    policy_state, candidate_next_actions = policy.action_fn(
         agent_state.policy_state, next_states,
         agent_state.n_update_candidates, True)
     agent_state = agent_state.replace(policy_state=policy_state)
@@ -213,10 +211,10 @@ def full_step(agent_state: AgentState, replay, rng, env,
     # get candidate actions
     with jax.profiler.TraceContext("get action candidates"):
         s_batch = jnp.expand_dims(s, axis=0)
-        policy_state, candidate_actions = agent_state.policy_action_fn(
+        policy_state, candidate_actions = policy.action_fn(
             agent_state.policy_state, s_batch, n, train)
 
-    # policy_action_fn deals with batches and we only have one element
+    # policy.action_fn deals with batches and we only have one element
     candidate_actions = candidate_actions[0]
     agent_state = agent_state.replace(policy_state=policy_state)
 
@@ -349,8 +347,6 @@ def main(args):
         target_network=args.target_network)
     agent_state = AgentState(exploration_state=exploration_state,
                              policy_state=policy_state,
-                             policy_action_fn=policy.action_fn,
-                             policy_update_fn=policy.update_fn,
                              n_candidates=n_candidates,
                              n_update_candidates=args.n_update_candidates)
 
@@ -364,17 +360,16 @@ def main(args):
             train=True, max_steps=args.max_steps)
 
         # update the task policy
-        # TODO: pull this loop inside the policy_update_fn
+        # TODO: pull this loop inside the policy.update_fn
         policy_state = agent_state.policy_state
-        for _ in range(10):
+        for _ in range(50):
             transitions = tuple((jnp.array(el)
                                  for el in replay.sample(batch_size)))
-            policy_state = agent_state.policy_update_fn(policy_state,
-                                                        transitions)
+            policy_state = policy.update_fn(policy_state, transitions)
         agent_state = agent_state.replace(policy_state=policy_state)
 
         # hacky reset of targetq to q
-        if episode % 5 == 0:
+        if episode % 1 == 0:
             policy_state = agent_state.policy_state.replace(
                 targetq_state=policy_state.q_state)
             agent_state = agent_state.replace(policy_state=policy_state)
@@ -406,16 +401,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', default='default')
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--env_size', type=int, default=5)
+    parser.add_argument('--env_size', type=int, default=20)
     parser.add_argument('--max_steps', type=int, default=100)
 
     parser.add_argument('--debug', action='store_true', default=False)
-    parser.add_argument('--vis', default='local')
+    parser.add_argument('--vis', default='disk')
     parser.add_argument('--eval_every', type=int, default=10)
 
     parser.add_argument('--tabular', action='store_true', default=False)
     parser.add_argument('--temperature', type=float, default=1)
-    parser.add_argument('--prior_count', type=float, default=1)
+    parser.add_argument('--prior_count', type=float, default=1e-3)
     parser.add_argument('--n_update_candidates', type=int, default=64)
     parser.add_argument('--no_optimistic_updates', dest='optimistic_updates',
                         action='store_false', default=True)
