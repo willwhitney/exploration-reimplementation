@@ -5,6 +5,8 @@
     "version": "0.2.0",
     "configurations": [
 
+
+
         {
             "name": "main.py deep",
             "type": "python",
@@ -12,8 +14,7 @@
             "program": "main.py",
             "console": "internalConsole",
             "args": [
-                "--env_size",
-                "10",
+                "--env_size", "10",
                 "--debug",
                 "--vis",
                 "disk",
@@ -38,7 +39,7 @@
             "args": [
                 "--env_size", "2",
                 "--tabular",
-                "--debug",
+                // "--debug",
                 // "--no_vis"
             ],
             "env": {"CUDA_VISIBLE_DEVICES": "3"}

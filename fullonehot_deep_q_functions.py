@@ -4,6 +4,7 @@ from jax import numpy as jnp, random, profiler  # noqa: F401
 from flax import nn, optim
 
 import q_learning
+from deep_q_functions import train_step, bellman_train_step  # noqa: F401
 
 
 class DenseQNetwork(nn.Module):
@@ -38,36 +39,36 @@ def init_fn(seed, state_shape, action_shape, discount, **kwargs):
     return q_learning.QLearnerState(q_opt, discount)
 
 
-def loss_fn(model, states, actions, targets):
-    preds = model(states, actions)
-    loss = jnp.mean((preds - targets)**2)
-    return loss
-grad_loss_fn = jax.grad(loss_fn)  # noqa: E305
+# def loss_fn(model, states, actions, targets):
+#     preds = model(states, actions)
+#     loss = jnp.mean((preds - targets)**2)
+#     return loss
+# grad_loss_fn = jax.grad(loss_fn)  # noqa: E305
 
 
-@jax.jit
-def train_step(q_state: q_learning.QLearnerState, states, actions, targets):
-    grad = grad_loss_fn(q_state.model, states, actions, targets)
-    q_state = q_state.replace(optimizer=q_state.optimizer.apply_gradient(grad))
-    return q_state
+# @jax.jit
+# def train_step(q_state: q_learning.QLearnerState, states, actions, targets):
+#     grad = grad_loss_fn(q_state.model, states, actions, targets)
+#     q_state = q_state.replace(optimizer=q_state.optimizer.apply_gradient(grad))
+#     return q_state
 
 
-@jax.partial(jax.profiler.trace_function, name="bellman_train_step")
-@jax.jit
-def bellman_train_step(q_state: q_learning.QLearnerState,
-                       targetq_state: q_learning.QLearnerState,
-                       transitions,
-                       candidate_actions):
-    # transitions should be of form (states, actions, next_states, rewards)
-    # candidate_actions should be of form bsize x n_cands x *action_dim
-    bsize, n_candidates = candidate_actions.shape[:2]
+# @jax.partial(jax.profiler.trace_function, name="bellman_train_step")
+# @jax.jit
+# def bellman_train_step(q_state: q_learning.QLearnerState,
+#                        targetq_state: q_learning.QLearnerState,
+#                        transitions,
+#                        candidate_actions):
+#     # transitions should be of form (states, actions, next_states, rewards)
+#     # candidate_actions should be of form bsize x n_cands x *action_dim
+#     bsize, n_candidates = candidate_actions.shape[:2]
 
-    # compute max_a' Q_t (s', a')
-    targetq_preds = q_learning.predict_action_values_batch(
-        targetq_state, transitions[2], candidate_actions)
-    targetq_preds = targetq_preds.max(axis=-1).reshape(transitions[3].shape)
+#     # compute max_a' Q_t (s', a')
+#     targetq_preds = q_learning.predict_action_values_batch(
+#         targetq_state, transitions[2], candidate_actions)
+#     targetq_preds = targetq_preds.max(axis=-1).reshape(transitions[3].shape)
 
-    # compute targets and update
-    q_targets = transitions[3] + q_state.discount * targetq_preds
-    return train_step(
-        q_state, transitions[0], transitions[1], q_targets)
+#     # compute targets and update
+#     q_targets = transitions[3] + q_state.discount * targetq_preds
+#     return train_step(
+#         q_state, transitions[0], transitions[1], q_targets)

@@ -1,8 +1,10 @@
 import time
 import os
+import queue
+from typing import Any
+
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Any
 
 import jax
 from jax import numpy as jnp, random, lax
@@ -39,8 +41,10 @@ class AgentState():
     """
     exploration_state: ExplorationState
     policy_state: Any = struct.field(pytree_node=False)
+    replay: Any = struct.field(pytree_node=False)
     n_candidates: int
     n_update_candidates: int
+    prioritized_update: bool
 
 
 @jax.jit
@@ -95,11 +99,11 @@ def train_step_candidates(exploration_state: ExplorationState,
         exploration_state, states, actions).reshape(rewards.shape)
     q_targets = novelty_reward + discount * expected_next_values
 
-    novq_state = q_functions.train_step(
+    novq_state, losses = q_functions.train_step(
         exploration_state.novq_state,
         states, actions, q_targets)
 
-    return exploration_state.replace(novq_state=novq_state)
+    return exploration_state.replace(novq_state=novq_state), losses
 
 
 @jax.profiler.trace_function
@@ -115,13 +119,66 @@ def train_step(agent_state, transitions):
 
     # somehow if I don't cast these to bool JAX will recompile the jitted
     # function train_step_candidates on every call...
-    exploration_state = train_step_candidates(
+    exploration_state, losses = train_step_candidates(
         agent_state.exploration_state,
         transitions,
         candidate_next_actions,
         bool(agent_state.exploration_state.target_network),
         bool(agent_state.exploration_state.optimistic_updates))
-    return agent_state.replace(exploration_state=exploration_state)
+    agent_state = agent_state.replace(exploration_state=exploration_state)
+    return agent_state, losses
+
+
+def prioritized_update(agent_state: AgentState, last_transition_id):
+    pqueue = queue.PriorityQueue()
+    pqueue.put((0, last_transition_id))
+    replay = agent_state.replay
+
+    error_threshold = 1e-1
+    max_depth = 16
+    max_bsize = 128
+
+    def next_batch():
+        transition_ids = []
+        while len(transition_ids) < max_bsize:
+            try:
+                _, transition_id = pqueue.get_nowait()
+            except queue.Empty:
+                break
+            transition_ids.append(transition_id)
+        if len(transition_ids) > 0:
+            transitions = replay.get_transitions(
+                np.array(transition_ids))
+            return transitions
+        else:
+            return []
+
+    def queue_predecessors(s, loss):
+        preceding_ids = replay.predecessors(s)
+        for preceding_id in preceding_ids:
+            pqueue.put((-loss, preceding_id))
+
+    n_updates = 0
+    # update the tree up to a max depth
+    for step in range(max_depth):
+        # get the highest-priority transitions from the queue
+        transitions = next_batch()
+        if len(transitions) == 0:
+            break
+
+        # update on the current batch of transitions
+        agent_state, losses = train_step(agent_state, transitions)
+        n_updates += len(losses)
+
+        # check the loss for each transition
+        for i, loss in enumerate(losses):
+            if loss > error_threshold:
+                start_state = transitions[0][i]
+
+                # add predecessors of transitions with large loss to the queue
+                queue_predecessors(start_state, loss)
+    print(f"Max depth: {step}, total updates: {n_updates}")
+    return agent_state
 
 
 def update_target_q(agent_state: AgentState):
@@ -130,16 +187,17 @@ def update_target_q(agent_state: AgentState):
     return agent_state.replace(exploration_state=exploration_state)
 
 
-def update_novelty_q(agent_state, replay, rng):
+def uniform_update(agent_state, rng):
     for _ in range(10):
-        transitions = tuple((jnp.array(el) for el in replay.sample(128)))
-        agent_state = train_step(agent_state, transitions)
+        transitions = tuple((jnp.array(el)
+                             for el in agent_state.replay.sample(128)))
+        agent_state, losses = train_step(agent_state, transitions)
     return agent_state
 
 
 @jax.profiler.trace_function
-def update_exploration(agent_state, replay, rng, transition):
-    s, a, sp, r = transition
+def update_exploration(agent_state, rng, transition_id):
+    s, a, sp, r = agent_state.replay.get_transitions(transition_id)
 
     # update density on new observations
     exploration_state = agent_state.exploration_state
@@ -151,7 +209,11 @@ def update_exploration(agent_state, replay, rng, transition):
 
     # update exploration Q to consistency with new density
     rng, novq_rng = random.split(rng)
-    agent_state = update_novelty_q(agent_state, replay, novq_rng)
+
+    if agent_state.prioritized_update:
+        agent_state = prioritized_update(agent_state, transition_id)
+    else:
+        agent_state = uniform_update(agent_state, novq_rng)
     return agent_state
 
 
@@ -199,7 +261,7 @@ def select_action(exploration_state, rng, state, candidate_actions):
 
 
 @jax.profiler.trace_function
-def full_step(agent_state: AgentState, replay, rng, env,
+def full_step(agent_state: AgentState, rng, env,
               train=True):
     # get env state
     with jax.profiler.TraceContext("env render"):
@@ -234,33 +296,33 @@ def full_step(agent_state: AgentState, replay, rng, env,
     if train:
         # add transition to replay
         with jax.profiler.TraceContext("replay append"):
-            replay.append(s, a, sp, r)
+            transition_id = agent_state.replay.append(s, a, sp, r)
 
         # update the exploration policy with the observed transition
         rng, update_rng = random.split(rng)
 
-        if len(replay) > 128:
+        if len(agent_state.replay) > 128:
             agent_state = update_exploration(
-                agent_state, replay, update_rng, (s, a, sp, r))
+                agent_state, update_rng, transition_id)
 
     return agent_state, env, r, novelty_reward
 
 
-def run_episode(agent_state: AgentState, replay, rngs, env,
+def run_episode(agent_state: AgentState, rngs, env,
                 train=True, max_steps=100, use_exploration=True):
     env = gridworld.reset(env)
     score = 0
     novelty_score = 0
     for i in range(max_steps):
         agent_state, env, r, novelty_r = full_step(
-            agent_state, replay, rngs[i], env, train=train)
+            agent_state, rngs[i], env, train=train)
         score += r
         novelty_score += novelty_r
     return agent_state, env, score, novelty_score
 
 
 # ----- Visualizations for gridworld ---------------------------------
-def display_state(agent_state: AgentState, replay, env,
+def display_state(agent_state: AgentState, env,
                   max_steps=100, rendering='local', savepath=None):
     exploration_state = agent_state.exploration_state
     policy_state = agent_state.policy_state
@@ -286,7 +348,8 @@ def display_state(agent_state: AgentState, replay, env,
     novelty_reward_map = gridworld.render_function(
         jax.partial(compute_novelty_reward, exploration_state),
         env, reduction=jnp.max)
-    traj_map = replay_buffer.render_trajectory(replay, max_steps, env)
+    traj_map = replay_buffer.render_trajectory(
+        agent_state.replay, max_steps, env)
 
     # print(f"Max novelty value: {novq_map.max() :.2f}")
 
@@ -330,7 +393,10 @@ def main(args):
                                      discount=0.97)
 
     density_state = density.new([env.size, env.size], [len(env.actions)])
-    replay = replay_buffer.Replay(state_shape, action_shape)
+
+    # for gridworld we can discretize with one bit per dimension
+    replay = replay_buffer.LowPrecisionTracingReplay(
+        state_shape, action_shape, min_s=0, max_s=1, n_bins=2)
 
     policy_state = policy.init_fn(args.seed,
                                   state_shape, action_shape,
@@ -346,8 +412,10 @@ def main(args):
         target_network=args.target_network)
     agent_state = AgentState(exploration_state=exploration_state,
                              policy_state=policy_state,
+                             replay=replay,
                              n_candidates=n_candidates,
-                             n_update_candidates=args.n_update_candidates)
+                             n_update_candidates=args.n_update_candidates,
+                             prioritized_update=args.prioritized_update)
 
     for episode in range(1, 100000):
         # run an episode
@@ -355,7 +423,7 @@ def main(args):
         rng = rngs[0]
 
         agent_state, env, score, novelty_score = run_episode(
-            agent_state, replay, rngs[1:], env,
+            agent_state, rngs[1:], env,
             train=True, max_steps=args.max_steps)
 
         # update the task policy
@@ -363,7 +431,7 @@ def main(args):
         policy_state = agent_state.policy_state
         for _ in range(50):
             transitions = tuple((jnp.array(el)
-                                 for el in replay.sample(batch_size)))
+                                 for el in agent_state.replay.sample(batch_size)))
             policy_state = policy.update_fn(policy_state, transitions)
         agent_state = agent_state.replace(policy_state=policy_state)
 
@@ -381,7 +449,7 @@ def main(args):
             rngs = random.split(rng, args.max_steps + 1)
             rng = rngs[0]
             _, _, test_score, test_novelty_score = run_episode(
-                agent_state, replay, rngs[1:], env,
+                agent_state, rngs[1:], env,
                 train=False, max_steps=args.max_steps)
             print((f"Episode {episode:4d}"
                    f", Train score {score:3d}"
@@ -390,7 +458,7 @@ def main(args):
                    f", Test novelty score {test_novelty_score:3.0f}"))
             if args.vis != 'none':
                 savepath = f"results/exploration/{args.name}/{episode}.png"
-                display_state(agent_state, replay, env,
+                display_state(agent_state, env,
                               max_steps=args.max_steps, rendering=args.vis,
                               savepath=savepath)
 
@@ -416,6 +484,9 @@ if __name__ == '__main__':
     parser.add_argument('--target_network', action='store_true', default=False)
 
     parser.add_argument('--no_exploration', dest='use_exploration',
+                        action='store_false', default=True)
+    parser.add_argument('--no_prioritized_update',
+                        dest='prioritized_update',
                         action='store_false', default=True)
     args = parser.parse_args()
 

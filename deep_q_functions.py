@@ -30,18 +30,36 @@ def init_fn(seed, state_shape, action_shape, discount, **kwargs):
     return q_learning.QLearnerState(q_opt, discount)
 
 
+def single_loss_fn(model, state, action, target):
+    pred = model(jnp.expand_dims(state, axis=0),
+                 jnp.expand_dims(action, axis=0)).reshape(())
+    loss = (target - pred)**2
+    return loss.mean()
+single_loss_and_grad = jax.value_and_grad(single_loss_fn)  # noqa: E305
+batch_loss_and_grad = jax.vmap(single_loss_and_grad, in_axes=(None, 0, 0, 0))
+
+
 def loss_fn(model, states, actions, targets):
     preds = model(states, actions)
     loss = jnp.mean((preds - targets)**2)
     return loss
 grad_loss_fn = jax.grad(loss_fn)  # noqa: E305
+loss_and_grad_fn = jax.value_and_grad(loss_fn)
+
+
+@jax.jit
+def losses_and_grad_fn(model, states, actions, targets):
+    losses, grads = batch_loss_and_grad(model, states, actions, targets)
+    grad = jax.tree_map(jax.partial(jnp.mean, axis=0), grads)
+    return losses, grad
 
 
 @jax.jit
 def train_step(q_state: q_learning.QLearnerState, states, actions, targets):
-    grad = grad_loss_fn(q_state.model, states, actions, targets)
+    # loss, grad = value_and_grad_loss_fn(q_state.model, states, actions, targets)
+    losses, grad = losses_and_grad_fn(q_state.model, states, actions, targets)
     q_state = q_state.replace(optimizer=q_state.optimizer.apply_gradient(grad))
-    return q_state
+    return q_state, losses
 
 
 @jax.partial(jax.profiler.trace_function, name="bellman_train_step")

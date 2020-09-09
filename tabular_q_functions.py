@@ -35,6 +35,8 @@ def init_fn(seed, state_shape, action_shape, discount, **kwargs):
 @jax.jit
 def train_step(q_state: q_learning.QLearnerState, states, actions, targets):
     state_coords = states.argmax(axis=-1)
+    preds = q_state.model(states, actions)
+    losses = ((targets - preds)**2)
     for coord, a, t in zip(state_coords, actions, targets):
         x, y = coord
         a = a.astype(jnp.int16)[0]
@@ -45,7 +47,7 @@ def train_step(q_state: q_learning.QLearnerState, states, actions, targets):
         new_model = q_state.model.replace(params={'table': new_table})
         new_optimizer = q_state.optimizer.replace(target=new_model)
         q_state = q_state.replace(optimizer=new_optimizer)
-    return q_state
+    return q_state, losses
 
 
 @jax.jit

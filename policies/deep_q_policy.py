@@ -58,7 +58,7 @@ def update_fn(policy_state, transitions):
     candidate_actions = jnp.expand_dims(policy_state.actions, 0)
     candidate_actions = candidate_actions.repeat(bsize, axis=0)
 
-    q_state = q_functions.bellman_train_step(
+    q_state, _ = q_functions.bellman_train_step(
         policy_state.q_state, policy_state.targetq_state,
         transitions, candidate_actions)
     policy_state = policy_state.replace(q_state=q_state)

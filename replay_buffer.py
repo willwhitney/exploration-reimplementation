@@ -29,6 +29,9 @@ class Replay:
 
     def sample(self, n):
         indices = np.random.randint(0, self.length, size=(n,))
+        return self.get_transitions(indices)
+
+    def get_transitions(self, indices):
         return (self.s[indices], self.a[indices],
                 self.sp[indices], self.r[indices])
 
@@ -55,8 +58,8 @@ class TracingReplay(Replay):
 
 class LowPrecisionTracingReplay(TracingReplay):
     def __init__(self, *args, **kwargs):
-        self.mins = kwargs.pop('mins')
-        self.maxs = kwargs.pop('maxs')
+        self.min_s = kwargs.pop('min_s')
+        self.max_s = kwargs.pop('max_s')
         self.n_bins = kwargs.pop('n_bins')
         super().__init__(*args, **kwargs)
 
@@ -64,9 +67,10 @@ class LowPrecisionTracingReplay(TracingReplay):
         self.trace = collections.defaultdict(list)
 
     def discretize(self, s):
-        normalized_s = (s - self.mins) / self.maxs
+        normalized_s = (s - self.min_s) / self.max_s
         normalized_s = normalized_s.clip(0, 1)
-        return (normalized_s * self.n_bins).astype(np.uint8)
+        discrete_s = (normalized_s * self.n_bins).astype(np.uint8)
+        return tuple(discrete_s.flatten())
 
     def append(self, s, a, sp, r):
         index = super().append(s, a, sp, r)
