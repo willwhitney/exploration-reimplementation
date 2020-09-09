@@ -1,5 +1,6 @@
 import time
 import os
+import math
 import queue
 from typing import Any
 
@@ -65,19 +66,19 @@ def compute_novelty_reward(exploration_state, states, actions):
 def train_step_candidates(exploration_state: ExplorationState,
                           transitions,
                           candidate_next_actions,
-                          target_network,
-                          optimistic_updates):
+                          use_target_network,
+                          use_optimistic_updates):
     """The jittable component of the optimistic training step."""
     states, actions, next_states, rewards = transitions
     discount = exploration_state.novq_state.discount
     temp = exploration_state.temperature
 
-    if target_network:
+    if use_target_network:
         target_q_state = exploration_state.target_novq_state
     else:
         target_q_state = exploration_state.novq_state
 
-    if optimistic_updates:
+    if use_optimistic_updates:
         next_values = predict_optimistic_values_batch(
             target_q_state,
             exploration_state.density_state,
@@ -114,7 +115,7 @@ def train_step(agent_state, transitions):
     # candidate actions should be (bsize x 64 x *action_shape)
     policy_state, candidate_next_actions = policy.action_fn(
         agent_state.policy_state, next_states,
-        agent_state.n_update_candidates, True)
+        int(agent_state.n_update_candidates), True)
     agent_state = agent_state.replace(policy_state=policy_state)
 
     # somehow if I don't cast these to bool JAX will recompile the jitted
@@ -129,6 +130,7 @@ def train_step(agent_state, transitions):
     return agent_state, losses
 
 
+@jax.profiler.trace_function
 def prioritized_update(agent_state: AgentState, last_transition_id):
     pqueue = queue.PriorityQueue()
     pqueue.put((0, last_transition_id))
@@ -138,20 +140,31 @@ def prioritized_update(agent_state: AgentState, last_transition_id):
     max_depth = 16
     max_bsize = 128
 
+    def largest_pow(n):
+        if n == 0:
+            return 0
+        else:
+            return int(math.pow(2, int(math.log(n, 2))))
+
     def next_batch():
+        queue_size = pqueue.qsize()
+
+        # only use power-of-two batch sizes to limit the number of JIT
+        # recompiles inside train_step
+        batch_size = min(largest_pow(queue_size), max_bsize)
+
         transition_ids = []
-        while len(transition_ids) < max_bsize:
+        while len(transition_ids) < batch_size:
             try:
                 _, transition_id = pqueue.get_nowait()
+                transition_ids.append(transition_id)
             except queue.Empty:
                 break
-            transition_ids.append(transition_id)
         if len(transition_ids) > 0:
-            transitions = replay.get_transitions(
-                np.array(transition_ids))
+            transitions = replay.get_transitions(np.array(transition_ids))
             return transitions
         else:
-            return []
+            return None
 
     def queue_predecessors(s, loss):
         preceding_ids = replay.predecessors(s)
@@ -163,7 +176,7 @@ def prioritized_update(agent_state: AgentState, last_transition_id):
     for step in range(max_depth):
         # get the highest-priority transitions from the queue
         transitions = next_batch()
-        if len(transitions) == 0:
+        if transitions is None:
             break
 
         # update on the current batch of transitions
@@ -177,7 +190,7 @@ def prioritized_update(agent_state: AgentState, last_transition_id):
 
                 # add predecessors of transitions with large loss to the queue
                 queue_predecessors(start_state, loss)
-    print(f"Max depth: {step}, total updates: {n_updates}")
+    # print(f"Max depth: {step}, total updates: {n_updates}")
     return agent_state
 
 
@@ -322,7 +335,7 @@ def run_episode(agent_state: AgentState, rngs, env,
 
 
 # ----- Visualizations for gridworld ---------------------------------
-def display_state(agent_state: AgentState, env,
+def display_state(agent_state: AgentState, env: gridworld.GridWorld,
                   max_steps=100, rendering='local', savepath=None):
     exploration_state = agent_state.exploration_state
     policy_state = agent_state.policy_state
@@ -476,7 +489,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval_every', type=int, default=10)
 
     parser.add_argument('--tabular', action='store_true', default=False)
-    parser.add_argument('--temperature', type=float, default=1)
+    parser.add_argument('--temperature', type=float, default=1e-1)
     parser.add_argument('--prior_count', type=float, default=1e-3)
     parser.add_argument('--n_update_candidates', type=int, default=64)
     parser.add_argument('--no_optimistic_updates', dest='optimistic_updates',

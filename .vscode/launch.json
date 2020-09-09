@@ -16,10 +16,8 @@
             "args": [
                 "--env_size", "10",
                 "--debug",
-                "--vis",
-                "disk",
-                "--name",
-                "debug",
+                "--vis", "disk",
+                "--name", "debug",
                 // "--no_vis"
             ],
             "env": {
