@@ -140,6 +140,8 @@ def prioritized_update(agent_state: AgentState, last_transition_id):
     max_depth = 16
     max_bsize = 128
 
+    visited = set()
+
     def largest_pow(n):
         if n == 0:
             return 0
@@ -157,9 +159,12 @@ def prioritized_update(agent_state: AgentState, last_transition_id):
         while len(transition_ids) < batch_size:
             try:
                 _, transition_id = pqueue.get_nowait()
+                # if transition_id not in visited:
                 transition_ids.append(transition_id)
+                    # visited.add(transition_id)
             except queue.Empty:
                 break
+
         if len(transition_ids) > 0:
             transitions = replay.get_transitions(np.array(transition_ids))
             return transitions
@@ -169,7 +174,9 @@ def prioritized_update(agent_state: AgentState, last_transition_id):
     def queue_predecessors(s, loss):
         preceding_ids = replay.predecessors(s)
         for preceding_id in preceding_ids:
-            pqueue.put((-loss, preceding_id))
+            if preceding_id not in visited:
+                pqueue.put((-loss, preceding_id))
+                visited.add(preceding_id)
 
     n_updates = 0
     # update the tree up to a max depth

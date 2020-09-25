@@ -159,8 +159,7 @@ def main(args):
             if len(replay) > batch_size:
                 transitions = replay.sample(batch_size)
 
-                # TODO: change this back
-                q_state = q_functions.bellman_train_step(
+                q_state, losses = q_functions.bellman_train_step(
                     q_state, targetq_state,
                     # q_state, q_state,
                     transitions, candidate_actions)

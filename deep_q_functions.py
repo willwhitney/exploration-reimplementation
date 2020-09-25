@@ -26,7 +26,7 @@ def init_fn(seed, state_shape, action_shape, discount, **kwargs):
         rng, [(state_shape, jnp.float32), (action_shape, jnp.float32)])
     rng = random.split(rng, 1)[0]
     initial_model = nn.Model(q_net, initial_params)
-    q_opt = optim.Adam(1e-2).create(initial_model)
+    q_opt = optim.Adam(1e-3).create(initial_model)
     return q_learning.QLearnerState(q_opt, discount)
 
 
