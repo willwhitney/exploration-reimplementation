@@ -2,13 +2,17 @@ import numpy as np
 import typing
 import matplotlib.pyplot as plt
 
+from dm_control import suite
+
 import jax
 from jax import numpy as jnp, random, lax, profiler
 
 from flax import nn, struct
 
-import gridworld
+import dmcontrol_gridworld
 import utils
+import replay_buffer
+from observation_domains import DOMAINS
 
 
 @struct.dataclass
@@ -100,10 +104,24 @@ sample_egreedy_n = jax.vmap(sample_egreedy,  # noqa: E305
                             in_axes=(0, None, None, None))
 
 
+@jax.partial(jax.jit, static_argnums=(0, 2))
+def sample_uniform_actions(action_spec, rng, n):
+    if len(action_spec.shape) > 0:
+        shape = (n, *action_spec.shape)
+    else:
+        shape = (n, 1)
+    minval = jnp.expand_dims(action_spec.minimum, axis=0).tile((n, 1))
+    maxval = jnp.expand_dims(action_spec.maximum, axis=0).tile((n, 1))
+    actions = random.uniform(rng, shape=shape,
+                             minval=minval,
+                             maxval=maxval)
+    return actions.reshape((n, *action_spec.shape))
+
+
 # ---------- Utilities for gridworlds --------------
-def display_state(q_state: QLearnerState, env: gridworld.GridWorld,
+def display_state(q_state: QLearnerState, env: dmcontrol_gridworld.GridWorld,
                   rendering='disk', savepath=None):
-    q_map = gridworld.render_function(
+    q_map = dmcontrol_gridworld.render_function(
         jax.partial(predict_value, q_state),
         env, reduction=jnp.max)
     subfigs = [
@@ -114,26 +132,35 @@ def display_state(q_state: QLearnerState, env: gridworld.GridWorld,
 
 
 def main(args):
-    import gridworld
-    import replay_buffer
+    rng = random.PRNGKey(0)
+
+    if args.env == 'gridworld':
+        env = dmcontrol_gridworld.GridWorld(args.env_size, 100)
+        state_spec = env.observation_spec()
+    else:
+        env = suite.load(args.env, args.task)
+        state_spec = DOMAINS['env']['task']
+
+    action_spec = env.action_spec()
+
+    state_shape = utils.flatten_spec_shape(state_spec)
+    action_shape = action_spec.shape
+
+    batch_size = 128
 
     if args.tabular:
         import tabular_q_functions as q_functions
     else:
-        # import deep_q_functions as q_functions
-        import fullonehot_deep_q_functions as q_functions
-
-    rng = random.PRNGKey(0)
-    env = gridworld.new(args.env_size)
-    state_shape = (2, env.size)
-    action_shape = (1,)
-    batch_size = 128
-    max_steps = 100
+        import deep_q_functions as q_functions
+        # import onehot_deep_q_functions as q_functions
 
     if args.boltzmann:
         sample_action = jax.partial(sample_action_boltzmann, temp=1)
     else:
         sample_action = jax.partial(sample_action_egreedy, epsilon=0.5)
+
+    action_proposal = jax.partial(sample_uniform_actions,
+                                  action_spec)
 
     q_state = q_functions.init_fn(0,
                                   (batch_size, *state_shape),
@@ -142,51 +169,59 @@ def main(args):
                                   discount=0.99)
     targetq_state = q_state
     replay = replay_buffer.Replay(state_shape, action_shape)
-    candidate_actions = jnp.tile(jnp.expand_dims(env.actions, 0),
-                                 (batch_size, 1))
+    # candidate_actions = jnp.tile(jnp.expand_dims(env.actions, 0),
+    #                              (batch_size, 1))
+    n_proposal = 16
 
-    def full_step(q_state, targetq_state, rng, env, train=True):
-        s = gridworld.render(env)
+    def get_action(q_state, targetq_state, rng, s, train=True):
+        rng, action_rng = random.split(rng)
+        actions = action_proposal(action_rng, n_proposal)
         if train:
-            a, v = sample_action(q_state, rng, s, env.actions)
+            a, v = sample_action(q_state, rng, s, actions)
         else:
-            a, v = sample_action_egreedy(q_state, rng, s, env.actions, 0.01)
+            a, v = sample_action_egreedy(q_state, rng, s, actions, 0.01)
 
-        env, sp, r = gridworld.step(env, int(a))
+        return a, v
 
-        if train:
-            replay.append(s, a, sp, r)
-            if len(replay) > batch_size:
-                transitions = replay.sample(batch_size)
-
-                q_state, losses = q_functions.bellman_train_step(
-                    q_state, targetq_state,
-                    # q_state, q_state,
-                    transitions, candidate_actions)
-
-        return q_state, env, r
+        # return q_state, env, r
 
     # @jax.profiler.trace_function
-    def run_episode(rngs, q_state, targetq_state, env, train=True):
-        env = gridworld.reset(env)
+    def run_episode(rng, q_state, targetq_state, env, train=True):
+        timestep = env.reset()
         score = 0
-        for i in range(max_steps):
-            q_state, env, r = full_step(
-                q_state, targetq_state, rngs[i], env, train)
+        while not timestep.last():
+            rng, step_rng = random.split(rng)
+            s = utils.flatten_observation(timestep.observation)
+            a, _ = get_action(q_state, targetq_state, step_rng, s, train)
+            timestep = env.step(a)
+
+            sp = utils.flatten_observation(timestep.observation)
+            r = timestep.reward
+            if train:
+                replay.append(s, a, sp, r)
+                if len(replay) > batch_size:
+                    transitions = replay.sample(batch_size)
+
+                    rng, update_rng = random.split(rng)
+                    candidate_actions = action_proposal(
+                        update_rng, batch_size * n_proposal)
+                    candidate_actions = candidate_actions.reshape(
+                        (batch_size, n_proposal, -1))
+                    q_state, losses = q_functions.bellman_train_step(
+                        q_state, targetq_state,
+                        transitions, candidate_actions)
             score += r
-        return q_state, env, score
+        return q_state, score
 
     for episode in range(1000):
-        rngs = random.split(rng, max_steps + 1)
-        rng = rngs[0]
-        q_state, env, score = run_episode(
-            rngs[1:], targetq_state, q_state, env)
+        rng, episode_rng = random.split(rng)
+        q_state, score = run_episode(
+            episode_rng, targetq_state, q_state, env)
 
-        if episode % 10 == 0:
-            rngs = random.split(rng, max_steps + 1)
-            rng = rngs[0]
-            _, _, test_score = run_episode(
-                rngs[1:], targetq_state, q_state, env, train=False)
+        if episode % 1 == 0:
+            rng, episode_rng = random.split(rng)
+            _, test_score = run_episode(
+                episode_rng, targetq_state, q_state, env, train=False)
             print((f"Episode {episode:4d}"
                    f", Train score {score:3d}"
                    f", Test score {test_score:3d}"))
@@ -203,6 +238,8 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', default="default")
+    parser.add_argument('--env', default='gridworld')
+    parser.add_argument('--task', default='default')
     parser.add_argument('--tabular', action='store_true', default=False)
     parser.add_argument('--env_size', type=int, default=5)
     parser.add_argument('--debug', action='store_true', default=False)

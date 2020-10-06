@@ -13,11 +13,14 @@ from jax import numpy as jnp, random, lax
 import flax
 from flax import nn, optim, struct
 
-import gridworld
+from dm_control import suite
+
+import dmcontrol_gridworld
 import replay_buffer
 import q_learning
 import tabular_density as density
 import utils
+from observation_domains import DOMAINS
 
 
 R_MAX = 100
@@ -280,92 +283,134 @@ def select_action(exploration_state, rng, state, candidate_actions):
         exploration_state.temperature)
 
 
-@jax.profiler.trace_function
-def full_step(agent_state: AgentState, rng, env,
-              train=True):
-    # get env state
-    with jax.profiler.TraceContext("env render"):
-        s = gridworld.render(env)
+# @jax.profiler.trace_function
+# def full_step(agent_state: AgentState, rng, env,
+#               train=True):
+#     # get env state
+#     with jax.profiler.TraceContext("env render"):
+#         s = gridworld.render(env)
 
+#     n = agent_state.n_candidates if train else 1
+
+#     # get candidate actions
+#     with jax.profiler.TraceContext("get action candidates"):
+#         s_batch = jnp.expand_dims(s, axis=0)
+#         policy_state, candidate_actions = policy.action_fn(
+#             agent_state.policy_state, s_batch, n, train)
+
+#     # policy.action_fn deals with batches and we only have one element
+#     candidate_actions = candidate_actions[0]
+#     agent_state = agent_state.replace(policy_state=policy_state)
+
+#     # sample a behavior action from the candidates
+#     with jax.profiler.TraceContext("select action"):
+#         rng, action_rng = random.split(rng)
+#         a = select_action(agent_state.exploration_state,
+#                           action_rng, s, candidate_actions)
+
+#     # take action and observe outcome
+#     with jax.profiler.TraceContext("env step"):
+#         env, sp, r = gridworld.step(env, int(a))
+
+#     novelty_reward = compute_novelty_reward(agent_state.exploration_state,
+#                                             jnp.expand_dims(s, axis=0),
+#                                             jnp.expand_dims(a, axis=0))
+#     novelty_reward = float(novelty_reward)
+#     if train:
+#         # add transition to replay
+#         with jax.profiler.TraceContext("replay append"):
+#             transition_id = agent_state.replay.append(s, a, sp, r)
+
+#         # update the exploration policy with the observed transition
+#         rng, update_rng = random.split(rng)
+
+#         if len(agent_state.replay) > 128:
+#             agent_state = update_exploration(
+#                 agent_state, update_rng, transition_id)
+
+#     return agent_state, env, r, novelty_reward
+
+
+def sample_exploration_action(agent_state: AgentState, rng, s, train=True):
+    # during test, take only one action sample from the task policy
+    # -> will follow the task policy
     n = agent_state.n_candidates if train else 1
 
-    # get candidate actions
-    with jax.profiler.TraceContext("get action candidates"):
-        s_batch = jnp.expand_dims(s, axis=0)
-        policy_state, candidate_actions = policy.action_fn(
-            agent_state.policy_state, s_batch, n, train)
+    s_batch = jnp.expand_dims(s, axis=0)
+    policy_state, candidate_actions = policy.action_fn(
+        agent_state.policy_state, s_batch, n, train)
 
     # policy.action_fn deals with batches and we only have one element
     candidate_actions = candidate_actions[0]
     agent_state = agent_state.replace(policy_state=policy_state)
 
-    # sample a behavior action from the candidates
-    with jax.profiler.TraceContext("select action"):
-        rng, action_rng = random.split(rng)
-        a = select_action(agent_state.exploration_state,
-                          action_rng, s, candidate_actions)
-
-    # take action and observe outcome
-    with jax.profiler.TraceContext("env step"):
-        env, sp, r = gridworld.step(env, int(a))
-
-    novelty_reward = compute_novelty_reward(agent_state.exploration_state,
-                                            jnp.expand_dims(s, axis=0),
-                                            jnp.expand_dims(a, axis=0))
-    novelty_reward = float(novelty_reward)
-    if train:
-        # add transition to replay
-        with jax.profiler.TraceContext("replay append"):
-            transition_id = agent_state.replay.append(s, a, sp, r)
-
-        # update the exploration policy with the observed transition
-        rng, update_rng = random.split(rng)
-
-        if len(agent_state.replay) > 128:
-            agent_state = update_exploration(
-                agent_state, update_rng, transition_id)
-
-    return agent_state, env, r, novelty_reward
+    a = select_action(agent_state.exploration_state,
+                      rng, s, candidate_actions)
+    return agent_state, a
 
 
-def run_episode(agent_state: AgentState, rngs, env,
+def update_agent(agent_state: AgentState, rng, transition):
+    # add transition to replay
+    transition_id = agent_state.replay.append(*transition)
+
+    # update the exploration policy and density with the observed transition
+    if len(agent_state.replay) > 128:
+        agent_state = update_exploration(agent_state, rng, transition_id)
+    return agent_state
+
+
+def run_episode(agent_state: AgentState, rng, env,
                 train=True, max_steps=100, use_exploration=True):
-    env = gridworld.reset(env)
-    score = 0
-    novelty_score = 0
-    for i in range(max_steps):
-        agent_state, env, r, novelty_r = full_step(
-            agent_state, rngs[i], env, train=train)
+    timestep = env.reset()
+    score, novelty_score = 0, 0
+    while not timestep.last():
+        rng, action_rng = random.split(rng)
+        s = utils.flatten_observation(timestep.observation)
+        agent_state, a = sample_exploration_action(
+            agent_state, action_rng, s, train)
+        timestep = env.step(a)
+
+        sp = utils.flatten_observation(timestep.observation)
+        r = timestep.reward
+
+        novelty_reward = compute_novelty_reward(agent_state.exploration_state,
+                                                jnp.expand_dims(s, axis=0),
+                                                jnp.expand_dims(a, axis=0))
         score += r
-        novelty_score += novelty_r
+        novelty_score += float(novelty_reward)
+
+        if train:
+            transition = (s, a, sp, r)
+            rng, update_rng = random.split(rng)
+            agent_state = update_agent(agent_state, update_rng, transition)
     return agent_state, env, score, novelty_score
 
 
 # ----- Visualizations for gridworld ---------------------------------
-def display_state(agent_state: AgentState, env: gridworld.GridWorld,
+def display_state(agent_state: AgentState, env: dmcontrol_gridworld.GridWorld,
                   max_steps=100, rendering='local', savepath=None):
     exploration_state = agent_state.exploration_state
     policy_state = agent_state.policy_state
 
-    # min_count_map = gridworld.render_function(
+    # min_count_map = dmcontrol_gridworld.render_function(
     #     jax.partial(density.get_count_batch, exploration_state.density_state),
     #     env, reduction=jnp.min)
-    sum_count_map = gridworld.render_function(
+    sum_count_map = dmcontrol_gridworld.render_function(
         jax.partial(density.get_count_batch, exploration_state.density_state),
         env, reduction=jnp.sum)
-    novq_map = gridworld.render_function(
+    novq_map = dmcontrol_gridworld.render_function(
         jax.partial(q_learning.predict_value, exploration_state.novq_state),
         env, reduction=jnp.max)
-    optimistic_novq_map = gridworld.render_function(
+    optimistic_novq_map = dmcontrol_gridworld.render_function(
         jax.partial(predict_optimistic_value_batch,
                     exploration_state.novq_state,
                     exploration_state.density_state,
                     exploration_state.prior_count),
         env, reduction=jnp.max)
-    taskq_map = gridworld.render_function(
+    taskq_map = dmcontrol_gridworld.render_function(
         jax.partial(q_learning.predict_value, policy_state.q_state),
         env, reduction=jnp.max)
-    novelty_reward_map = gridworld.render_function(
+    novelty_reward_map = dmcontrol_gridworld.render_function(
         jax.partial(compute_novelty_reward, exploration_state),
         env, reduction=jnp.max)
     traj_map = replay_buffer.render_trajectory(
@@ -397,9 +442,17 @@ def display_state(agent_state: AgentState, env: gridworld.GridWorld,
 
 def main(args):
     rng = random.PRNGKey(args.seed)
-    env = gridworld.new(args.env_size)
-    state_shape = (2, env.size)
-    action_shape = (1,)
+    if args.env == 'gridworld':
+        env = dmcontrol_gridworld.GridWorld(args.env_size, args.max_steps)
+        state_spec = env.observation_spec()
+    else:
+        env = suite.load(args.env, args.task)
+        state_spec = DOMAINS['env']['task']
+
+    action_spec = env.action_spec()
+
+    state_shape = utils.flatten_spec_shape(state_spec)
+    action_shape = action_spec.shape
     batch_size = 128
 
     # drawing only one candidate action sample from the policy
@@ -439,19 +492,17 @@ def main(args):
 
     for episode in range(1, 100000):
         # run an episode
-        rngs = random.split(rng, args.max_steps + 1)
-        rng = rngs[0]
-
+        rng, episode_rng = random.split(rng)
         agent_state, env, score, novelty_score = run_episode(
-            agent_state, rngs[1:], env,
+            agent_state, episode_rng, env,
             train=True, max_steps=args.max_steps)
 
         # update the task policy
         # TODO: pull this loop inside the policy.update_fn
         policy_state = agent_state.policy_state
         for _ in range(50):
-            transitions = tuple((jnp.array(el)
-                                 for el in agent_state.replay.sample(batch_size)))
+            transitions = agent_state.replay.sample(batch_size)
+            transitions = tuple((jnp.array(el) for el in transitions))
             policy_state = policy.update_fn(policy_state, transitions)
         agent_state = agent_state.replace(policy_state=policy_state)
 
@@ -466,15 +517,15 @@ def main(args):
 
         # output / visualize
         if episode % args.eval_every == 0:
-            rngs = random.split(rng, args.max_steps + 1)
-            rng = rngs[0]
+            rng, episode_rng = random.split(rng)
             _, _, test_score, test_novelty_score = run_episode(
-                agent_state, rngs[1:], env,
+                agent_state, episode_rng, env,
                 train=False, max_steps=args.max_steps)
+
             print((f"Episode {episode:4d}"
-                   f", Train score {score:3d}"
+                   f", Train score {score:3.0f}"
                    f", Train novelty score {novelty_score:3.0f}"
-                   f", Test score {test_score:3d}"
+                   f", Test score {test_score:3.0f}"
                    f", Test novelty score {test_novelty_score:3.0f}"))
             if args.vis != 'none':
                 savepath = f"results/exploration/{args.name}/{episode}.png"
@@ -487,6 +538,8 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', default='default')
+    parser.add_argument('--env', default='gridworld')
+    parser.add_argument('--task', default='default')
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--env_size', type=int, default=20)
     parser.add_argument('--max_steps', type=int, default=100)
@@ -514,8 +567,10 @@ if __name__ == '__main__':
         import tabular_q_functions as q_functions
         import policies.tabular_q_policy as policy
     else:
-        # import deep_q_functions as q_functions
-        import fullonehot_deep_q_functions as q_functions
+        # if args.env == 'gridworld':
+            # import onehot_deep_q_functions as q_functions
+        # else:
+        import deep_q_functions as q_functions
         import policies.deep_q_policy as policy
 
     jit = not args.debug

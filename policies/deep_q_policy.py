@@ -4,8 +4,8 @@ from jax import numpy as jnp, random
 from flax import struct
 
 import q_learning
-# import deep_q_functions as q_functions
-import fullonehot_deep_q_functions as q_functions
+import deep_q_functions as q_functions
+# import onehot_deep_q_functions as q_functions
 
 
 TEMP = 1

@@ -6,6 +6,24 @@
     "configurations": [
 
 
+        {
+            "name": "q_learning.py deep",
+            "type": "python",
+            "request": "launch",
+            "program": "q_learning.py",
+            "console": "internalConsole",
+            "args": [
+                "--debug",
+                "--name",
+                "debug",
+                // "--no_vis"
+            ],
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "3"
+            }
+        },
+
+
 
         {
             "name": "main.py deep",

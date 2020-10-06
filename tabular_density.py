@@ -33,7 +33,8 @@ def new(state_values_per_dim, action_values_per_dim):
 
 @jax.jit
 def update_batch(density_state: DensityState, states, actions):
-    keys = _make_key_gridworld_batch(states, actions)
+    keys = _make_key_batch(states, actions)
+    # keys = _make_key_gridworld_batch(states, actions)
     new_observations = jax.ops.index_add(density_state.observations, keys, 1)
     new_total = density_state.total + states.shape[0]
     density_state = density_state.replace(observations=new_observations,
@@ -42,13 +43,15 @@ def update_batch(density_state: DensityState, states, actions):
 
 
 def get_count(density_state: DensityState, state, action):
-    key = _make_key_gridworld(state, action)
+    key = _make_key(state, action)
+    # key = _make_key_gridworld(state, action)
     return density_state.observations[key]
 
 
 @jax.jit
 def get_count_batch(density_state: DensityState, states, actions):
-    keys = _make_key_gridworld_batch(states, actions)
+    keys = _make_key_batch(states, actions)
+    # keys = _make_key_gridworld_batch(states, actions)
     return density_state.observations[keys]
 
 
@@ -71,6 +74,11 @@ def _make_key_gridworld(s, a):
     a = _process_gridworld_action(a)
     return tuple(jnp.concatenate([s.flatten(), a.flatten()]))
 _make_key_gridworld_batch = jax.vmap(_make_key_gridworld)  # noqa: E305
+
+
+def _make_key(s, a):
+    return tuple(jnp.concatenate([s.flatten(), a.flatten()]).astype(int))
+_make_key_batch = jax.vmap(_make_key)  # noqa: E305
 
 
 def _flatten(s, a):

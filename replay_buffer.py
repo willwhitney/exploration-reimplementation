@@ -94,11 +94,11 @@ def render_trajectory(replay, n, env):
     end = replay.next_slot
     start = max(0, end - n)
     transitions = replay[start:end]
-    states = transitions[0]
+    states = transitions[0].astype(int)
     render = np.zeros((env.size, env.size))
     for state in states:
-        loc = state.argmax(axis=1)
-        render[loc[0], loc[1]] += 1
+        # loc = state.argmax(axis=1)
+        render[state[0], state[1]] += 1
     return render
 
 

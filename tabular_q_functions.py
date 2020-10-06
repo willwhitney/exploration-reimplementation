@@ -3,15 +3,23 @@ from jax import numpy as jnp, random
 
 from flax import nn, optim
 
+import utils
 import q_learning
 
 
 class TabularQ(nn.Module):
-    def apply(self, s, a, env_size):
+    def apply(self, s, a, state_spec, action_spec, bins):
         def init(key, shape, dtype=jnp.float32):
             return jnp.full(shape, 0, dtype=dtype)
 
-        table = self.param('table', (env_size, env_size, 4), init)
+        state_shape = utils.flatten_spec_shape(state_spec)
+        action_shape = utils.flatten_spec_shape(action_spec)
+
+        onehot_state_shape = (bins for el in state_shape for _ in range(el))
+        onehot_action_shape = (bins for el in action_shape for _ in range(el))
+
+        table = self.param(
+            'table', (*onehot_state_shape, *onehot_action_shape), init)
 
         def lookup(table, s, a):
             x, y = s.argmax(axis=1)
@@ -21,9 +29,11 @@ class TabularQ(nn.Module):
         return batched_lookup(table, s, a)
 
 
-def init_fn(seed, state_shape, action_shape, discount, **kwargs):
+def init_fn(seed, state_spec, action_spec, discount, **kwargs):
     rng = random.PRNGKey(seed)
-    q_net = TabularQ.partial(env_size=kwargs['env_size'])
+    q_net = TabularQ.partial(state_spec=state_spec, action_spec=action_spec)
+    state_shape = utils.flatten_spec_shape(state_spec)
+    action_shape = utils.flatten_spec_shape(action_spec)
     _, initial_params = q_net.init_by_shape(
         rng, [(state_shape, jnp.float32), (action_shape, jnp.float32)])
     rng = random.split(rng, 1)[0]
@@ -34,7 +44,7 @@ def init_fn(seed, state_shape, action_shape, discount, **kwargs):
 
 @jax.jit
 def train_step(q_state: q_learning.QLearnerState, states, actions, targets):
-    state_coords = states.argmax(axis=-1)
+    state_coords = states
     preds = q_state.model(states, actions)
     losses = ((targets - preds)**2)
     for coord, a, t in zip(state_coords, actions, targets):
