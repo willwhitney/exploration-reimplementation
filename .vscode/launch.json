@@ -4,8 +4,13 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
-
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "internalConsole"
+        },
         {
             "name": "q_learning.py deep",
             "type": "python",
@@ -14,27 +19,6 @@
             "console": "internalConsole",
             "args": [
                 "--debug",
-                "--name",
-                "debug",
-                // "--no_vis"
-            ],
-            "env": {
-                "CUDA_VISIBLE_DEVICES": "3"
-            }
-        },
-
-
-
-        {
-            "name": "main.py deep",
-            "type": "python",
-            "request": "launch",
-            "program": "main.py",
-            "console": "internalConsole",
-            "args": [
-                "--env_size", "10",
-                "--debug",
-                "--vis", "disk",
                 "--name", "debug",
                 // "--no_vis"
             ],
@@ -42,10 +26,27 @@
                 "CUDA_VISIBLE_DEVICES": "3"
             }
         },
-
-
-
-
+        {
+            "name": "main.py deep",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "console": "internalConsole",
+            "args": [
+                // "--env_size", "10",
+                "--debug",
+                // "--vis", "disk",
+                // "--env", "point_mass",
+                // "--task", "easy",
+                "--eval_every", "1",
+                "--vis", "none",
+                "--name", "debug",
+                "--no_prioritized_update"
+            ],
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "3"
+            }
+        },
         {
             "name": "main.py tabular",
             "type": "python",
@@ -58,7 +59,9 @@
                 // "--debug",
                 // "--no_vis"
             ],
-            "env": {"CUDA_VISIBLE_DEVICES": "3"}
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "3"
+            }
         }
     ]
 }

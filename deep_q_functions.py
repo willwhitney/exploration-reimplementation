@@ -4,6 +4,7 @@ from jax import numpy as jnp, random, profiler  # noqa: F401
 from flax import nn, optim
 
 import q_learning
+import utils
 
 
 class DenseQNetwork(nn.Module):
@@ -18,12 +19,15 @@ class DenseQNetwork(nn.Module):
         return q
 
 
-def init_fn(seed, state_shape, action_shape, discount, **kwargs):
+def init_fn(seed, state_spec, action_spec, discount, **kwargs):
+    state_shape = utils.flatten_spec_shape(state_spec)
+    action_shape = action_spec.shape
     rng = random.PRNGKey(seed)
     q_net = DenseQNetwork.partial(hidden_layers=2,
                                   hidden_dim=512)
     _, initial_params = q_net.init_by_shape(
-        rng, [(state_shape, jnp.float32), (action_shape, jnp.float32)])
+        rng, [((128, *state_shape), jnp.float32), 
+              ((128, *action_shape), jnp.float32)])
     rng = random.split(rng, 1)[0]
     initial_model = nn.Model(q_net, initial_params)
     q_opt = optim.Adam(1e-3).create(initial_model)

@@ -5,7 +5,7 @@ from dm_env.specs import BoundedArray
 
 
 DOMAINS = {
-    'pointmass': {
+    'point_mass': {
         'easy': OrderedDict({
             'position': BoundedArray(name='position', shape=(2,),
                                      dtype=np.float32,

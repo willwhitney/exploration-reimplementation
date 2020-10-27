@@ -4,8 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import jax
-from jax import numpy as jnp
+from jax import numpy as jnp, random
 from jax.lib import pytree
+from dm_env import specs
+import jax_specs
 
 
 def one_hot(x, k, dtype=jnp.int16):
@@ -126,15 +128,14 @@ def super_unflatten(big_array, treedef, shapes):
 def discretize(x, spec, bins):
     """Discretize an input ndarray `x` into `bins` values.
 
-    First rescales `x` to have every value in [0, 1] using `minimum` and
-        `maximum`, which may be ndarrays.
+    First rescales `x` to have every value in [0, 1] using the spec min and max.
     Then scales `x` up to [0, bins - 1].
     Finally casts `x` to an integer type.
     """
-    x = (x + spec.minimum) / (spec.maximum - spec.minimum)
+    x = (x - spec.minimum) / (spec.maximum - spec.minimum)
     x = jnp.floor(x * bins)
     x = jnp.clip(x, 0, bins - 1)
-    return x
+    return x.astype(jnp.uint32)
 
 
 def normalize(obs_el, spec_el):
@@ -159,6 +160,42 @@ def discretize_observation(obs, spec, bins, preserve_batch=False):
 
 def flatten_spec_shape(spec):
     return (sum([np.prod(v.shape) for v in spec.values()]),)
+
+
+def flatten_observation_spec(spec):
+    """Takes a dm_env spec and flattens it.
+    Preserves the minimum and maximum vectors by flattening them as well.
+    CANNOT be called with a jax_specs spec!
+    """
+    flat_tree = jax.tree_leaves(spec)
+    assert isinstance(flat_tree[0], specs.BoundedArray)
+    mins = jnp.concatenate([el.minimum.flatten() for el in flat_tree])
+    maxs = jnp.concatenate([el.maximum.flatten() for el in flat_tree])
+    shape = flatten_spec_shape(spec)
+    return specs.BoundedArray(shape, dtype=np.float32,
+                              minimum=mins, maximum=maxs)
+
+
+@jax.partial(jax.jit, static_argnums=(0, 2))
+def sample_uniform_actions(action_spec, rng, n):
+    if len(action_spec.shape) > 0:
+        shape = (n, *action_spec.shape)
+    else:
+        shape = (n, 1)
+    minval = jnp.expand_dims(action_spec.minimum, axis=0).tile((n, 1))
+    maxval = jnp.expand_dims(action_spec.maximum, axis=0).tile((n, 1))
+
+    # if jnp.issubdtype(action_spec.dtype, jnp.integer):
+    if (isinstance(action_spec, jax_specs.DiscreteArray) or
+        isinstance(action_spec, specs.DiscreteArray)):
+        sampler = random.randint
+        maxval += 1  # maxval is exclusive for randint but not uniform
+    else:
+        sampler = random.uniform
+
+    actions = sampler(rng, shape=shape, # dtype=action_spec.dtype,
+                      minval=minval, maxval=maxval)
+    return actions.reshape((n, *action_spec.shape))
 
 
 if __name__ == "__main__":

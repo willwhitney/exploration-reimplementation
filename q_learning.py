@@ -82,8 +82,10 @@ sample_action_boltzmann_batch_n = jax.vmap(sample_action_boltzmann,
 
 @jax.jit
 def sample_boltzmann(rng, values, actions, temp=1):
-    boltzmann_probs = nn.softmax(values / temp)
-    action = random.choice(rng, actions, p=boltzmann_probs)
+    boltzmann_logits = values / temp
+    action_index = random.categorical(rng, boltzmann_logits)
+    action = actions[action_index]
+    # action = random.choice(rng, actions, p=boltzmann_probs)
     return action
 sample_boltzmann_n = jax.vmap(sample_boltzmann,  # noqa: E305
                               in_axes=(0, None, None, None))
@@ -104,19 +106,6 @@ sample_egreedy_n = jax.vmap(sample_egreedy,  # noqa: E305
                             in_axes=(0, None, None, None))
 
 
-@jax.partial(jax.jit, static_argnums=(0, 2))
-def sample_uniform_actions(action_spec, rng, n):
-    if len(action_spec.shape) > 0:
-        shape = (n, *action_spec.shape)
-    else:
-        shape = (n, 1)
-    minval = jnp.expand_dims(action_spec.minimum, axis=0).tile((n, 1))
-    maxval = jnp.expand_dims(action_spec.maximum, axis=0).tile((n, 1))
-    actions = random.uniform(rng, shape=shape,
-                             minval=minval,
-                             maxval=maxval)
-    return actions.reshape((n, *action_spec.shape))
-
 
 # ---------- Utilities for gridworlds --------------
 def display_state(q_state: QLearnerState, env: dmcontrol_gridworld.GridWorld,
@@ -136,14 +125,14 @@ def main(args):
 
     if args.env == 'gridworld':
         env = dmcontrol_gridworld.GridWorld(args.env_size, 100)
-        state_spec = env.observation_spec()
+        observation_spec = env.observation_spec()
     else:
         env = suite.load(args.env, args.task)
-        state_spec = DOMAINS['env']['task']
+        observation_spec = DOMAINS[args.env][args.task]
 
     action_spec = env.action_spec()
 
-    state_shape = utils.flatten_spec_shape(state_spec)
+    state_shape = utils.flatten_spec_shape(observation_spec)
     action_shape = action_spec.shape
 
     batch_size = 128
@@ -159,12 +148,10 @@ def main(args):
     else:
         sample_action = jax.partial(sample_action_egreedy, epsilon=0.5)
 
-    action_proposal = jax.partial(sample_uniform_actions,
+    action_proposal = jax.partial(utils.sample_uniform_actions,
                                   action_spec)
 
-    q_state = q_functions.init_fn(0,
-                                  (batch_size, *state_shape),
-                                  (batch_size, *action_shape),
+    q_state = q_functions.init_fn(0, observation_spec, action_spec,
                                   env_size=args.env_size,
                                   discount=0.99)
     targetq_state = q_state
@@ -223,9 +210,9 @@ def main(args):
             _, test_score = run_episode(
                 episode_rng, targetq_state, q_state, env, train=False)
             print((f"Episode {episode:4d}"
-                   f", Train score {score:3d}"
-                   f", Test score {test_score:3d}"))
-        if episode % 1 == 0:
+                   f", Train score {score:3.0f}"
+                   f", Test score {test_score:3.0f}"))
+        if args.env == 'gridworld' and episode % 1 == 0:
             savepath = f"results/q_learning/{args.name}/{episode}.png"
             display_state(q_state, env, rendering='disk', savepath=savepath)
             # display_value_map(q_state, env)
