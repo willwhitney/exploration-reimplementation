@@ -176,10 +176,11 @@ def flatten_observation_spec(spec):
                               minimum=mins, maximum=maxs)
 
 
-@jax.partial(jax.jit, static_argnums=(0, 2))
+@jax.partial(jax.jit, static_argnums=(2,))
 def sample_uniform_actions(action_spec, rng, n):
-    if len(action_spec.shape) > 0:
-        shape = (n, *action_spec.shape)
+    aspec_shape = action_spec.minimum.shape
+    if len(aspec_shape) > 0:
+        shape = (n, *aspec_shape)
     else:
         shape = (n, 1)
     minval = jnp.expand_dims(action_spec.minimum, axis=0).tile((n, 1))
@@ -195,7 +196,7 @@ def sample_uniform_actions(action_spec, rng, n):
 
     actions = sampler(rng, shape=shape, # dtype=action_spec.dtype,
                       minval=minval, maxval=maxval)
-    return actions.reshape((n, *action_spec.shape))
+    return actions.reshape((n, *aspec_shape))
 
 
 if __name__ == "__main__":

@@ -52,7 +52,7 @@ class AgentState():
     n_candidates: int
     n_update_candidates: int
     prioritized_update: bool
-    policy_fns: Any = struct.field(pytree_node=False)
+    # policy_fns: Any = struct.field(pytree_node=False)
 
 
 @jax.jit
@@ -121,7 +121,7 @@ def train_step(agent_state, transitions):
 
     # candidate actions should be (bsize x 64 x *action_shape)
     with jax.profiler.TraceContext("get candidates"):
-        policy_state, candidate_next_actions = agent_state.policy_fns.action_fn(
+        policy_state, candidate_next_actions = policy.action_fn(
             agent_state.policy_state, next_states,
             int(agent_state.n_update_candidates), True)
         agent_state = agent_state.replace(policy_state=policy_state)
@@ -299,7 +299,7 @@ def sample_exploration_action(agent_state: AgentState, rng, s, train=True):
 
     with jax.profiler.TraceContext("sample candidate actions"):
         s_batch = jnp.expand_dims(s, axis=0)
-        policy_state, candidate_actions = agent_state.policy_fns.action_fn(
+        policy_state, candidate_actions = policy.action_fn(
             agent_state.policy_state, s_batch, n, train)
 
     # policy.action_fn deals with batches and we only have one element
@@ -438,7 +438,7 @@ def main(args):
     replay = replay_buffer.LowPrecisionTracingReplay(
         state_shape, action_shape, min_s=0, max_s=1, n_bins=2)
 
-    policy_state, policy_fns = policy.make_policy(
+    policy_state = policy.init_fn(
         j_observation_spec, action_spec, args.seed)
 
     exploration_state = ExplorationState(
@@ -454,8 +454,7 @@ def main(args):
                              replay=replay,
                              n_candidates=n_candidates,
                              n_update_candidates=args.n_update_candidates,
-                             prioritized_update=args.prioritized_update,
-                             policy_fns=policy_fns)
+                             prioritized_update=args.prioritized_update,)
 
     for episode in range(1, 100000):
         # run an episode
@@ -469,7 +468,7 @@ def main(args):
         for _ in range(50):
             transitions = agent_state.replay.sample(batch_size)
             transitions = tuple((jnp.array(el) for el in transitions))
-            policy_state = agent_state.policy_fns.update_fn(
+            policy_state = policy.update_fn(
                 policy_state, transitions)
         agent_state = agent_state.replace(policy_state=policy_state)
 

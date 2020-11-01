@@ -34,7 +34,7 @@
             "console": "internalConsole",
             "args": [
                 // "--env_size", "10",
-                "--debug",
+                // "--debug",
                 // "--vis", "disk",
                 // "--env", "point_mass",
                 // "--task", "easy",
