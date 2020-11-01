@@ -138,7 +138,7 @@ def update_batch(density_state: DensityState, states, actions):
     return _update_batch(density_state, density_state.settings, states, actions)
 
 
-@jax.partial(jax.jit, static_argnums=(1,))
+@jax.jit
 def _update_batch(density_state: DensityState,
                   density_settings: DensitySettings,
                   states, actions):
@@ -185,7 +185,7 @@ def _make_key_gridworld(s, a):
 _make_key_gridworld_batch = jax.vmap(_make_key_gridworld)  # noqa: E305
 
 
-@jax.partial(jax.jit, static_argnums=0)
+@jax.jit
 def _make_key(density_settings: DensitySettings, s, a):
     ospec = density_settings.observation_spec
     aspec = density_settings.action_spec
