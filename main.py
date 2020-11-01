@@ -39,7 +39,7 @@ class ExplorationState():
     prior_count: float
     optimistic_updates: bool
     target_network: bool
-    density_fns: Any
+    # density_fns: Any
 
 
 @struct.dataclass

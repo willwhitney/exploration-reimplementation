@@ -11,9 +11,15 @@ import dm_env
 class Array():
     shape: tuple
 
-    # def __eq__(self, other):
-    #     # print("Equality tested: ", self)
-    #     return self.shape == other.shape
+    def __eq__(self, other):
+        # return self.shape == other.shape
+        return self.__key() == other.__key()
+
+    def __key(self):
+        return self.shape
+
+    def __hash__(self):
+        return hash(self.__key())
 
 
 @struct.dataclass
@@ -27,6 +33,10 @@ class BoundedArray(Array):
     #                 jnp.allclose(self.minimum, other.minimum),
     #                 jnp.allclose(self.maximum, other.maximum)))
 
+    def __key(self):
+        return (self.shape,
+                tuple(self.minimum.flatten()),
+                tuple(self.maximum.flatten()))
 
 @struct.dataclass
 class DiscreteArray(BoundedArray):
@@ -37,7 +47,13 @@ class DiscreteArray(BoundedArray):
 
     # def __eq__(self, other):
     #     return all((super().__eq__(other),
-    #                self.num_values == other.num_values))
+    #                 self.num_values == other.num_values))
+
+    def __key(self):
+        return (self.shape,
+                tuple(self.minimum.flatten()),
+                tuple(self.maximum.flatten()),
+                self.num_values)
 
 
 def convert_dm_spec_single(spec):
