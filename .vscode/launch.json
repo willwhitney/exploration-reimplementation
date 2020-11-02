@@ -39,7 +39,7 @@
                 // "--env", "point_mass",
                 // "--task", "easy",
                 "--eval_every", "1",
-                "--vis", "none",
+                "--vis", "disk",
                 "--name", "debug",
                 "--no_prioritized_update"
             ],

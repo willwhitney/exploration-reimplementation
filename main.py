@@ -350,7 +350,7 @@ def run_episode(agent_state: AgentState, rng, env,
 
 
 # ----- Visualizations for gridworld ---------------------------------
-def display_state(agent_state: AgentState, env: dmcontrol_gridworld.GridWorld,
+def display_state(agent_state: AgentState, ospec, aspec,
                   max_steps=100, rendering='local', savepath=None):
     exploration_state = agent_state.exploration_state
     policy_state = agent_state.policy_state
@@ -358,26 +358,45 @@ def display_state(agent_state: AgentState, env: dmcontrol_gridworld.GridWorld,
     # min_count_map = dmcontrol_gridworld.render_function(
     #     jax.partial(density.get_count_batch, exploration_state.density_state),
     #     env, reduction=jnp.min)
-    sum_count_map = dmcontrol_gridworld.render_function(
+    sum_count_map = utils.render_function(
         jax.partial(density.get_count_batch, exploration_state.density_state),
-        env, reduction=jnp.sum)
-    novq_map = dmcontrol_gridworld.render_function(
+        ospec, aspec, reduction=jnp.sum)
+    novq_map = utils.render_function(
         jax.partial(q_learning.predict_value, exploration_state.novq_state),
-        env, reduction=jnp.max)
-    optimistic_novq_map = dmcontrol_gridworld.render_function(
+        ospec, aspec, reduction=jnp.max)
+    optimistic_novq_map = utils.render_function(
         jax.partial(predict_optimistic_value_batch,
                     exploration_state.novq_state,
                     exploration_state.density_state,
                     exploration_state.prior_count),
-        env, reduction=jnp.max)
-    taskq_map = dmcontrol_gridworld.render_function(
+        ospec, aspec, reduction=jnp.max)
+    taskq_map = utils.render_function(
         jax.partial(q_learning.predict_value, policy_state.q_state),
-        env, reduction=jnp.max)
-    novelty_reward_map = dmcontrol_gridworld.render_function(
+        ospec, aspec, reduction=jnp.max)
+    novelty_reward_map = utils.render_function(
         jax.partial(compute_novelty_reward, exploration_state),
-        env, reduction=jnp.max)
-    traj_map = replay_buffer.render_trajectory(
-        agent_state.replay, max_steps, env)
+        ospec, aspec, reduction=jnp.max)
+
+    # sum_count_map = dmcontrol_gridworld.render_function(
+    #     jax.partial(density.get_count_batch, exploration_state.density_state),
+    #     env, reduction=jnp.sum)
+    # novq_map = dmcontrol_gridworld.render_function(
+    #     jax.partial(q_learning.predict_value, exploration_state.novq_state),
+    #     env, reduction=jnp.max)
+    # optimistic_novq_map = dmcontrol_gridworld.render_function(
+    #     jax.partial(predict_optimistic_value_batch,
+    #                 exploration_state.novq_state,
+    #                 exploration_state.density_state,
+    #                 exploration_state.prior_count),
+    #     env, reduction=jnp.max)
+    # taskq_map = dmcontrol_gridworld.render_function(
+    #     jax.partial(q_learning.predict_value, policy_state.q_state),
+    #     env, reduction=jnp.max)
+    # novelty_reward_map = dmcontrol_gridworld.render_function(
+    #     jax.partial(compute_novelty_reward, exploration_state),
+    #     env, reduction=jnp.max)
+    # traj_map = replay_buffer.render_trajectory(
+    #     agent_state.replay, max_steps, env)
 
     # print(f"Max novelty value: {novq_map.max() :.2f}")
 
@@ -388,7 +407,7 @@ def display_state(agent_state: AgentState, env: dmcontrol_gridworld.GridWorld,
         (optimistic_novq_map, "Optimistic novelty value (max)"),
         (taskq_map, "Task value (max)"),
         (novelty_reward_map, "Novelty reward (max)"),
-        (traj_map, "Last trajectory"),
+        # (traj_map, "Last trajectory"),
     ]
 
     fig, axs = plt.subplots(1, len(subfigs))
@@ -413,7 +432,7 @@ def main(args):
         observation_spec = DOMAINS[args.env][args.task]
 
     action_spec = env.action_spec()
-    action_spec = jax_specs.convert_dm_spec(action_spec)
+    j_action_spec = jax_specs.convert_dm_spec(action_spec)
     j_observation_spec = jax_specs.convert_dm_spec(observation_spec)
 
     state_shape = utils.flatten_spec_shape(j_observation_spec)
@@ -426,11 +445,11 @@ def main(args):
 
     novq_state = q_functions.init_fn(args.seed,
                                      j_observation_spec,
-                                     action_spec,
+                                     j_action_spec,
                                     #  env_size=env.size,
                                      discount=0.97)
 
-    density_state = density.new(observation_spec, action_spec,
+    density_state = density.new(observation_spec, j_action_spec,
                                 state_bins=args.n_state_bins,
                                 action_bins=args.n_action_bins)
 
@@ -439,7 +458,7 @@ def main(args):
         state_shape, action_shape, min_s=0, max_s=1, n_bins=2)
 
     policy_state = policy.init_fn(
-        j_observation_spec, action_spec, args.seed)
+        j_observation_spec, j_action_spec, args.seed)
 
     exploration_state = ExplorationState(
         novq_state=novq_state,
@@ -494,7 +513,7 @@ def main(args):
                    f", Test novelty score {test_novelty_score:3.0f}"))
             if args.vis != 'none':
                 savepath = f"results/exploration/{args.name}/{episode}.png"
-                display_state(agent_state, env,
+                display_state(agent_state, observation_spec, action_spec,
                               max_steps=args.max_steps, rendering=args.vis,
                               savepath=savepath)
 

@@ -2,6 +2,7 @@ import os
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+import collections
 
 import jax
 from jax import numpy as jnp, random
@@ -197,6 +198,81 @@ def sample_uniform_actions(action_spec, rng, n):
     actions = sampler(rng, shape=shape, # dtype=action_spec.dtype,
                       minval=minval, maxval=maxval)
     return actions.reshape((n, *aspec_shape))
+
+
+# @jax.partial(jax.jit, static_argnums=(2,))
+def sample_uniform_single(spec, rng, n):
+    aspec_shape = spec.minimum.shape
+    if len(aspec_shape) > 0:
+        shape = (n, *aspec_shape)
+    else:
+        shape = (n, 1)
+    minval = jnp.expand_dims(spec.minimum, axis=0).tile((n, 1))
+    maxval = jnp.expand_dims(spec.maximum, axis=0).tile((n, 1))
+
+    if (isinstance(spec, jax_specs.DiscreteArray) or
+        isinstance(spec, specs.DiscreteArray)):
+        sampler = random.randint
+        maxval += 1  # maxval is exclusive for randint but not uniform
+    else:
+        sampler = random.uniform
+
+    samples = sampler(rng, shape=shape,
+                      minval=minval, maxval=maxval)
+    return samples.reshape(shape)
+
+
+def sample_flat_uniform(spec, rng, n):
+    samples = jax.tree_map(jax.partial(sample_uniform_single, rng=rng, n=n),
+                           spec)
+    return flatten_observation(samples, preserve_batch=True)
+    # if isinstance(spec, collections.OrderedDict):
+    #     samples = [sample_uniform_single(s, rng, n) for k, s in spec.items()]
+    #     # samples = jax.tree_map(jax.partial(sample_uniform_single, rng=rng, n=n),
+    #                         # spec)
+    #     return flatten_observation(samples, preserve_batch=True)
+    # else:
+    #     return sample_uniform_single(spec, rng, n)
+
+
+def render_function(fn, ospec, aspec, reduction=jnp.max,
+                    vis_dims=(0, 1), bins=20):
+    """Renders a given function at sampled (state, action) pairs.
+
+    Arguments:
+    - fn: a function that takes (batch of states, batch of actions) as its
+        arguments
+    - ospec: an observation spec
+    - aspec: an action spec
+    - reduction: a function mapping from jnp.ndarray -> float. maps from the
+        vector of values for each action at a particular state to a single
+        value which will represent that state.
+    """
+    rng = random.PRNGKey(0)
+    n_samples = 1000
+    sampled_flat_states = sample_flat_uniform(ospec, rng, n_samples)
+    sampled_actions = sample_uniform_single(aspec, rng, n_samples)
+
+    values = fn(sampled_flat_states, sampled_actions)
+
+    flat_ospec = flatten_observation_spec(ospec)
+    discrete_states = discretize(sampled_flat_states, flat_ospec, bins)
+    discrete_actions = discretize(sampled_actions, aspec, bins)
+
+    xs = jnp.concatenate([discrete_states, discrete_actions],
+                         axis=1)
+    value_lists = [[[] for _ in range(bins)] for _ in range(bins)]
+    for (x, value) in zip(xs, values):
+        i, j = x[vis_dims[0]], x[vis_dims[1]]
+        value_lists[i][j].append(value)
+
+    rendered_values = np.zeros((bins, bins))
+    for i in range(bins):
+        for j in range(bins):
+            l = value_lists[i][j]
+            if len(l) > 0:
+                rendered_values[i, j] = reduction(l)
+    return rendered_values
 
 
 if __name__ == "__main__":
