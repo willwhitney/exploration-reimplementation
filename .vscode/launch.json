@@ -41,7 +41,11 @@
                 "--eval_every", "1",
                 "--vis", "disk",
                 "--name", "debug",
-                "--no_prioritized_update"
+                "--no_prioritized_update",
+                "--target_network",
+                "--n_state_bins", "20",
+                "--n_action_bins", "4",
+                "--max_steps", "100"
             ],
             "env": {
                 "CUDA_VISIBLE_DEVICES": "3"

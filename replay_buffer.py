@@ -3,6 +3,8 @@ import collections
 import numpy as np
 import matplotlib.pyplot as plt
 
+import utils
+
 
 class Replay:
     def __init__(self, state_shape, action_shape, max_size=int(1e5)):
@@ -90,15 +92,19 @@ class LowPrecisionTracingReplay(TracingReplay):
 
 
 # ----- Visualizations for gridworld ---------------------------------
-def render_trajectory(replay, n, env):
+def render_trajectory(replay, n, ospec, bins, vis_dims=(0, 1)):
+    x_dim, y_dim = vis_dims
     end = replay.next_slot
     start = max(0, end - n)
+    flat_spec = utils.flatten_observation_spec(ospec)
+
     transitions = replay[start:end]
     states = transitions[0].astype(int)
-    render = np.zeros((env.size, env.size))
+    render = np.zeros((bins, bins))
     for state in states:
         # loc = state.argmax(axis=1)
-        render[state[0], state[1]] += 1
+        discrete_state = utils.discretize_observation(state, flat_spec, bins)
+        render[discrete_state[x_dim], discrete_state[y_dim]] += 1
     return render
 
 

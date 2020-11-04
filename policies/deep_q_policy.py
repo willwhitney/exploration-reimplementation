@@ -12,7 +12,7 @@ import utils
 import jax_specs
 
 
-TEMP = 1
+TEMP = 100
 N_CANDIDATES = 32
 
 

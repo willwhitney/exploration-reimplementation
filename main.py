@@ -217,7 +217,7 @@ def update_target_q(agent_state: AgentState):
 
 
 def uniform_update(agent_state, rng):
-    for _ in range(1):
+    for _ in range(10):
         transitions = tuple((jnp.array(el)
                              for el in agent_state.replay.sample(128)))
         agent_state, losses = train_step(agent_state, transitions)
@@ -237,14 +237,15 @@ def update_exploration(agent_state, rng, transition_id):
         exploration_state = exploration_state.replace(density_state=density_state)
         agent_state = agent_state.replace(exploration_state=exploration_state)
 
-    # update exploration Q to consistency with new density
-    rng, novq_rng = random.split(rng)
+    if len(agent_state.replay) > 128:
+        # update exploration Q to consistency with new density
+        rng, novq_rng = random.split(rng)
 
-    if agent_state.prioritized_update:
-        agent_state = prioritized_update(agent_state, transition_id)
-    else:
-        with jax.profiler.TraceContext("uniform update"):
-            agent_state = uniform_update(agent_state, novq_rng)
+        if agent_state.prioritized_update:
+            agent_state = prioritized_update(agent_state, transition_id)
+        else:
+            with jax.profiler.TraceContext("uniform update"):
+                agent_state = uniform_update(agent_state, novq_rng)
     return agent_state
 
 
@@ -317,8 +318,7 @@ def update_agent(agent_state: AgentState, rng, transition):
     transition_id = agent_state.replay.append(*transition)
 
     # update the exploration policy and density with the observed transition
-    if len(agent_state.replay) > 128:
-        agent_state = update_exploration(agent_state, rng, transition_id)
+    agent_state = update_exploration(agent_state, rng, transition_id)
     return agent_state
 
 
@@ -360,22 +360,22 @@ def display_state(agent_state: AgentState, ospec, aspec,
     #     env, reduction=jnp.min)
     sum_count_map = utils.render_function(
         jax.partial(density.get_count_batch, exploration_state.density_state),
-        ospec, aspec, reduction=jnp.sum)
+        ospec, aspec, reduction=jnp.sum, bins=20)
     novq_map = utils.render_function(
         jax.partial(q_learning.predict_value, exploration_state.novq_state),
-        ospec, aspec, reduction=jnp.max)
+        ospec, aspec, reduction=jnp.max, bins=20)
     optimistic_novq_map = utils.render_function(
         jax.partial(predict_optimistic_value_batch,
                     exploration_state.novq_state,
                     exploration_state.density_state,
                     exploration_state.prior_count),
-        ospec, aspec, reduction=jnp.max)
+        ospec, aspec, reduction=jnp.max, bins=20)
     taskq_map = utils.render_function(
         jax.partial(q_learning.predict_value, policy_state.q_state),
-        ospec, aspec, reduction=jnp.max)
+        ospec, aspec, reduction=jnp.max, bins=20)
     novelty_reward_map = utils.render_function(
         jax.partial(compute_novelty_reward, exploration_state),
-        ospec, aspec, reduction=jnp.max)
+        ospec, aspec, reduction=jnp.max, bins=20)
 
     # sum_count_map = dmcontrol_gridworld.render_function(
     #     jax.partial(density.get_count_batch, exploration_state.density_state),
@@ -395,8 +395,8 @@ def display_state(agent_state: AgentState, ospec, aspec,
     # novelty_reward_map = dmcontrol_gridworld.render_function(
     #     jax.partial(compute_novelty_reward, exploration_state),
     #     env, reduction=jnp.max)
-    # traj_map = replay_buffer.render_trajectory(
-    #     agent_state.replay, max_steps, env)
+    traj_map = replay_buffer.render_trajectory(
+        agent_state.replay, max_steps, ospec, bins=20)
 
     # print(f"Max novelty value: {novq_map.max() :.2f}")
 
@@ -407,7 +407,7 @@ def display_state(agent_state: AgentState, ospec, aspec,
         (optimistic_novq_map, "Optimistic novelty value (max)"),
         (taskq_map, "Task value (max)"),
         (novelty_reward_map, "Novelty reward (max)"),
-        # (traj_map, "Last trajectory"),
+        (traj_map, "Last trajectory"),
     ]
 
     fig, axs = plt.subplots(1, len(subfigs))
@@ -444,12 +444,12 @@ def main(args):
     n_candidates = 64 if args.use_exploration else 1
 
     novq_state = q_functions.init_fn(args.seed,
-                                     j_observation_spec,
-                                     j_action_spec,
+                                     observation_spec,
+                                     action_spec,
                                     #  env_size=env.size,
                                      discount=0.97)
 
-    density_state = density.new(observation_spec, j_action_spec,
+    density_state = density.new(observation_spec, action_spec,
                                 state_bins=args.n_state_bins,
                                 action_bins=args.n_action_bins)
 
@@ -458,7 +458,7 @@ def main(args):
         state_shape, action_shape, min_s=0, max_s=1, n_bins=2)
 
     policy_state = policy.init_fn(
-        j_observation_spec, j_action_spec, args.seed)
+        observation_spec, action_spec, args.seed)
 
     exploration_state = ExplorationState(
         novq_state=novq_state,
