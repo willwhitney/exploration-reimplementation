@@ -243,11 +243,12 @@ if __name__ == "__main__":
     ospec = DOMAINS['point_mass']['easy']
     # ospec = jax_specs.convert_dm_spec(ospec)
     aspec = env.action_spec()
+    j_aspec = jax_specs.convert_dm_spec(aspec)
     density_state = new(ospec, aspec, state_bins=10, action_bins=2)
 
     timestep = env.reset()
     state = utils.flatten_observation(timestep.observation)
-    actions = utils.sample_uniform_actions(aspec, jax.random.PRNGKey(0), 1)
+    actions = utils.sample_uniform_actions(j_aspec, jax.random.PRNGKey(0), 1)
     action = actions[0]
     key = _make_key(density_state.settings, state, action)
 

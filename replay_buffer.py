@@ -99,7 +99,7 @@ def render_trajectory(replay, n, ospec, bins, vis_dims=(0, 1)):
     flat_spec = utils.flatten_observation_spec(ospec)
 
     transitions = replay[start:end]
-    states = transitions[0].astype(int)
+    states = transitions[0]
     render = np.zeros((bins, bins))
     for state in states:
         # loc = state.argmax(axis=1)

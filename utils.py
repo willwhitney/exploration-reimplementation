@@ -140,16 +140,17 @@ def discretize(x, spec, bins):
 
 
 def normalize(obs_el, spec_el):
-    return (obs_el + spec_el.minimum) / (spec_el.maximum - spec_el.minimum)
+    return (obs_el - spec_el.minimum) / (spec_el.maximum - spec_el.minimum)
 
 
 def flatten_observation(obs, preserve_batch=False):
     flat_tree = jax.tree_leaves(obs)
     if preserve_batch:
         flat_elements = [el.reshape((el.shape[0], -1)) for el in flat_tree]
+        return jnp.concatenate(flat_elements, axis=1)
     else:
         flat_elements = [el.flatten() for el in flat_tree]
-    return jnp.concatenate(flat_elements)
+        return jnp.concatenate(flat_elements, axis=0)
 
 
 def discretize_observation(obs, spec, bins, preserve_batch=False):
@@ -235,7 +236,16 @@ def sample_flat_uniform(spec, rng, n):
     #     return sample_uniform_single(spec, rng, n)
 
 
-def render_function(fn, ospec, aspec, reduction=jnp.max,
+def sample_grid(spec, dims, bins):
+    xmin, xmax = spec.minimum[dims[0]], spec.maximum[dims[0]]
+    ymin, ymax = spec.minimum[dims[1]], spec.maximum[dims[1]]
+    grid = np.stack(np.meshgrid(np.linspace(xmin, xmax, bins),
+                                np.linspace(ymin, ymax, bins)))
+    grid = grid.transpose().reshape(-1, 2)
+    return grid
+
+
+def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
                     vis_dims=(0, 1), bins=20):
     """Renders a given function at sampled (state, action) pairs.
 
@@ -249,9 +259,20 @@ def render_function(fn, ospec, aspec, reduction=jnp.max,
         value which will represent that state.
     """
     rng = random.PRNGKey(0)
-    n_samples = 1000
-    sampled_flat_states = sample_flat_uniform(ospec, rng, n_samples)
+    n_samples = 10000
+    sampled_flat_states = np.array(sample_flat_uniform(ospec, rng, n_samples))
     sampled_actions = sample_uniform_single(aspec, rng, n_samples)
+
+    # grid = sample_grid(flatten_observation_spec(ospec), vis_dims, bins)
+    # sampled_flat_states[:len(grid), vis_dims[0]] = grid[:, 0]
+    # sampled_flat_states[:len(grid), vis_dims[1]] = grid[:, 1]
+
+    replay_states = replay.s[:replay.next_slot]
+    replay_actions = replay.a[:replay.next_slot]
+    sampled_flat_states = jnp.concatenate([sampled_flat_states,
+                                           replay_states], axis=0)
+    sampled_actions = jnp.concatenate([sampled_actions,
+                                       replay_actions], axis=0)
 
     values = fn(sampled_flat_states, sampled_actions)
 

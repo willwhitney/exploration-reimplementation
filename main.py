@@ -323,9 +323,11 @@ def update_agent(agent_state: AgentState, rng, transition):
 
 
 def run_episode(agent_state: AgentState, rng, env,
-                train=True, use_exploration=True):
+                train=True, use_exploration=True, max_steps=None):
     timestep = env.reset()
     score, novelty_score = 0, 0
+
+    i = 0
     while not timestep.last():
         rng, action_rng = random.split(rng)
         s = utils.flatten_observation(timestep.observation)
@@ -346,36 +348,44 @@ def run_episode(agent_state: AgentState, rng, env,
             transition = (s, a, sp, r)
             rng, update_rng = random.split(rng)
             agent_state = update_agent(agent_state, update_rng, transition)
+        i += 1
+        if max_steps is not None and i >= max_steps:
+            break
     return agent_state, env, score, novelty_score
 
 
 # ----- Visualizations for gridworld ---------------------------------
 def display_state(agent_state: AgentState, ospec, aspec,
-                  max_steps=100, rendering='local', savepath=None):
+                  max_steps=100, rendering='local', savepath=None, bins=20):
     exploration_state = agent_state.exploration_state
     policy_state = agent_state.policy_state
 
     # min_count_map = dmcontrol_gridworld.render_function(
     #     jax.partial(density.get_count_batch, exploration_state.density_state),
     #     env, reduction=jnp.min)
-    sum_count_map = utils.render_function(
+    count_map = utils.render_function(
         jax.partial(density.get_count_batch, exploration_state.density_state),
-        ospec, aspec, reduction=jnp.sum, bins=20)
+        agent_state.replay,
+        ospec, aspec, reduction=jnp.max, bins=bins)
     novq_map = utils.render_function(
         jax.partial(q_learning.predict_value, exploration_state.novq_state),
-        ospec, aspec, reduction=jnp.max, bins=20)
+        agent_state.replay,
+        ospec, aspec, reduction=jnp.max, bins=bins)
     optimistic_novq_map = utils.render_function(
         jax.partial(predict_optimistic_value_batch,
                     exploration_state.novq_state,
                     exploration_state.density_state,
                     exploration_state.prior_count),
-        ospec, aspec, reduction=jnp.max, bins=20)
+        agent_state.replay,
+        ospec, aspec, reduction=jnp.max, bins=bins)
     taskq_map = utils.render_function(
         jax.partial(q_learning.predict_value, policy_state.q_state),
-        ospec, aspec, reduction=jnp.max, bins=20)
+        agent_state.replay,
+        ospec, aspec, reduction=jnp.max, bins=bins)
     novelty_reward_map = utils.render_function(
         jax.partial(compute_novelty_reward, exploration_state),
-        ospec, aspec, reduction=jnp.max, bins=20)
+        agent_state.replay,
+        ospec, aspec, reduction=jnp.max, bins=bins)
 
     # sum_count_map = dmcontrol_gridworld.render_function(
     #     jax.partial(density.get_count_batch, exploration_state.density_state),
@@ -396,13 +406,13 @@ def display_state(agent_state: AgentState, ospec, aspec,
     #     jax.partial(compute_novelty_reward, exploration_state),
     #     env, reduction=jnp.max)
     traj_map = replay_buffer.render_trajectory(
-        agent_state.replay, max_steps, ospec, bins=20)
+        agent_state.replay, max_steps, ospec, bins=bins)
 
     # print(f"Max novelty value: {novq_map.max() :.2f}")
 
     subfigs = [
         # (min_count_map, "Visit count (min)"),
-        (sum_count_map, "Visit count (sum)"),
+        (count_map, "Visit count (max)"),
         (novq_map, "Novelty value (max)"),
         (optimistic_novq_map, "Optimistic novelty value (max)"),
         (taskq_map, "Task value (max)"),
@@ -479,7 +489,7 @@ def main(args):
         # run an episode
         rng, episode_rng = random.split(rng)
         agent_state, env, score, novelty_score = run_episode(
-            agent_state, episode_rng, env, train=True)
+            agent_state, episode_rng, env, train=True, max_steps=args.max_steps)
 
         # update the task policy
         # TODO: pull this loop inside the policy.update_fn
@@ -492,6 +502,7 @@ def main(args):
         agent_state = agent_state.replace(policy_state=policy_state)
 
         # hacky reset of targetq to q
+        # TODO: pull this inside the policy.update_fn
         if episode % 1 == 0:
             policy_state = agent_state.policy_state.replace(
                 targetq_state=policy_state.q_state)
@@ -504,7 +515,8 @@ def main(args):
         if episode % args.eval_every == 0:
             rng, episode_rng = random.split(rng)
             _, _, test_score, test_novelty_score = run_episode(
-                agent_state, episode_rng, env, train=False)
+                agent_state, episode_rng, env,
+                train=False, max_steps=args.max_steps)
 
             print((f"Episode {episode:4d}"
                    f", Train score {score:3.0f}"
