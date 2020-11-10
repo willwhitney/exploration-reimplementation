@@ -53,6 +53,9 @@ class AgentState():
     n_candidates: int
     n_update_candidates: int
     prioritized_update: bool
+    update_target_every: int
+    warmup_steps: int
+    steps_since_tupdate: int = 0
     # policy_fns: Any = struct.field(pytree_node=False)
 
 
@@ -81,25 +84,37 @@ def train_step_candidates(exploration_state: ExplorationState,
     discount = exploration_state.novq_state.discount
     temp = exploration_state.temperature
 
-    if use_target_network:
-        target_q_state = exploration_state.target_novq_state
-    else:
-        target_q_state = exploration_state.novq_state
+    # if use_target_network:
+    #     target_q_state = exploration_state.target_novq_state
+    # else:
+    #     target_q_state = exploration_state.novq_state
 
     if use_optimistic_updates:
         next_values = predict_optimistic_values_batch(
-            target_q_state,
+            exploration_state.novq_state,
+            exploration_state.density_state,
+            exploration_state.prior_count,
+            next_states, candidate_next_actions)
+        next_values_target = predict_optimistic_values_batch(
+            exploration_state.target_novq_state,
             exploration_state.density_state,
             exploration_state.prior_count,
             next_states, candidate_next_actions)
     else:
         next_values = q_learning.predict_action_values_batch(
-            target_q_state,
+            exploration_state.novq_state,
+            next_states,
+            candidate_next_actions)
+        next_values_target = q_learning.predict_action_values_batch(
+            exploration_state.target_novq_state,
             next_states,
             candidate_next_actions)
 
+    # double DQN rule:
+    # - select next action according to current Q
+    # - evaluate it according to target Q
     next_value_probs = nn.softmax(next_values / temp, axis=1)
-    next_value_elements = (next_value_probs * next_values)
+    next_value_elements = (next_value_probs * next_values_target)
     expected_next_values = next_value_elements.sum(axis=1)
     expected_next_values = expected_next_values.reshape(rewards.shape)
 
@@ -225,6 +240,10 @@ def uniform_update(agent_state, rng):
         transitions = tuple((jnp.array(el)
                              for el in agent_state.replay.sample(128)))
         agent_state, losses = train_step(agent_state, transitions)
+        agent_state = agent_state.replace(
+            steps_since_tupdate=agent_state.steps_since_tupdate + 1)
+        if agent_state.steps_since_tupdate >= agent_state.update_target_every:
+            agent_state = update_target_q(agent_state)
     return agent_state
 
 
@@ -238,10 +257,11 @@ def update_exploration(agent_state, rng, transition_id):
         density_state = density.update_batch(exploration_state.density_state,
                                             jnp.expand_dims(s, axis=0),
                                             jnp.expand_dims(a, axis=0))
-        exploration_state = exploration_state.replace(density_state=density_state)
+        exploration_state = exploration_state.replace(
+            density_state=density_state)
         agent_state = agent_state.replace(exploration_state=exploration_state)
 
-    if len(agent_state.replay) > 5 * 128:
+    if len(agent_state.replay) > agent_state.warmup_steps:
         # update exploration Q to consistency with new density
         rng, novq_rng = random.split(rng)
 
@@ -487,7 +507,9 @@ def main(args):
                              replay=replay,
                              n_candidates=n_candidates,
                              n_update_candidates=args.n_update_candidates,
-                             prioritized_update=args.prioritized_update,)
+                             prioritized_update=args.prioritized_update,
+                             update_target_every=args.update_target_every,
+                             warmup_steps=args.warmup_steps)
 
     for episode in range(1, 100000):
         # run an episode
@@ -513,7 +535,7 @@ def main(args):
             agent_state = agent_state.replace(policy_state=policy_state)
 
         # update the target novelty Q function
-        agent_state = update_target_q(agent_state)
+        # agent_state = update_target_q(agent_state)
 
         # output / visualize
         if episode % args.eval_every == 0:
@@ -557,6 +579,8 @@ if __name__ == '__main__':
     parser.add_argument('--no_optimistic_updates', dest='optimistic_updates',
                         action='store_false', default=True)
     parser.add_argument('--target_network', action='store_true', default=False)
+    parser.add_argument('--update_target_every', type=int, default=100)
+    parser.add_argument('--warmup_steps', type=int, default=128)
 
     parser.add_argument('--no_exploration', dest='use_exploration',
                         action='store_false', default=True)
