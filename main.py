@@ -23,6 +23,7 @@ import tabular_density as density
 import utils
 from observation_domains import DOMAINS
 import jax_specs
+import point_velocity
 
 
 R_MAX = 100
@@ -107,6 +108,8 @@ def train_step_candidates(exploration_state: ExplorationState,
         exploration_state, states, actions).reshape(rewards.shape)
     q_targets = novelty_reward + discount * expected_next_values
 
+    # import ipdb; ipdb.set_trace()
+
     novq_state, losses = q_functions.train_step(
         exploration_state.novq_state,
         states, actions, q_targets)
@@ -126,6 +129,7 @@ def train_step(agent_state, transitions):
             int(agent_state.n_update_candidates), True)
         agent_state = agent_state.replace(policy_state=policy_state)
 
+    # import ipdb; ipdb.set_trace()
     # somehow if I don't cast these to bool JAX will recompile the jitted
     # function train_step_candidates on every call...
     with jax.profiler.TraceContext("train_step_candidates"):
@@ -217,7 +221,7 @@ def update_target_q(agent_state: AgentState):
 
 
 def uniform_update(agent_state, rng):
-    for _ in range(10):
+    for _ in range(1):
         transitions = tuple((jnp.array(el)
                              for el in agent_state.replay.sample(128)))
         agent_state, losses = train_step(agent_state, transitions)
@@ -237,7 +241,7 @@ def update_exploration(agent_state, rng, transition_id):
         exploration_state = exploration_state.replace(density_state=density_state)
         agent_state = agent_state.replace(exploration_state=exploration_state)
 
-    if len(agent_state.replay) > 128:
+    if len(agent_state.replay) > 5 * 128:
         # update exploration Q to consistency with new density
         rng, novq_rng = random.split(rng)
 
@@ -556,9 +560,10 @@ if __name__ == '__main__':
 
     parser.add_argument('--no_exploration', dest='use_exploration',
                         action='store_false', default=True)
-    parser.add_argument('--no_prioritized_update',
-                        dest='prioritized_update',
-                        action='store_false', default=True)
+    parser.add_argument('--prioritized_update', dest='prioritized_update',
+                        action='store_true', default=False)
+    parser.add_argument('--no_prioritized_update', dest='prioritized_update',
+                        action='store_false')
     args = parser.parse_args()
 
     if args.tabular:

@@ -267,8 +267,11 @@ def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
     # sampled_flat_states[:len(grid), vis_dims[0]] = grid[:, 0]
     # sampled_flat_states[:len(grid), vis_dims[1]] = grid[:, 1]
 
+    action_shape = aspec.shape
+    if len(action_shape) == 0:
+        action_shape = (1,)
     replay_states = replay.s[:replay.next_slot]
-    replay_actions = replay.a[:replay.next_slot]
+    replay_actions = replay.a[:replay.next_slot].reshape((-1, *action_shape))
     sampled_flat_states = jnp.concatenate([sampled_flat_states,
                                            replay_states], axis=0)
     sampled_actions = jnp.concatenate([sampled_actions,

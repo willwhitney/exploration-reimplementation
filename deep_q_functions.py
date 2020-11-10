@@ -12,8 +12,8 @@ class DenseQNetwork(nn.Module):
     def apply(self, s, a, hidden_layers, hidden_dim, flat_ospec, flat_aspec):
         s = jnp.reshape(s, (s.shape[0], -1))
         a = jnp.reshape(a, (a.shape[0], -1))
-        s = utils.normalize(s, flat_ospec)
-        a = utils.normalize(a, flat_aspec)
+        s = utils.normalize(s, flat_ospec) * 2 - 1
+        a = utils.normalize(a, flat_aspec) * 2 - 1
         x = jnp.concatenate([s, a], axis=1)
         for layer in range(hidden_layers):
             x = nn.Dense(x, hidden_dim, name=f'fc{layer}')
