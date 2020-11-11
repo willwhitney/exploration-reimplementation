@@ -201,7 +201,6 @@ def sample_uniform_actions(action_spec, rng, n):
     return actions.reshape((n, *aspec_shape))
 
 
-# @jax.partial(jax.jit, static_argnums=(2,))
 def sample_uniform_single(spec, rng, n):
     aspec_shape = spec.minimum.shape
     if len(aspec_shape) > 0:
@@ -227,13 +226,6 @@ def sample_flat_uniform(spec, rng, n):
     samples = jax.tree_map(jax.partial(sample_uniform_single, rng=rng, n=n),
                            spec)
     return flatten_observation(samples, preserve_batch=True)
-    # if isinstance(spec, collections.OrderedDict):
-    #     samples = [sample_uniform_single(s, rng, n) for k, s in spec.items()]
-    #     # samples = jax.tree_map(jax.partial(sample_uniform_single, rng=rng, n=n),
-    #                         # spec)
-    #     return flatten_observation(samples, preserve_batch=True)
-    # else:
-    #     return sample_uniform_single(spec, rng, n)
 
 
 def sample_grid(spec, dims, bins):
@@ -270,8 +262,12 @@ def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
     action_shape = aspec.shape
     if len(action_shape) == 0:
         action_shape = (1,)
-    replay_states = replay.s[:replay.next_slot]
-    replay_actions = replay.a[:replay.next_slot].reshape((-1, *action_shape))
+    # replay_states = replay.s[replay.next_slot - n_samples:replay.next_slot]
+    # replay_actions = replay.a[replay.next_slot - n_samples:replay.next_slot]
+    transitions = replay.sample(min(n_samples, replay.next_slot))
+    replay_states = transitions[0]
+    replay_actions = transitions[1]
+    replay_actions = replay_actions.reshape((-1, *action_shape))
     sampled_flat_states = jnp.concatenate([sampled_flat_states,
                                            replay_states], axis=0)
     sampled_actions = jnp.concatenate([sampled_actions,

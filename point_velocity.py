@@ -120,7 +120,7 @@ class PointVelocity(base.Task):
   def get_observation(self, physics):
     """Returns an observation of the state."""
     obs = collections.OrderedDict()
-    obs['position'] = physics.position()
+    obs['position'] = np.array(physics.named.data.qpos)
     # obs['velocity'] = physics.velocity()
     return obs
 
@@ -142,4 +142,8 @@ suite._DOMAINS['point_velocity'] = module
 
 if __name__ == '__main__':
   env = suite.load('point_velocity', 'easy')
-
+  env.reset()
+  with env.physics.reset_context():
+    env.physics.named.data.qpos[:] = [0.25, 0.25]
+  step = env.step(np.zeros(2))
+  pass

@@ -101,10 +101,12 @@ def render_trajectory(replay, n, ospec, bins, vis_dims=(0, 1)):
     transitions = replay[start:end]
     states = transitions[0]
     render = np.zeros((bins, bins))
-    for state in states:
+    discrete_states = utils.discretize_observation(states, flat_spec, bins,
+                                                   preserve_batch=True)
+    for state in discrete_states:
         # loc = state.argmax(axis=1)
-        discrete_state = utils.discretize_observation(state, flat_spec, bins)
-        render[discrete_state[x_dim], discrete_state[y_dim]] += 1
+        # discrete_state = utils.discretize_observation(state, flat_spec, bins)
+        render[state[x_dim], state[y_dim]] += 1
     return render
 
 

@@ -236,7 +236,7 @@ def update_target_q(agent_state: AgentState):
 
 
 def uniform_update(agent_state, rng):
-    for _ in range(1):
+    for _ in range(10):
         transitions = tuple((jnp.array(el)
                              for el in agent_state.replay.sample(128)))
         agent_state, losses = train_step(agent_state, transitions)
@@ -410,29 +410,8 @@ def display_state(agent_state: AgentState, ospec, aspec,
         jax.partial(compute_novelty_reward, exploration_state),
         agent_state.replay,
         ospec, aspec, reduction=jnp.max, bins=bins)
-
-    # sum_count_map = dmcontrol_gridworld.render_function(
-    #     jax.partial(density.get_count_batch, exploration_state.density_state),
-    #     env, reduction=jnp.sum)
-    # novq_map = dmcontrol_gridworld.render_function(
-    #     jax.partial(q_learning.predict_value, exploration_state.novq_state),
-    #     env, reduction=jnp.max)
-    # optimistic_novq_map = dmcontrol_gridworld.render_function(
-    #     jax.partial(predict_optimistic_value_batch,
-    #                 exploration_state.novq_state,
-    #                 exploration_state.density_state,
-    #                 exploration_state.prior_count),
-    #     env, reduction=jnp.max)
-    # taskq_map = dmcontrol_gridworld.render_function(
-    #     jax.partial(q_learning.predict_value, policy_state.q_state),
-    #     env, reduction=jnp.max)
-    # novelty_reward_map = dmcontrol_gridworld.render_function(
-    #     jax.partial(compute_novelty_reward, exploration_state),
-    #     env, reduction=jnp.max)
     traj_map = replay_buffer.render_trajectory(
         agent_state.replay, max_steps, ospec, bins=bins)
-
-    # print(f"Max novelty value: {novq_map.max() :.2f}")
 
     subfigs = [
         # (min_count_map, "Visit count (min)"),
@@ -578,7 +557,9 @@ if __name__ == '__main__':
     parser.add_argument('--n_action_bins', type=int, default=2)
     parser.add_argument('--no_optimistic_updates', dest='optimistic_updates',
                         action='store_false', default=True)
-    parser.add_argument('--target_network', action='store_true', default=False)
+    parser.add_argument('--target_network', action='store_true', default=True)
+    parser.add_argument('--no_target_network', dest='target_network',
+                        action='store_false')
     parser.add_argument('--update_target_every', type=int, default=100)
     parser.add_argument('--warmup_steps', type=int, default=128)
 
@@ -589,6 +570,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_prioritized_update', dest='prioritized_update',
                         action='store_false')
     args = parser.parse_args()
+    print(args)
 
     if args.tabular:
         import tabular_q_functions as q_functions
