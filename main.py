@@ -232,7 +232,9 @@ def prioritized_update(agent_state: AgentState, last_transition_id):
 def update_target_q(agent_state: AgentState):
     exploration_state = agent_state.exploration_state.replace(
         target_novq_state=agent_state.exploration_state.novq_state)
-    return agent_state.replace(exploration_state=exploration_state)
+    agent_state = agent_state.replace(exploration_state=exploration_state,
+                                      steps_since_tupdate=0)
+    return agent_state
 
 
 def uniform_update(agent_state, rng):

@@ -94,7 +94,7 @@ class LowPrecisionTracingReplay(TracingReplay):
 # ----- Visualizations for gridworld ---------------------------------
 def render_trajectory(replay, n, ospec, bins, vis_dims=(0, 1)):
     x_dim, y_dim = vis_dims
-    end = replay.next_slot
+    end = replay.next_slot if replay.next_slot > 0 else replay.length
     start = max(0, end - n)
     flat_spec = utils.flatten_observation_spec(ospec)
 
