@@ -12,7 +12,8 @@ import utils
 import jax_specs
 
 
-TEMP = 100
+TEMP = 1
+TEST_TEMP = 1
 N_CANDIDATES = 32
 
 
@@ -52,13 +53,17 @@ def action_fn(policy_state: PolicyState, s, n=1, explore=True):
                         *candidate_actions.shape[1:])
     candidate_actions = candidate_actions.reshape(candidate_shape)
     if explore:
-        with jax.profiler.TraceContext("sample boltzmann"):
+        with jax.profiler.TraceContext("sample explore"):
             actions, values = q_learning.sample_action_boltzmann_n_batch(
                 policy_state.q_state, action_rngs, s, candidate_actions, TEMP)
     else:
-        with jax.profiler.TraceContext("sample egreedy"):
-            actions, values = q_learning.sample_action_egreedy_n_batch(
-                policy_state.q_state, action_rngs, s, candidate_actions, 0.01)
+        with jax.profiler.TraceContext("sample test"):
+            actions, values = q_learning.sample_action_boltzmann_n_batch(
+                policy_state.q_state, action_rngs, s, candidate_actions,
+                TEST_TEMP)
+
+            # actions, values = q_learning.sample_action_egreedy_n_batch(
+            #     policy_state.q_state, action_rngs, s, candidate_actions, 0.01)
     policy_state = policy_state.replace(rng=policy_rng)
     return policy_state, actions
 

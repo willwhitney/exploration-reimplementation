@@ -238,7 +238,7 @@ def sample_grid(spec, dims, bins):
 
 
 def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
-                    vis_dims=(0, 1), bins=20):
+                    vis_dims=(0, 1), bins=20, use_uniform_states=False):
     """Renders a given function at sampled (state, action) pairs.
 
     Arguments:
@@ -251,33 +251,35 @@ def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
         value which will represent that state.
     """
     rng = random.PRNGKey(0)
-    n_samples = 10000
-    sampled_flat_states = np.array(sample_flat_uniform(ospec, rng, n_samples))
-    sampled_actions = sample_uniform_single(aspec, rng, n_samples)
-
-    # grid = sample_grid(flatten_observation_spec(ospec), vis_dims, bins)
-    # sampled_flat_states[:len(grid), vis_dims[0]] = grid[:, 0]
-    # sampled_flat_states[:len(grid), vis_dims[1]] = grid[:, 1]
+    n_samples = min(5 * len(replay), 10000)
 
     action_shape = aspec.shape
     if len(action_shape) == 0:
         action_shape = (1,)
-    # replay_states = replay.s[replay.next_slot - n_samples:replay.next_slot]
-    # replay_actions = replay.a[replay.next_slot - n_samples:replay.next_slot]
-    transitions = replay.sample(min(n_samples, replay.next_slot))
-    replay_states = transitions[0]
-    replay_actions = transitions[1]
-    replay_actions = replay_actions.reshape((-1, *action_shape))
-    sampled_flat_states = jnp.concatenate([sampled_flat_states,
-                                           replay_states], axis=0)
-    sampled_actions = jnp.concatenate([sampled_actions,
-                                       replay_actions], axis=0)
 
-    values = fn(sampled_flat_states, sampled_actions)
+    transitions = replay.sample(2 * n_samples)
+    states = transitions[0]
+    actions = transitions[1]
+    actions = actions.reshape((-1, *action_shape))
+
+
+    uniform_actions = sample_uniform_single(aspec, rng, n_samples)
+    actions[:n_samples] = uniform_actions
+
+    if use_uniform_states:
+        sampled_flat_states = np.array(
+            sample_flat_uniform(ospec, rng, n_samples))
+        sampled_actions = sample_uniform_single(aspec, rng, n_samples)
+        states = jnp.concatenate([sampled_flat_states,
+                                  states], axis=0)
+        actions = jnp.concatenate([sampled_actions,
+                                   actions], axis=0)
+
+    values = fn(states, actions)
 
     flat_ospec = flatten_observation_spec(ospec)
-    discrete_states = discretize(sampled_flat_states, flat_ospec, bins)
-    discrete_actions = discretize(sampled_actions, aspec, bins)
+    discrete_states = discretize(states, flat_ospec, bins)
+    discrete_actions = discretize(actions, aspec, bins)
 
     xs = jnp.concatenate([discrete_states, discrete_actions],
                          axis=1)

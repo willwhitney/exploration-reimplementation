@@ -23,7 +23,7 @@ import tabular_density as density
 import utils
 from observation_domains import DOMAINS
 import jax_specs
-import point_velocity
+import point
 
 
 R_MAX = 100
@@ -122,6 +122,9 @@ def train_step_candidates(exploration_state: ExplorationState,
     novelty_reward = compute_novelty_reward(
         exploration_state, states, actions).reshape(rewards.shape)
     q_targets = novelty_reward + discount * expected_next_values
+
+    # clip targets to be within the feasible set
+    q_targets = jnp.minimum(q_targets, R_MAX)
 
     # import ipdb; ipdb.set_trace()
 
@@ -357,8 +360,14 @@ def run_episode(agent_state: AgentState, rng, env,
     while not timestep.last():
         rng, action_rng = random.split(rng)
         s = utils.flatten_observation(timestep.observation)
-        agent_state, a = sample_exploration_action(
-            agent_state, action_rng, s, train)
+
+        # put some random steps in the replay buffer
+        if len(agent_state.replay) < agent_state.warmup_steps:
+            action_spec = jax_specs.convert_dm_spec(env.action_spec())
+            a = utils.sample_uniform_actions(action_spec, action_rng, 1)[0]
+        else:
+            agent_state, a = sample_exploration_action(
+                agent_state, action_rng, s, train)
         timestep = env.step(a)
 
         sp = utils.flatten_observation(timestep.observation)
@@ -497,11 +506,14 @@ def main(args):
         rng, episode_rng = random.split(rng)
         agent_state, env, score, novelty_score = run_episode(
             agent_state, episode_rng, env, train=True, max_steps=args.max_steps)
+        logger.update('train/episode', episode)
+        logger.update('train/score', score)
+        logger.update('train/novelty_score', novelty_score)
 
         # update the task policy
         # TODO: pull this loop inside the policy.update_fn
         policy_state = agent_state.policy_state
-        for _ in range(50):
+        for _ in range(args.max_steps // 2):
             transitions = agent_state.replay.sample(batch_size)
             transitions = tuple((jnp.array(el) for el in transitions))
             policy_state = policy.update_fn(
@@ -524,14 +536,19 @@ def main(args):
             _, _, test_score, test_novelty_score = run_episode(
                 agent_state, episode_rng, env,
                 train=False, max_steps=args.max_steps)
+            logger.update('test/episode', episode)
+            logger.update('test/score', test_score)
+            logger.update('test/novelty_score', test_novelty_score)
 
-            print((f"Episode {episode:4d}"
-                   f", Train score {score:3.0f}"
-                   f", Train novelty score {novelty_score:3.0f}"
-                   f", Test score {test_score:3.0f}"
-                   f", Test novelty score {test_novelty_score:3.0f}"))
+            # print((f"Episode {episode:4d}"
+            #        f", Train score {score:3.0f}"
+            #        f", Train novelty score {novelty_score:3.0f}"
+            #        f", Test score {test_score:3.0f}"
+            #        f", Test novelty score {test_novelty_score:3.0f}"))
+            logger.write_all()
+
             if args.vis != 'none':
-                savepath = f"results/exploration/{args.name}/{episode}.png"
+                savepath = f"{args.save_dir}/{episode}.png"
                 display_state(agent_state, observation_spec, action_spec,
                               max_steps=args.max_steps, rendering=args.vis,
                               savepath=savepath)
@@ -573,6 +590,12 @@ if __name__ == '__main__':
                         action='store_false')
     args = parser.parse_args()
     print(args)
+
+    args.save_dir = f"results/exploration/{args.name}"
+    os.makedirs(args.save_dir, exist_ok=True)
+    import experiment_logging
+    experiment_logging.setup_default_logger(args.save_dir)
+    from experiment_logging import default_logger as logger
 
     if args.tabular:
         import tabular_q_functions as q_functions

@@ -37,24 +37,37 @@ SUITE = containers.TaggedTasks()
 
 def get_model_and_assets():
   """Returns a tuple containing the model XML string and a dict of assets."""
-  return resources.GetResource('point_velocity.xml'), common.ASSETS
+  return resources.GetResource('point.xml'), common.ASSETS
 
 
-@SUITE.add('benchmarking', 'easy')
-def easy(time_limit=_DEFAULT_TIME_LIMIT, random=None, environment_kwargs=None):
+@SUITE.add()
+def velocity(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
   """Returns the easy point_mass task."""
   physics = Physics.from_xml_string(*get_model_and_assets())
-  task = PointVelocity(randomize_gains=False, random=random)
+  task = Point(velocity=True, vel_gain=1.0, random=random)
   environment_kwargs = environment_kwargs or {}
   return control.Environment(
       physics, task, time_limit=time_limit, **environment_kwargs)
 
 
 @SUITE.add()
-def hard(time_limit=_DEFAULT_TIME_LIMIT, random=None, environment_kwargs=None):
-  """Returns the hard point_mass task."""
+def velocity_slow(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+                  environment_kwargs=None):
+  """Returns the easy point_mass task."""
   physics = Physics.from_xml_string(*get_model_and_assets())
-  task = PointVelocity(randomize_gains=True, random=random)
+  task = Point(velocity=True, vel_gain=0.2, random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+
+@SUITE.add()
+def mass(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Point(velocity=False, random=random)
   environment_kwargs = environment_kwargs or {}
   return control.Environment(
       physics, task, time_limit=time_limit, **environment_kwargs)
@@ -73,11 +86,11 @@ class Physics(mujoco.Physics):
     return np.linalg.norm(self.mass_to_target())
 
 
-class PointVelocity(base.Task):
-  """A point_velocity `Task` to reach target."""
+class Point(base.Task):
+  """A point `Task` to reach target."""
 
-  def __init__(self, randomize_gains, random=None):
-    """Initialize an instance of `PointVelocity`.
+  def __init__(self, velocity=True, vel_gain=1, random=None):
+    """Initialize an instance of `Point`.
 
     Args:
       randomize_gains: A `bool`, whether to randomize the actuator gains.
@@ -85,43 +98,31 @@ class PointVelocity(base.Task):
         integer seed for creating a new `RandomState`, or None to select a seed
         automatically (default).
     """
-    self._randomize_gains = randomize_gains
-    super(PointVelocity, self).__init__(random=random)
+    self.velocity = velocity
+    self.vel_gain = vel_gain
+    super(Point, self).__init__(random=random)
 
   def initialize_episode(self, physics):
     """Sets the state of the environment at the start of each episode.
 
-       If _randomize_gains is True, the relationship between the controls and
-       the joints is randomized, so that each control actuates a random linear
-       combination of joints.
-
     Args:
       physics: An instance of `mujoco.Physics`.
     """
-    # randomizers.randomize_limited_and_rotational_joints(physics, self.random)
     physics.named.data.qpos[:] = [-0.25, -0.25]
-    if self._randomize_gains:
-      dir1 = self.random.randn(2)
-      dir1 /= np.linalg.norm(dir1)
-      # Find another actuation direction that is not 'too parallel' to dir1.
-      parallel = True
-      while parallel:
-        dir2 = self.random.randn(2)
-        dir2 /= np.linalg.norm(dir2)
-        parallel = abs(np.dot(dir1, dir2)) > 0.9
-      physics.model.wrap_prm[[0, 1]] = dir1
-      physics.model.wrap_prm[[2, 3]] = dir2
-    super(PointVelocity, self).initialize_episode(physics)
+    super(Point, self).initialize_episode(physics)
 
   def before_step(self, action, physics):
-    physics.set_control(np.zeros(2))
-    physics.named.data.qvel[:] = action
+    super().before_step(action, physics)
+    if self.velocity:
+      physics.set_control(np.zeros(2))
+      physics.named.data.qvel[:] = action / self.vel_gain
 
   def get_observation(self, physics):
     """Returns an observation of the state."""
     obs = collections.OrderedDict()
     obs['position'] = np.array(physics.named.data.qpos)
-    # obs['velocity'] = physics.velocity()
+    if not self.velocity:
+      obs['velocity'] = physics.velocity()
     return obs
 
   def get_reward(self, physics):
@@ -138,12 +139,12 @@ class PointVelocity(base.Task):
 
 import sys
 module = sys.modules[__name__]
-suite._DOMAINS['point_velocity'] = module
+suite._DOMAINS['point'] = module
 
 if __name__ == '__main__':
-  env = suite.load('point_velocity', 'easy')
-  env.reset()
-  with env.physics.reset_context():
-    env.physics.named.data.qpos[:] = [0.25, 0.25]
-  step = env.step(np.zeros(2))
-  pass
+  env = suite.load('point', 'velocity')
+  print(env.reset())
+  for i in range(100):
+    print(env.step(np.ones(2)).observation)
+  # step = env.step(np.zeros(2))
+  # pass
