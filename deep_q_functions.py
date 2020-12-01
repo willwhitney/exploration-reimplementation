@@ -102,3 +102,58 @@ def bellman_train_step(q_state: q_learning.QLearnerState,
     q_targets = transitions[3] + q_state.discount * targetq_preds
     return train_step(
         q_state, transitions[0], transitions[1], q_targets)
+
+
+@jax.partial(jax.profiler.trace_function, name="soft_bellman_train_step")
+@jax.jit
+def soft_bellman_train_step(q_state: q_learning.QLearnerState,
+                            targetq_state: q_learning.QLearnerState,
+                            transitions,
+                            candidate_actions,
+                            temperature):
+    # transitions should be of form (states, actions, next_states, rewards)
+    # candidate_actions should be of form bsize x n_cands x *action_dim
+    bsize, n_candidates = candidate_actions.shape[:2]
+
+    # compute expected next value at some temperature
+    targetq_preds = q_learning.predict_action_values_batch(
+        targetq_state, transitions[2], candidate_actions)
+    targetq_probs = nn.softmax(targetq_preds / temperature, axis=1)
+
+    next_value_elements = (targetq_probs * targetq_preds)
+    expected_next_values = next_value_elements.sum(axis=1)
+    expected_next_values = expected_next_values.reshape(transitions[3].shape)
+
+    # compute targets and update
+    q_targets = transitions[3] + q_state.discount * expected_next_values
+    return train_step(
+        q_state, transitions[0], transitions[1], q_targets)
+
+
+@jax.partial(jax.profiler.trace_function, name="ddqn_train_step")
+@jax.jit
+def ddqn_train_step(q_state: q_learning.QLearnerState,
+                    targetq_state: q_learning.QLearnerState,
+                    transitions,
+                    candidate_actions):
+    # transitions should be of form (states, actions, next_states, rewards)
+    # candidate_actions should be of form bsize x n_cands x *action_dim
+    bsize, n_candidates = candidate_actions.shape[:2]
+
+    # compute best action according to q_state
+    q_preds = q_learning.predict_action_values_batch(
+        q_state, transitions[2], candidate_actions)
+    # q_preds: bsize x n_cands
+    best_action_indices = jnp.argmax(q_preds, axis=1)
+
+    # compute value of that action according to targetq_state
+    targetq_preds = q_learning.predict_action_values_batch(
+        targetq_state, transitions[2], candidate_actions)
+    next_action_values = targetq_preds[jnp.arange(bsize),     # in each row...
+                                       best_action_indices]   # take this index
+    next_action_values = next_action_values.reshape(transitions[3].shape)
+
+    # compute targets and update
+    q_targets = transitions[3] + q_state.discount * next_action_values
+    return train_step(
+        q_state, transitions[0], transitions[1], q_targets)

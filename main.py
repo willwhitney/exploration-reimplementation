@@ -308,7 +308,7 @@ predict_optimistic_values_batch = jax.vmap(  # noqa: E305
 
 
 @jax.profiler.trace_function
-@jax.jit
+# @jax.jit
 def select_action(exploration_state, rng, state, candidate_actions):
     optimistic_values = predict_optimistic_values(
         exploration_state.novq_state,
@@ -337,8 +337,10 @@ def sample_exploration_action(agent_state: AgentState, rng, s, train=True):
     agent_state = agent_state.replace(policy_state=policy_state)
 
     with jax.profiler.TraceContext("select from candidates"):
-        a = select_action(agent_state.exploration_state,
+        a, h = select_action(agent_state.exploration_state,
                           rng, s, candidate_actions)
+    flag = 'train' if train else 'test'
+    logger.update(f'{flag}/explore_entropy', h)
     return agent_state, a
 
 
@@ -365,6 +367,9 @@ def run_episode(agent_state: AgentState, rng, env,
         if len(agent_state.replay) < agent_state.warmup_steps:
             action_spec = jax_specs.convert_dm_spec(env.action_spec())
             a = utils.sample_uniform_actions(action_spec, action_rng, 1)[0]
+            flag = 'train' if train else 'test'
+            logger.update(f'{flag}/policy_entropy', 0)
+            logger.update(f'{flag}/explore_entropy', 0)
         else:
             agent_state, a = sample_exploration_action(
                 agent_state, action_rng, s, train)
@@ -471,7 +476,8 @@ def main(args):
                                      observation_spec,
                                      action_spec,
                                     #  env_size=env.size,
-                                     discount=0.97)
+                                     discount=0.97,
+                                     max_value=R_MAX)
 
     density_state = density.new(observation_spec, action_spec,
                                 state_bins=args.n_state_bins,
@@ -569,6 +575,8 @@ if __name__ == '__main__':
     parser.add_argument('--eval_every', type=int, default=10)
 
     parser.add_argument('--tabular', action='store_true', default=False)
+    parser.add_argument('--q_functions', type=str, default='deep')
+
     parser.add_argument('--temperature', type=float, default=1e-1)
     parser.add_argument('--prior_count', type=float, default=1e-3)
     parser.add_argument('--n_update_candidates', type=int, default=64)
@@ -579,7 +587,7 @@ if __name__ == '__main__':
     parser.add_argument('--target_network', action='store_true', default=True)
     parser.add_argument('--no_target_network', dest='target_network',
                         action='store_false')
-    parser.add_argument('--update_target_every', type=int, default=100)
+    parser.add_argument('--update_target_every', type=int, default=10)
     parser.add_argument('--warmup_steps', type=int, default=128)
 
     parser.add_argument('--no_exploration', dest='use_exploration',
@@ -600,11 +608,11 @@ if __name__ == '__main__':
     if args.tabular:
         import tabular_q_functions as q_functions
         import policies.tabular_q_policy as policy
-    else:
-        # if args.env == 'gridworld':
-            # import onehot_deep_q_functions as q_functions
-        # else:
+    elif args.q_functions == 'deep':
         import deep_q_functions as q_functions
+        import policies.deep_q_policy as policy
+    elif args.q_functions == 'sigmoid':
+        import sigmoid_q_functions as q_functions
         import policies.deep_q_policy as policy
 
     jit = not args.debug

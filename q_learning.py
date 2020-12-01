@@ -68,8 +68,8 @@ sample_action_egreedy_n_batch = jax.vmap(sample_action_egreedy_n,
 @jax.jit
 def sample_action_boltzmann(q_state: QLearnerState, rng, state, actions, temp):
     values = predict_action_values(q_state, state, actions)
-    action = sample_boltzmann(rng, values, actions, temp)
-    return action, values
+    action, entropy = sample_boltzmann(rng, values, actions, temp)
+    return action, values, entropy
 sample_action_boltzmann_n = jax.vmap(sample_action_boltzmann,  # noqa: E305
                                      in_axes=(None, 0, None, None, None))
 sample_action_boltzmann_n_batch = jax.vmap(sample_action_boltzmann_n,
@@ -83,10 +83,14 @@ sample_action_boltzmann_batch_n = jax.vmap(sample_action_boltzmann,
 @jax.jit
 def sample_boltzmann(rng, values, actions, temp=1):
     boltzmann_logits = values / temp
+
+    probs = nn.softmax(boltzmann_logits)
+    entropy = - jnp.dot(probs, jnp.log(probs))
+
+    # jax categorical is actually categorical(softmax(logits))
     action_index = random.categorical(rng, boltzmann_logits)
     action = actions[action_index]
-    # action = random.choice(rng, actions, p=boltzmann_probs)
-    return action
+    return action, entropy
 sample_boltzmann_n = jax.vmap(sample_boltzmann,  # noqa: E305
                               in_axes=(0, None, None, None))
 
@@ -164,7 +168,7 @@ def main(args):
         rng, action_rng = random.split(rng)
         actions = action_proposal(action_rng, n_proposal)
         if train:
-            a, v = sample_action(q_state, rng, s, actions)
+            a, v, h = sample_action(q_state, rng, s, actions)
         else:
             a, v = sample_action_egreedy(q_state, rng, s, actions, 0.01)
 

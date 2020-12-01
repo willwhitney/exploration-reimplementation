@@ -7,7 +7,7 @@ import utils
 
 
 class Replay:
-    def __init__(self, state_shape, action_shape, max_size=int(1e5)):
+    def __init__(self, state_shape, action_shape, max_size=int(1e6)):
         # state s, next state sp (s prime), action a, reward r, done d
         self.s = np.zeros((max_size, *state_shape))
         self.a = np.zeros((max_size, *action_shape))

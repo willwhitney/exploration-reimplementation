@@ -114,8 +114,10 @@ SUMMARY_FORMAT_STR = ', '.join((
     "Episode {values[train/episode]:4.0f}",
     "Train score {values[train/score]:4.0f}",
     "Train novelty score {values[train/novelty_score]:4.0f}",
+    "Train policy entropy {values[train/policy_entropy]:5.2f}",
     "Test score {values[test/score]:4.0f}",
     "Test novelty score {values[test/novelty_score]:4.0f}",
+    "Test policy entropy {values[test/policy_entropy]:5.2f}",
 ))
 
 default_logger = Logger()
