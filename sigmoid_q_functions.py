@@ -26,7 +26,8 @@ class SigmoidQNetwork(nn.Module):
         q = (max_value + 2) * nn.sigmoid(q / 10) - 1
         return q
 
-def init_fn(seed, state_spec, action_spec, discount, max_value=100, **kwargs):
+def init_fn(seed, state_spec, action_spec, discount, max_value=100, lr=1e-2,
+            **kwargs):
     flat_state_spec = utils.flatten_observation_spec(state_spec)
     j_state_spec = jax_specs.convert_dm_spec(flat_state_spec)
     j_action_spec = jax_specs.convert_dm_spec(action_spec)
@@ -43,6 +44,6 @@ def init_fn(seed, state_spec, action_spec, discount, max_value=100, **kwargs):
               ((128, *action_shape), jnp.float32)])
     rng = random.split(rng, 1)[0]
     initial_model = nn.Model(q_net, initial_params)
-    q_opt = optim.Adam(1e-2).create(initial_model)
+    q_opt = optim.Adam(lr).create(initial_model)
     return q_learning.QLearnerState(q_opt, discount)
 

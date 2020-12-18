@@ -79,7 +79,7 @@ def train_step_candidates(exploration_state: ExplorationState,
                           candidate_next_actions,
                           use_target_network,
                           use_optimistic_updates):
-    """The jittable component of the optimistic training step."""
+    """The jittable component of the exploration Q function training step."""
     states, actions, next_states, rewards = transitions
     discount = exploration_state.novq_state.discount
     temp = exploration_state.temperature
@@ -137,7 +137,7 @@ def train_step_candidates(exploration_state: ExplorationState,
 
 @jax.profiler.trace_function
 def train_step(agent_state, transitions):
-    """A full (optimistic) training step."""
+    """A full (optimistic) training step for the exploration Q function."""
     states, actions, next_states, rewards = transitions
 
     # candidate actions should be (bsize x 64 x *action_shape)
@@ -308,7 +308,7 @@ predict_optimistic_values_batch = jax.vmap(  # noqa: E305
 
 
 @jax.profiler.trace_function
-# @jax.jit
+@jax.jit
 def select_action(exploration_state, rng, state, candidate_actions):
     optimistic_values = predict_optimistic_values(
         exploration_state.novq_state,
@@ -487,8 +487,9 @@ def main(args):
     replay = replay_buffer.LowPrecisionTracingReplay(
         state_shape, action_shape, min_s=0, max_s=1, n_bins=2)
 
-    policy_state = policy.init_fn(
-        observation_spec, action_spec, args.seed)
+    policy_state = policy.init_fn(observation_spec, action_spec, args.seed,
+                                  lr=args.policy_lr,
+                                  update_rule=args.policy_update)
 
     exploration_state = ExplorationState(
         novq_state=novq_state,
@@ -576,6 +577,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--tabular', action='store_true', default=False)
     parser.add_argument('--q_functions', type=str, default='deep')
+    parser.add_argument('--policy_update', type=str, default='bellman')
+    parser.add_argument('--policy_lr', type=float, default=1e-2)
 
     parser.add_argument('--temperature', type=float, default=1e-1)
     parser.add_argument('--prior_count', type=float, default=1e-3)
@@ -604,6 +607,10 @@ if __name__ == '__main__':
     import experiment_logging
     experiment_logging.setup_default_logger(args.save_dir)
     from experiment_logging import default_logger as logger
+
+    import json
+    with open(args.save_dir + '/args.json', 'w') as argfile:
+        json.dump(args.__dict__, argfile, indent=4)
 
     if args.tabular:
         import tabular_q_functions as q_functions

@@ -85,7 +85,7 @@ def sample_boltzmann(rng, values, actions, temp=1):
     boltzmann_logits = values / temp
 
     probs = nn.softmax(boltzmann_logits)
-    entropy = - jnp.dot(probs, jnp.log(probs))
+    entropy = - jnp.dot(probs, jnp.log(probs + 1e-8))
 
     # jax categorical is actually categorical(softmax(logits))
     action_index = random.categorical(rng, boltzmann_logits)

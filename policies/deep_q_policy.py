@@ -14,8 +14,8 @@ import jax_specs
 from experiment_logging import default_logger as logger
 
 
-TEMP = 1
-TEST_TEMP = 0.3
+TEMP = 0.1
+TEST_TEMP = 0.03
 N_CANDIDATES = 32
 
 
@@ -26,16 +26,20 @@ class PolicyState():
     rng: jnp.ndarray
     action_spec: jax_specs.BoundedArray
     n_candidates: int
+    update_rule: str
 
 
-def init_fn(state_spec, action_spec, seed, n_candidates=32, **kwargs):
+def init_fn(state_spec, action_spec, seed,
+            n_candidates=32, lr=1e-2, update_rule='bellman',
+            **kwargs):
     j_action_spec = jax_specs.convert_dm_spec(action_spec)
     q_state = q_functions.init_fn(seed, state_spec, action_spec,
-                                  discount=0.99, **kwargs)
+                                  discount=0.99, lr=lr, **kwargs)
     targetq_state = q_state
     rng = random.PRNGKey(seed)
     return PolicyState(q_state=q_state, targetq_state=targetq_state, rng=rng,
-                       action_spec=j_action_spec, n_candidates=n_candidates)
+                       action_spec=j_action_spec, n_candidates=n_candidates,
+                       update_rule=update_rule)
 
 
 def action_fn(policy_state: PolicyState, s, n=1, explore=True):
@@ -65,17 +69,12 @@ def action_fn(policy_state: PolicyState, s, n=1, explore=True):
                 policy_state.q_state, action_rngs, s, candidate_actions,
                 TEST_TEMP)
             logger.update('test/policy_entropy', entropies.mean())
-
-            # actions, values = q_learning.sample_action_egreedy_n_batch(
-            #     policy_state.q_state, action_rngs, s, candidate_actions, 0.01)
     policy_state = policy_state.replace(rng=policy_rng)
     return policy_state, actions
 
 
 @jax.profiler.trace_function
-@jax.jit
 def update_fn(policy_state: PolicyState, transitions):
-    # assert False
     bsize = len(transitions[0])
     policy_rng, candidate_rng = random.split(policy_state.rng)
     candidate_actions = utils.sample_uniform_actions(
@@ -86,14 +85,18 @@ def update_fn(policy_state: PolicyState, transitions):
                        *candidate_actions.shape[1:])
     candidate_actions = candidate_actions.reshape(candidate_shape)
 
-    q_state, _ = q_functions.bellman_train_step(
-        policy_state.q_state, policy_state.targetq_state,
-        transitions, candidate_actions)
-    # q_state, _ = q_functions.ddqn_train_step(
-    #     policy_state.q_state, policy_state.targetq_state,
-    #     transitions, candidate_actions)
-    # q_state, _ = q_functions.soft_bellman_train_step(
-    #     policy_state.q_state, policy_state.targetq_state,
-    #     transitions, candidate_actions, TEST_TEMP)
+    if policy_state.update_rule == 'bellman':
+        q_state, _ = q_functions.bellman_train_step(
+            policy_state.q_state, policy_state.targetq_state,
+            transitions, candidate_actions)
+    elif policy_state.update_rule == 'ddqn':
+        q_state, _ = q_functions.ddqn_train_step(
+            policy_state.q_state, policy_state.targetq_state,
+            transitions, candidate_actions)
+    elif policy_state.update_rule == 'soft':
+        q_state, _ = q_functions.soft_bellman_train_step(
+            policy_state.q_state, policy_state.targetq_state,
+            transitions, candidate_actions, TEST_TEMP)
+
     policy_state = policy_state.replace(q_state=q_state, rng=policy_rng)
     return policy_state
