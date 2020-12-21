@@ -1,4 +1,5 @@
 import collections
+import pickle
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -89,6 +90,17 @@ class LowPrecisionTracingReplay(TracingReplay):
 
     def predecessors(self, state):
         return self.trace[self.discretize(state)]
+
+
+def save(replay, path):
+    with open(path, 'wb') as f:
+        pickle.dump(replay, f, protocol=4)
+
+
+def load(path):
+    with open(path, 'rb') as f:
+        replay = pickle.load(f)
+    return replay
 
 
 # ----- Visualizations for gridworld ---------------------------------

@@ -14,9 +14,10 @@ import jax_specs
 from experiment_logging import default_logger as logger
 
 
-TEMP = 0.1
-TEST_TEMP = 0.03
+TEMP = 0.3
+TEST_TEMP = 0.1
 N_CANDIDATES = 32
+TARGET_UPDATE_FREQ = 50
 
 
 @struct.dataclass
@@ -27,6 +28,7 @@ class PolicyState():
     action_spec: jax_specs.BoundedArray
     n_candidates: int
     update_rule: str
+    update_count: int
 
 
 def init_fn(state_spec, action_spec, seed,
@@ -39,7 +41,7 @@ def init_fn(state_spec, action_spec, seed,
     rng = random.PRNGKey(seed)
     return PolicyState(q_state=q_state, targetq_state=targetq_state, rng=rng,
                        action_spec=j_action_spec, n_candidates=n_candidates,
-                       update_rule=update_rule)
+                       update_rule=update_rule, update_count=0)
 
 
 def action_fn(policy_state: PolicyState, s, n=1, explore=True):
@@ -98,5 +100,9 @@ def update_fn(policy_state: PolicyState, transitions):
             policy_state.q_state, policy_state.targetq_state,
             transitions, candidate_actions, TEST_TEMP)
 
-    policy_state = policy_state.replace(q_state=q_state, rng=policy_rng)
+    update_count = policy_state.update_count + 1
+    updates = dict(q_state=q_state, rng=policy_rng, update_count=update_count)
+    if update_count % TARGET_UPDATE_FREQ == 0:
+        updates['targetq_state'] = q_state
+    policy_state = policy_state.replace(**updates)
     return policy_state

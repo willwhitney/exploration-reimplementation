@@ -1,8 +1,8 @@
 import time
 import os
 import math
+import pickle
 import queue
-# import types
 from typing import Any
 
 import numpy as np
@@ -37,6 +37,7 @@ class ExplorationState():
     target_novq_state: q_learning.QLearnerState
     density_state: density.DensityState
     temperature: float
+    update_temperature: float
     prior_count: float
     optimistic_updates: bool
     target_network: bool
@@ -55,6 +56,7 @@ class AgentState():
     prioritized_update: bool
     update_target_every: int
     warmup_steps: int
+    optimistic_actions: bool
     steps_since_tupdate: int = 0
     # policy_fns: Any = struct.field(pytree_node=False)
 
@@ -82,7 +84,7 @@ def train_step_candidates(exploration_state: ExplorationState,
     """The jittable component of the exploration Q function training step."""
     states, actions, next_states, rewards = transitions
     discount = exploration_state.novq_state.discount
-    temp = exploration_state.temperature
+    temp = exploration_state.update_temperature
 
     # if use_target_network:
     #     target_q_state = exploration_state.target_novq_state
@@ -140,7 +142,7 @@ def train_step(agent_state, transitions):
     """A full (optimistic) training step for the exploration Q function."""
     states, actions, next_states, rewards = transitions
 
-    # candidate actions should be (bsize x 64 x *action_shape)
+    # candidate actions should be (bsize x n_update_candidates x *action_shape)
     with jax.profiler.TraceContext("get candidates"):
         policy_state, candidate_next_actions = policy.action_fn(
             agent_state.policy_state, next_states,
@@ -192,7 +194,7 @@ def prioritized_update(agent_state: AgentState, last_transition_id):
                 _, transition_id = pqueue.get_nowait()
                 # if transition_id not in visited:
                 transition_ids.append(transition_id)
-                    # visited.add(transition_id)
+                # visited.add(transition_id)
             except queue.Empty:
                 break
 
@@ -279,9 +281,11 @@ def update_exploration(agent_state, rng, transition_id):
 
 
 def compute_weight(prior_count, count):
-    root_count = count ** 0.5
-    root_prior_count = prior_count ** 0.5
-    return root_count / (root_count + root_prior_count)
+    root_real_count = count ** 0.5
+    # root_prior_count = prior_count ** 0.5
+    # return root_real_count / (root_real_count + root_prior_count)
+    root_total_count = (count + prior_count) ** 0.5
+    return root_real_count / root_total_count
 
 
 @jax.profiler.trace_function
@@ -309,7 +313,8 @@ predict_optimistic_values_batch = jax.vmap(  # noqa: E305
 
 @jax.profiler.trace_function
 @jax.jit
-def select_action(exploration_state, rng, state, candidate_actions):
+def select_candidate_optimistic(exploration_state, rng,
+                                state, candidate_actions):
     optimistic_values = predict_optimistic_values(
         exploration_state.novq_state,
         exploration_state.density_state,
@@ -337,8 +342,14 @@ def sample_exploration_action(agent_state: AgentState, rng, s, train=True):
     agent_state = agent_state.replace(policy_state=policy_state)
 
     with jax.profiler.TraceContext("select from candidates"):
-        a, h = select_action(agent_state.exploration_state,
-                          rng, s, candidate_actions)
+        if agent_state.optimistic_actions:
+            a, h = select_candidate_optimistic(agent_state.exploration_state,
+                                               rng, s, candidate_actions)
+        else:
+            a, _, h = q_learning.sample_action_boltzmann(
+                agent_state.exploration_state.novq_state, rng,
+                s, candidate_actions,
+                agent_state.exploration_state.temperature)
     flag = 'train' if train else 'test'
     logger.update(f'{flag}/explore_entropy', h)
     return agent_state, a
@@ -354,7 +365,7 @@ def update_agent(agent_state: AgentState, rng, transition):
 
 
 def run_episode(agent_state: AgentState, rng, env,
-                train=True, use_exploration=True, max_steps=None):
+                train=True, max_steps=None):
     timestep = env.reset()
     score, novelty_score = 0, 0
 
@@ -396,7 +407,8 @@ def run_episode(agent_state: AgentState, rng, env,
 
 # ----- Visualizations for gridworld ---------------------------------
 def display_state(agent_state: AgentState, ospec, aspec,
-                  max_steps=100, rendering='local', savepath=None, bins=20):
+                  max_steps=100, bins=20,
+                  rendering='local', savedir=None, episode=None):
     exploration_state = agent_state.exploration_state
     policy_state = agent_state.policy_state
 
@@ -418,10 +430,6 @@ def display_state(agent_state: AgentState, ospec, aspec,
                     exploration_state.prior_count),
         agent_state.replay,
         ospec, aspec, reduction=jnp.max, bins=bins)
-    taskq_map = utils.render_function(
-        jax.partial(q_learning.predict_value, policy_state.q_state),
-        agent_state.replay,
-        ospec, aspec, reduction=jnp.max, bins=bins)
     novelty_reward_map = utils.render_function(
         jax.partial(compute_novelty_reward, exploration_state),
         agent_state.replay,
@@ -429,15 +437,29 @@ def display_state(agent_state: AgentState, ospec, aspec,
     traj_map = replay_buffer.render_trajectory(
         agent_state.replay, max_steps, ospec, bins=bins)
 
+
     subfigs = [
         # (min_count_map, "Visit count (min)"),
         (count_map, "Visit count (max)"),
         (novq_map, "Novelty value (max)"),
         (optimistic_novq_map, "Optimistic novelty value (max)"),
-        (taskq_map, "Task value (max)"),
         (novelty_reward_map, "Novelty reward (max)"),
         (traj_map, "Last trajectory"),
     ]
+
+    q_policies = ['policies.deep_q_policy', 'policies.tabular_q_policy']
+    if policy.__name__ in q_policies:
+        taskq_map = utils.render_function(
+            jax.partial(q_learning.predict_value, policy_state.q_state),
+            agent_state.replay,
+            ospec, aspec, reduction=jnp.max, bins=bins)
+        subfigs.append((taskq_map, "Task value (max)"))
+
+    # dump the raw data for later rendering
+    raw_path = f"{savedir}/data/{episode}.pkl"
+    os.makedirs(os.path.dirname(raw_path), exist_ok=True)
+    with open(raw_path, 'wb') as f:
+        pickle.dump(subfigs, f, protocol=4)
 
     fig, axs = plt.subplots(1, len(subfigs))
     for ax, subfig in zip(axs, subfigs):
@@ -447,7 +469,8 @@ def display_state(agent_state: AgentState, ospec, aspec,
         ax.set_title(title)
     fig.set_size_inches(4 * len(subfigs), 3)
 
-    utils.display_figure(fig, rendering, savepath=savepath)
+    fig_path = f"{savedir}/{episode}.png"
+    utils.display_figure(fig, rendering, savepath=fig_path)
 # -------------------------------------------------------------------
 
 
@@ -496,6 +519,7 @@ def main(args):
         target_novq_state=novq_state,
         density_state=density_state,
         temperature=args.temperature,
+        update_temperature=args.update_temperature,
         prior_count=args.prior_count,
         optimistic_updates=args.optimistic_updates,
         target_network=args.target_network)
@@ -506,9 +530,10 @@ def main(args):
                              n_update_candidates=args.n_update_candidates,
                              prioritized_update=args.prioritized_update,
                              update_target_every=args.update_target_every,
-                             warmup_steps=args.warmup_steps)
+                             warmup_steps=args.warmup_steps,
+                             optimistic_actions=args.optimistic_actions,)
 
-    for episode in range(1, 100000):
+    for episode in range(1, 1000):
         # run an episode
         rng, episode_rng = random.split(rng)
         agent_state, env, score, novelty_score = run_episode(
@@ -527,15 +552,12 @@ def main(args):
                 policy_state, transitions)
         agent_state = agent_state.replace(policy_state=policy_state)
 
-        # hacky reset of targetq to q
-        # TODO: pull this inside the policy.update_fn
-        if episode % 1 == 0:
-            policy_state = agent_state.policy_state.replace(
-                targetq_state=policy_state.q_state)
-            agent_state = agent_state.replace(policy_state=policy_state)
-
-        # update the target novelty Q function
-        # agent_state = update_target_q(agent_state)
+        # # hacky reset of targetq to q
+        # # TODO: pull this inside the policy.update_fn
+        # if episode % 1 == 0:
+        #     policy_state = agent_state.policy_state.replace(
+        #         targetq_state=policy_state.q_state)
+        #     agent_state = agent_state.replace(policy_state=policy_state)
 
         # output / visualize
         if episode % args.eval_every == 0:
@@ -547,18 +569,18 @@ def main(args):
             logger.update('test/score', test_score)
             logger.update('test/novelty_score', test_novelty_score)
 
-            # print((f"Episode {episode:4d}"
-            #        f", Train score {score:3.0f}"
-            #        f", Train novelty score {novelty_score:3.0f}"
-            #        f", Test score {test_score:3.0f}"
-            #        f", Test novelty score {test_novelty_score:3.0f}"))
             logger.write_all()
 
             if args.vis != 'none':
-                savepath = f"{args.save_dir}/{episode}.png"
+                # savepath = f"{args.save_dir}/{episode}"
                 display_state(agent_state, observation_spec, action_spec,
-                              max_steps=args.max_steps, rendering=args.vis,
-                              savepath=savepath)
+                              max_steps=args.max_steps, bins=args.n_state_bins,
+                              rendering=args.vis, savedir=args.save_dir,
+                              episode=episode)
+
+        if episode % args.save_replay_every == 0:
+            replay_path = f"{args.save_dir}/replay.pkl"
+            replay_buffer.save(agent_state.replay, replay_path)
 
 
 if __name__ == '__main__':
@@ -574,18 +596,22 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true', default=False)
     parser.add_argument('--vis', default='disk')
     parser.add_argument('--eval_every', type=int, default=10)
+    parser.add_argument('--save_replay_every', type=int, default=10)
 
-    parser.add_argument('--tabular', action='store_true', default=False)
-    parser.add_argument('--q_functions', type=str, default='deep')
-    parser.add_argument('--policy_update', type=str, default='bellman')
-    parser.add_argument('--policy_lr', type=float, default=1e-2)
+    parser.add_argument('--policy', type=str, default='deep')
+    parser.add_argument('--policy_update', type=str, default='ddqn')
+    parser.add_argument('--policy_lr', type=float, default=1e-3)
 
+    parser.add_argument('--novelty_q_function', type=str, default='deep')
     parser.add_argument('--temperature', type=float, default=1e-1)
+    parser.add_argument('--update_temperature', type=float, default=None)
     parser.add_argument('--prior_count', type=float, default=1e-3)
     parser.add_argument('--n_update_candidates', type=int, default=64)
     parser.add_argument('--n_state_bins', type=int, default=4)
     parser.add_argument('--n_action_bins', type=int, default=2)
     parser.add_argument('--no_optimistic_updates', dest='optimistic_updates',
+                        action='store_false', default=True)
+    parser.add_argument('--no_optimistic_actions', dest='optimistic_actions',
                         action='store_false', default=True)
     parser.add_argument('--target_network', action='store_true', default=True)
     parser.add_argument('--no_target_network', dest='target_network',
@@ -601,6 +627,9 @@ if __name__ == '__main__':
                         action='store_false')
     args = parser.parse_args()
     print(args)
+    if args.update_temperature is None:
+        print("Using --temperature as --update_temperature.")
+        args.update_temperature = args.temperature
 
     args.save_dir = f"results/exploration/{args.name}"
     os.makedirs(args.save_dir, exist_ok=True)
@@ -612,15 +641,23 @@ if __name__ == '__main__':
     with open(args.save_dir + '/args.json', 'w') as argfile:
         json.dump(args.__dict__, argfile, indent=4)
 
-    if args.tabular:
-        import tabular_q_functions as q_functions
-        import policies.tabular_q_policy as policy
-    elif args.q_functions == 'deep':
+    if args.novelty_q_function == 'deep':
         import deep_q_functions as q_functions
-        import policies.deep_q_policy as policy
-    elif args.q_functions == 'sigmoid':
+    elif args.novelty_q_function == 'sigmoid':
         import sigmoid_q_functions as q_functions
+    elif args.novelty_q_function == 'tabular':
+        import tabular_q_functions as q_functions
+    else:
+        raise Exception("Argument --novelty_q_function was invalid.")
+
+    if args.policy == 'deep':
         import policies.deep_q_policy as policy
+    elif args.policy == 'uniform':
+        import policies.uniform_policy as policy
+    elif args.policy == 'tabular':
+        import policies.tabular_q_policy as policy
+    else:
+        raise Exception("Argument --policy was invalid.")
 
     jit = not args.debug
     if jit:

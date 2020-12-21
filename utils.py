@@ -251,7 +251,7 @@ def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
         value which will represent that state.
     """
     rng = random.PRNGKey(0)
-    n_samples = min(5 * len(replay), 10000)
+    n_samples = min(5 * len(replay), 1000000)
 
     action_shape = aspec.shape
     if len(action_shape) == 0:
@@ -261,7 +261,6 @@ def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
     states = transitions[0]
     actions = transitions[1]
     actions = actions.reshape((-1, *action_shape))
-
 
     uniform_actions = sample_uniform_single(aspec, rng, n_samples)
     actions[:n_samples] = uniform_actions
@@ -275,7 +274,11 @@ def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
         actions = jnp.concatenate([sampled_actions,
                                    actions], axis=0)
 
-    values = fn(states, actions)
+    values_list = []
+    bsize = 10000
+    for i in range(0, states.shape[0], bsize):
+        values_list.append(fn(states[i: i + bsize], actions[i: i + bsize]))
+    values = jnp.concatenate(values_list, axis=0)
 
     flat_ospec = flatten_observation_spec(ospec)
     discrete_states = discretize(states, flat_ospec, bins)
