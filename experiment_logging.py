@@ -1,5 +1,4 @@
 import csv
-import time
 from collections import defaultdict
 
 
@@ -90,7 +89,8 @@ class Logger(MeterGroup):
     def write_console(self):
         if self.summary_format_str is None:
             for mg_name, mg_spec in self.sub_meter_map.items():
-                self._meter_groups[mg_name].write_console(mg_spec['format_str'])
+                self._meter_groups[mg_name].write_console(
+                    mg_spec['format_str'])
         else:
             super().write_console(self.summary_format_str)
 
@@ -113,11 +113,11 @@ TEST_FORMAT_STR = ', '.join((
 SUMMARY_FORMAT_STR = ', '.join((
     "Episode {values[train/episode]:4.0f}",
     "Train score {values[train/score]:4.0f}",
-    "Train novelty score {values[train/novelty_score]:4.0f}",
-    "Train policy entropy {values[train/policy_entropy]:5.2f}",
+    "Train nov score {values[train/novelty_score]:4.0f}",
+    "Train policy ent {values[train/policy_entropy]:5.2f}",
     "Test score {values[test/score]:4.0f}",
-    "Test novelty score {values[test/novelty_score]:4.0f}",
-    "Test policy entropy {values[test/policy_entropy]:5.2f}",
+    "Test nov score {values[test/novelty_score]:4.0f}",
+    "Test policy ent {values[test/policy_entropy]:5.2f}",
 ))
 
 default_logger = Logger()
@@ -157,6 +157,4 @@ if __name__ == "__main__":
         default_logger.update('test/novelty_score', random.uniform(0, 100))
         if episode % 10 == 0:
             default_logger.write_all()
-
-
 

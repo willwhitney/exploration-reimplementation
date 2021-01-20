@@ -14,9 +14,7 @@ import jax_specs
 from experiment_logging import default_logger as logger
 
 
-TEMP = 0.3
-TEST_TEMP = 0.1
-N_CANDIDATES = 32
+N_CANDIDATES = 128
 TARGET_UPDATE_FREQ = 50
 
 
@@ -29,11 +27,13 @@ class PolicyState():
     n_candidates: int
     update_rule: str
     update_count: int
+    temp: float
+    test_temp: float
 
 
 def init_fn(state_spec, action_spec, seed,
             n_candidates=32, lr=1e-2, update_rule='bellman',
-            **kwargs):
+            temp=0.3, test_temp=0.1, **kwargs):
     j_action_spec = jax_specs.convert_dm_spec(action_spec)
     q_state = q_functions.init_fn(seed, state_spec, action_spec,
                                   discount=0.99, lr=lr, **kwargs)
@@ -41,7 +41,8 @@ def init_fn(state_spec, action_spec, seed,
     rng = random.PRNGKey(seed)
     return PolicyState(q_state=q_state, targetq_state=targetq_state, rng=rng,
                        action_spec=j_action_spec, n_candidates=n_candidates,
-                       update_rule=update_rule, update_count=0)
+                       update_rule=update_rule, update_count=0,
+                       temp=temp, test_temp=test_temp)
 
 
 def action_fn(policy_state: PolicyState, s, n=1, explore=True):
@@ -63,13 +64,14 @@ def action_fn(policy_state: PolicyState, s, n=1, explore=True):
     if explore:
         with jax.profiler.TraceContext("sample explore"):
             actions, _, entropies = q_learning.sample_action_boltzmann_n_batch(
-                policy_state.q_state, action_rngs, s, candidate_actions, TEMP)
+                policy_state.q_state, action_rngs, s, candidate_actions,
+                policy_state.temp)
             logger.update('train/policy_entropy', entropies.mean())
     else:
         with jax.profiler.TraceContext("sample test"):
             actions, _, entropies = q_learning.sample_action_boltzmann_n_batch(
                 policy_state.q_state, action_rngs, s, candidate_actions,
-                TEST_TEMP)
+                policy_state.test_temp)
             logger.update('test/policy_entropy', entropies.mean())
     policy_state = policy_state.replace(rng=policy_rng)
     return policy_state, actions

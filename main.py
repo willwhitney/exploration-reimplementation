@@ -9,10 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import jax
-from jax import numpy as jnp, random, lax
-
-import flax
-from flax import nn, optim, struct
+from jax import numpy as jnp, random
+from flax import nn, struct
 
 from dm_control import suite
 
@@ -23,7 +21,6 @@ import tabular_density as density
 import utils
 from observation_domains import DOMAINS
 import jax_specs
-import point
 
 
 R_MAX = 100
@@ -512,7 +509,9 @@ def main(args):
 
     policy_state = policy.init_fn(observation_spec, action_spec, args.seed,
                                   lr=args.policy_lr,
-                                  update_rule=args.policy_update)
+                                  update_rule=args.policy_update,
+                                  temp=args.policy_temperature,
+                                  test_temp=args.policy_test_temperature)
 
     exploration_state = ExplorationState(
         novq_state=novq_state,
@@ -601,6 +600,8 @@ if __name__ == '__main__':
     parser.add_argument('--policy', type=str, default='deep')
     parser.add_argument('--policy_update', type=str, default='ddqn')
     parser.add_argument('--policy_lr', type=float, default=1e-3)
+    parser.add_argument('--policy_temperature', type=float, default=3e-1)
+    parser.add_argument('--policy_test_temperature', type=float, default=1e-1)
 
     parser.add_argument('--novelty_q_function', type=str, default='deep')
     parser.add_argument('--temperature', type=float, default=1e-1)
@@ -625,6 +626,8 @@ if __name__ == '__main__':
                         action='store_true', default=False)
     parser.add_argument('--no_prioritized_update', dest='prioritized_update',
                         action='store_false')
+
+    parser.add_subparsers()
     args = parser.parse_args()
     print(args)
     if args.update_temperature is None:

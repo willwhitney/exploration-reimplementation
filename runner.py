@@ -8,12 +8,43 @@ import numpy as np
 GPUS = 4
 MULTIPLEX = 4
 
+# jobs = [
+#     # no rewards
+#     ## gridworld 40
+#     "python main.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --policy uniform --name arxiv2_grid40_puniform",
+#     "python main.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --policy uniform --no_optimistic_updates --no_optimistic_actions --name arxiv2_grid40_noopt_puniform",
+#     "python main_ablation_slow.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --policy uniform --name arxiv2_grid40_slow_puniform",
+#     "python main_ablation_intrinsic.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --explore_only --name arxiv2_grid40_intrinsic_noreward",
+#     "python main.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --policy uniform --no_exploration --name arxiv2_grid40_puniform_noexplore",
+
+#     ## point velocity
+#     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --policy uniform --name arxiv2_pv100_puniform",
+#     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --policy uniform --no_optimistic_updates --no_optimistic_actions --name arxiv2_pv100_noopt_puniform",
+#     "python main_ablation_slow.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --policy uniform --name arxiv2_pv100_slow_puniform",
+#     "python main_ablation_intrinsic.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --explore_only --name arxiv2_pv100_intrinsic_noreward",
+#     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --policy uniform --no_exploration --name arxiv2_pv100_puniform_noexplore",
+
+#     # with rewards
+#     ## gridworld 40
+#     "python main.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --name arxiv2_grid40",
+#     "python main.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --no_optimistic_updates --no_optimistic_actions --name arxiv2_grid40_noopt",
+#     "python main_ablation_slow.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --name arxiv2_grid40_slow",
+#     "python main_ablation_intrinsic.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --name arxiv2_grid40_intrinsic",
+#     "python main.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --no_exploration --name arxiv2_grid40_noexplore",
+
+#     ## point velocity
+#     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --name arxiv2_pv100",
+#     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --no_optimistic_updates --no_optimistic_actions --name arxiv2_pv100_noopt",
+#     "python main_ablation_slow.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --name arxiv2_pv100_slow",
+#     "python main_ablation_intrinsic.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --name arxiv2_pv100_intrinsic",
+#     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --no_exploration --name arxiv2_pv100_noexplore",
+# ]
+
 jobs = [
-    "python main.py --eval_every 1 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --policy uniform --name arxiv_grid40_puniform",
-    "python main.py --eval_every 1 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --policy uniform --no_optimistic_updates --no_optimistic_actions --name arxiv_grid40_noopt_puniform",
-    "python main_ablation_slow.py --eval_every 1 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --policy uniform --name arxiv_grid40_slow_puniform",
-    "python main_ablation_intrinsic.py --eval_every 1 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --explore_only --name arxiv_grid40_intrinsic_noreward",
-    "python main.py --eval_every 1 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --policy uniform --no_exploration --name arxiv_grid40_puniform_noexplore",
+    ("python main.py --eval_every 1 --env cartpole --task swingup --n_state_bins 20 --n_action_bins 4 "
+     "--policy_temperature 3e-1 --policy_test_temperature 3e-2 --name explore_swingup_pttemp_0.03"),
+    ("python main.py --eval_every 1 --env cartpole --task swingup --n_state_bins 20 --n_action_bins 4 "
+     "--policy_temperature 3e-1 --policy_test_temperature 1e-2 --name explore_swingup_pttemp_0.01"),
 ]
 
 seeds = [0]
@@ -25,7 +56,7 @@ for seed in seeds:
         seeded_jobs.append(job)
 
 
-async def run_job(job, gpu_id):
+async def run_job(gpu_id, job):
     command = job.split(' ')
 
     print("Dispatching `{}`".format(command))
@@ -35,13 +66,29 @@ async def run_job(job, gpu_id):
     proc = await asyncio.create_subprocess_shell(' '.join(command), env=env)
     stdout, stderr = await proc.communicate()
 
-async def run_jobs(jobs):
-    tasks = (run_job(job, i % GPUS) for i, job in enumerate(jobs))
-    await asyncio.gather(*tasks)
+
+async def worker_fn(gpu_id, queue):
+    while True:
+        job = await queue.get()
+        await run_job(gpu_id, job)
+        queue.task_done()
+
 
 async def main():
+    queue = asyncio.Queue()
+    for job in seeded_jobs:
+        queue.put_nowait(job)
+
     n_parallel = MULTIPLEX * GPUS
-    for i in range(0, len(seeded_jobs), n_parallel):
-        await run_jobs(seeded_jobs[i: i + n_parallel])
+    workers = []
+    for i in range(n_parallel):
+        worker = asyncio.create_task(worker_fn(i % GPUS, queue))
+        workers.append(worker)
+
+    await queue.join()
+    for worker in workers:
+        worker.cancel()
+    await asyncio.gather(*workers, return_exceptions=True)
+
 
 asyncio.run(main())
