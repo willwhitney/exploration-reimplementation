@@ -14,7 +14,7 @@ import jax_specs
 from experiment_logging import default_logger as logger
 
 
-N_CANDIDATES = 128
+N_CANDIDATES = 32
 TARGET_UPDATE_FREQ = 50
 
 

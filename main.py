@@ -17,7 +17,6 @@ from dm_control import suite
 import dmcontrol_gridworld
 import replay_buffer
 import q_learning
-import tabular_density as density
 import utils
 from observation_domains import DOMAINS
 import jax_specs
@@ -32,13 +31,12 @@ class ExplorationState():
     """
     novq_state: q_learning.QLearnerState
     target_novq_state: q_learning.QLearnerState
-    density_state: density.DensityState
+    density_state: Any
     temperature: float
     update_temperature: float
     prior_count: float
     optimistic_updates: bool
     target_network: bool
-    # density_fns: Any
 
 
 @struct.dataclass
@@ -55,7 +53,6 @@ class AgentState():
     warmup_steps: int
     optimistic_actions: bool
     steps_since_tupdate: int = 0
-    # policy_fns: Any = struct.field(pytree_node=False)
 
 
 @jax.jit
@@ -603,6 +600,8 @@ if __name__ == '__main__':
     parser.add_argument('--policy_temperature', type=float, default=3e-1)
     parser.add_argument('--policy_test_temperature', type=float, default=1e-1)
 
+    parser.add_argument('--density', type=str, default='tabular')
+
     parser.add_argument('--novelty_q_function', type=str, default='deep')
     parser.add_argument('--temperature', type=float, default=1e-1)
     parser.add_argument('--update_temperature', type=float, default=None)
@@ -661,6 +660,13 @@ if __name__ == '__main__':
         import policies.tabular_q_policy as policy
     else:
         raise Exception("Argument --policy was invalid.")
+
+    if args.density == 'tabular':
+        import tabular_density as density
+    elif args.density == 'kernel':
+        import kernel_density as density
+    else:
+        raise Exception("Argument --density was invalid.")
 
     jit = not args.debug
     if jit:

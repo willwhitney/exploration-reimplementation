@@ -22,72 +22,9 @@ class DensitySettings():
 @struct.dataclass
 class DensityState():
     settings: DensitySettings
-    observations: jnp.ndarray = jnp.array((4, 4, 2))
+    observations: jnp.ndarray
     total: int = 1
     eps: float = 1e-8
-
-
-# def make_density(observation_spec, action_spec, state_bins=4, action_bins=2):
-#     """Creates a new DensityState."""
-#     observation_spec = utils.flatten_observation_spec(observation_spec)
-#     observation_spec = jax_specs.convert_dm_spec(observation_spec)
-#     action_spec = jax_specs.convert_dm_spec(action_spec)
-#     state_shape = observation_spec.shape
-#     if isinstance(action_spec, jax_specs.DiscreteArray):
-#         action_shape = (1,)
-#     else:
-#         action_shape = action_spec.shape
-#     state_values_per_dim = [state_bins
-#                             for s in state_shape for _ in range(s)]
-#     action_values_per_dim = [action_bins
-#                              for a in action_shape for _ in range(a)]
-#     total_dimension_list = state_values_per_dim + action_values_per_dim
-#     storage = jnp.zeros(tuple(total_dimension_list), dtype=jnp.uint32)
-
-#     return DensityState(observations=storage)
-
-
-#     @jax.jit
-#     def _make_key(s, a):
-#         ospec = observation_spec
-#         aspec = action_spec
-#         state_bins = state_bins
-#         action_bins = action_bins
-#         discrete_state = utils.discretize_observation(s, ospec, state_bins)
-#         discrete_action = utils.discretize_observation(a, aspec, action_bins)
-#         discrete_trans = [discrete_state.flatten(), discrete_action.flatten()]
-#         return tuple(jnp.concatenate(discrete_trans).astype(int))
-#     _make_key_batch = jax.vmap(_make_key)  # noqa: E305
-
-
-#     @jax.jit
-#     def update_batch(density_state: DensityState, states, actions):
-#         keys = _make_key_batch(states, actions)
-#         # keys = _make_key_gridworld_batch(states, actions)
-#         new_observations = jax.ops.index_add(density_state.observations, keys, 1)
-#         new_total = density_state.total + states.shape[0]
-#         density_state = density_state.replace(observations=new_observations,
-#                                               total=new_total)
-#         return density_state
-
-
-#     def get_count(density_state: DensityState, state, action):
-#         key = _make_key(state, action)
-#         # key = _make_key_gridworld(state, action)
-#         return density_state.observations[key]
-
-
-#     @jax.jit
-#     def get_count_batch(density_state: DensityState, states, actions):
-#         keys = _make_key_batch(states, actions)
-#         # keys = _make_key_gridworld_batch(states, actions)
-#         return density_state.observations[keys]
-
-
-# def log_p(density_state: DensityState, state, action):
-#     count = get_count(density_state, state, action)
-#     return jnp.log(count / density_state.total + density_state.eps)
-# log_p_batch = jax.vmap(log_p, in_axes=(None, 0, 0))  # noqa: E305
 
 
 def _process_gridworld_state(s):
@@ -105,7 +42,7 @@ def _make_key_gridworld(s, a):
 _make_key_gridworld_batch = jax.vmap(_make_key_gridworld)  # noqa: E305
 
 
-def new(observation_spec, action_spec, state_bins=4, action_bins=2):
+def new(observation_spec, action_spec, state_bins=4, action_bins=2, **kwargs):
     """Creates a new DensityState."""
     observation_spec = utils.flatten_observation_spec(observation_spec)
     observation_spec = jax_specs.convert_dm_spec(observation_spec)
@@ -128,13 +65,6 @@ def new(observation_spec, action_spec, state_bins=4, action_bins=2):
 
 
 def update_batch(density_state: DensityState, states, actions):
-    # keys = _make_key_batch(density_state.settings, states, actions)
-    # # keys = _make_key_gridworld_batch(states, actions)
-    # new_observations = jax.ops.index_add(density_state.observations, keys, 1)
-    # new_total = density_state.total + states.shape[0]
-    # density_state = density_state.replace(observations=new_observations,
-    #                                       total=new_total)
-    # return density_state
     return _update_batch(density_state, density_state.settings, states, actions)
 
 
@@ -143,7 +73,6 @@ def _update_batch(density_state: DensityState,
                   density_settings: DensitySettings,
                   states, actions):
     keys = _make_key_batch(density_settings, states, actions)
-    # keys = _make_key_gridworld_batch(states, actions)
     new_observations = jax.ops.index_add(density_state.observations, keys, 1)
     new_total = density_state.total + states.shape[0]
     density_state = density_state.replace(observations=new_observations,
@@ -153,14 +82,12 @@ def _update_batch(density_state: DensityState,
 
 def get_count(density_state: DensityState, state, action):
     key = _make_key(density_state.settings, state, action)
-    # key = _make_key_gridworld(state, action)
     return density_state.observations[key]
 
 
 @jax.jit
 def get_count_batch(density_state: DensityState, states, actions):
     keys = _make_key_batch(density_state.settings, states, actions)
-    # keys = _make_key_gridworld_batch(states, actions)
     return density_state.observations[keys]
 
 
