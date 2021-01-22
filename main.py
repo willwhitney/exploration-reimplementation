@@ -13,6 +13,7 @@ from jax import numpy as jnp, random
 from flax import nn, struct
 
 from dm_control import suite
+import point
 
 import dmcontrol_gridworld
 import replay_buffer
@@ -498,7 +499,8 @@ def main(args):
 
     density_state = density.new(observation_spec, action_spec,
                                 state_bins=args.n_state_bins,
-                                action_bins=args.n_action_bins)
+                                action_bins=args.n_action_bins,
+                                kernel_cov_scale=args.density_cov_scale)
 
     # for gridworld we can discretize with one bit per dimension
     replay = replay_buffer.LowPrecisionTracingReplay(
@@ -601,6 +603,7 @@ if __name__ == '__main__':
     parser.add_argument('--policy_test_temperature', type=float, default=1e-1)
 
     parser.add_argument('--density', type=str, default='tabular')
+    parser.add_argument('--density_cov_scale', type=float, default=1.)
 
     parser.add_argument('--novelty_q_function', type=str, default='deep')
     parser.add_argument('--temperature', type=float, default=1e-1)
@@ -665,6 +668,8 @@ if __name__ == '__main__':
         import tabular_density as density
     elif args.density == 'kernel':
         import kernel_density as density
+    elif args.density == 'kernel_count':
+        import kernel_count as density
     else:
         raise Exception("Argument --density was invalid.")
 

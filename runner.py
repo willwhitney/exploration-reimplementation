@@ -41,10 +41,14 @@ MULTIPLEX = 4
 # ]
 
 jobs = [
-    ("python main.py --eval_every 1 --env cartpole --task swingup --n_state_bins 20 --n_action_bins 4 "
-     "--policy_temperature 3e-1 --policy_test_temperature 3e-2 --name explore_swingup_pttemp_0.03"),
-    ("python main.py --eval_every 1 --env cartpole --task swingup --n_state_bins 20 --n_action_bins 4 "
-     "--policy_temperature 3e-1 --policy_test_temperature 1e-2 --name explore_swingup_pttemp_0.01"),
+    # "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel --max_steps 100 --name explore_pv100_kernel_clippednum",
+    # "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel --density_cov_scale 0.1 --max_steps 100 --name explore_pv100_kernelscale0.1_clippednum",
+    # "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel --density_cov_scale 0.01 --max_steps 100 --name explore_pv100_kernelscale0.01_clippednum",
+
+    # "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel_count --max_steps 100 --name explore_pv100_kcount_clippednum",
+    "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel_count --density_cov_scale 0.1 --max_steps 100 --name epv100kc_scale0.1",
+    "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel_count --density_cov_scale 0.01 --max_steps 100 --name epv100kc_scale0.01",
+    "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel_count --density_cov_scale 0.001 --max_steps 100 --name epv100kc_scale0.001",
 ]
 
 seeds = [0]
