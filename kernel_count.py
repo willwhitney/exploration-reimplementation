@@ -16,21 +16,23 @@ class DensityState:
     scale_factor: float = 1.0
 
 
-def new(observation_spec, action_spec, max_obs=100000, kernel_cov_scale=1,
-        **kwargs):
+def new(observation_spec, action_spec, max_obs=100000,
+        state_std_scale=1, action_std_scale=1, **kwargs):
     flat_ospec = utils.flatten_observation_spec(observation_spec)
-    concat_min = jnp.concatenate([flat_ospec.minimum, action_spec.minimum],
-                                 axis=0)
-    concat_max = jnp.concatenate([flat_ospec.maximum, action_spec.maximum],
-                                 axis=0)
-    kernel_cov = jnp.diag((concat_max - concat_min) ** 2) * kernel_cov_scale
+    state_std = flat_ospec.maximum - flat_ospec.minimum
+    action_std = action_spec.maximum - action_spec.minimum
+
+    state_std = state_std_scale * state_std
+    action_std = action_std_scale * action_std
+    concat_std = jnp.concatenate([state_std, action_std], axis=0)
+    kernel_cov = jnp.diag(concat_std ** 2)
 
     # calculate a scalar to shift the max to 1
     max_pdf = _max_pdf_value(kernel_cov)
     scale_factor = 1 / max_pdf
 
     # initialize this to some reasonable size
-    observations = jnp.zeros((1024, *concat_min.shape))
+    observations = jnp.zeros((1024, *concat_std.shape))
     return DensityState(kernel_cov, observations, max_obs=max_obs,
                         scale_factor=scale_factor)
 
@@ -126,7 +128,7 @@ if __name__ == "__main__":
 
     aspec = env.action_spec()
     j_aspec = jax_specs.convert_dm_spec(aspec)
-    density_state = new(ospec, aspec, kernel_cov_scale=1e-3)
+    density_state = new(ospec, aspec, state_std_scale=1e-2, action_std_scale=1)
 
     timestep = env.reset()
     state = utils.flatten_observation(timestep.observation)

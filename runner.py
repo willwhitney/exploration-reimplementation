@@ -46,12 +46,21 @@ jobs = [
     # "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel --density_cov_scale 0.01 --max_steps 100 --name explore_pv100_kernelscale0.01_clippednum",
 
     # "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel_count --max_steps 100 --name explore_pv100_kcount_clippednum",
-    "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel_count --density_cov_scale 0.1 --max_steps 100 --name epv100kc_scale0.1",
-    "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel_count --density_cov_scale 0.01 --max_steps 100 --name epv100kc_scale0.01",
-    "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel_count --density_cov_scale 0.001 --max_steps 100 --name epv100kc_scale0.001",
+
+    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 100 --name epv100kc_sscale0.1_ascale1",
+    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-2 --density_action_scale 1 --max_steps 100 --name epv100kc_sscale0.01_ascale1",
+    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-3 --density_action_scale 1 --max_steps 100 --name epv100kc_sscale0.001_ascale1",
+
+    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-1 --density_action_scale 1e-1 --max_steps 100 --name epv100kc_sscale0.1_ascale0.1",
+    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-2 --density_action_scale 1e-1 --max_steps 100 --name epv100kc_sscale0.01_ascale0.1",
+    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-3 --density_action_scale 1e-1 --max_steps 100 --name epv100kc_sscale0.001_ascale0.1",
+
+    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-1 --density_action_scale 1e-2 --max_steps 100 --name epv100kc_sscale0.1_ascale0.01",
+    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-2 --density_action_scale 1e-2 --max_steps 100 --name epv100kc_sscale0.01_ascale0.01",
+    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-3 --density_action_scale 1e-2 --max_steps 100 --name epv100kc_sscale0.001_ascale0.01",
 ]
 
-seeds = [0]
+seeds = [1, 2, 3]
 
 seeded_jobs = []
 for seed in seeds:

@@ -500,7 +500,8 @@ def main(args):
     density_state = density.new(observation_spec, action_spec,
                                 state_bins=args.n_state_bins,
                                 action_bins=args.n_action_bins,
-                                kernel_cov_scale=args.density_cov_scale)
+                                state_std_scale=args.density_state_scale,
+                                action_std_scale=args.density_action_scale)
 
     # for gridworld we can discretize with one bit per dimension
     replay = replay_buffer.LowPrecisionTracingReplay(
@@ -603,14 +604,15 @@ if __name__ == '__main__':
     parser.add_argument('--policy_test_temperature', type=float, default=1e-1)
 
     parser.add_argument('--density', type=str, default='tabular')
-    parser.add_argument('--density_cov_scale', type=float, default=1.)
+    parser.add_argument('--density_state_scale', type=float, default=1.)
+    parser.add_argument('--density_action_scale', type=float, default=1.)
 
     parser.add_argument('--novelty_q_function', type=str, default='deep')
     parser.add_argument('--temperature', type=float, default=1e-1)
     parser.add_argument('--update_temperature', type=float, default=None)
     parser.add_argument('--prior_count', type=float, default=1e-3)
     parser.add_argument('--n_update_candidates', type=int, default=64)
-    parser.add_argument('--n_state_bins', type=int, default=4)
+    parser.add_argument('--n_state_bins', type=int, default=20)
     parser.add_argument('--n_action_bins', type=int, default=2)
     parser.add_argument('--no_optimistic_updates', dest='optimistic_updates',
                         action='store_false', default=True)
