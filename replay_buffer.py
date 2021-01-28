@@ -48,6 +48,23 @@ class Replay:
         return (self.s[i], self.a[i], self.sp[i], self.r[i])
 
 
+def get_subset(replay, start=0, stop=None):
+    if stop == None:
+        stop = replay.length
+    assert (start < replay.length)
+    assert (stop <= replay.length)
+    assert (stop > start)
+    new_replay = Replay(replay.s.shape[1:], replay.a.shape[1:],
+                        max_size=replay.s.shape[0])
+    new_replay.s = np.array(replay.s[start:stop])
+    new_replay.a = np.array(replay.a[start:stop])
+    new_replay.sp = np.array(replay.sp[start:stop])
+    new_replay.r = np.array(replay.r[start:stop])
+    new_replay.max_size = stop - start
+    new_replay.next_slot = stop
+    new_replay.length = stop - start
+    return new_replay
+
 # def sample(replay, rng):
 #     index = random.randint(rng, (1,), minval=0, maxval=len(replay))
 #     return replay[index]

@@ -61,8 +61,9 @@ def update_batch(density_state: DensityState, states, actions):
     obs_size = density_state.observations.shape[0]
 
     # double the size of observations if needed
-    if density_state.next_slot + states.shape[0] > obs_size:
+    while density_state.next_slot + states.shape[0] >= obs_size:
         density_state = _grow_observations(density_state)
+        obs_size = density_state.observations.shape[0]
 
     return _update_batch(density_state, states, actions)
 
@@ -75,8 +76,7 @@ def _update_batch(density_state: DensityState, states, actions):
     obs_size = observations.shape[0]
 
     keys = _make_key_batch(states, actions)
-    indices = jnp.linspace(next_slot, next_slot + bsize - 1, bsize)
-    indices = indices.astype(jnp.int32) % obs_size
+    indices = jnp.arange(next_slot, next_slot + bsize)
     observations = jax.ops.index_update(observations, indices, keys)
     total = jnp.minimum(density_state.total + bsize, obs_size)
     next_slot = (next_slot + bsize) % obs_size

@@ -1,3 +1,5 @@
+import numpy as np
+
 import jax
 from jax import numpy as jnp, random, lax
 
@@ -20,7 +22,8 @@ def new(observation_spec, action_spec, max_obs=100000,
         state_std_scale=1, action_std_scale=1, **kwargs):
     flat_ospec = utils.flatten_observation_spec(observation_spec)
     state_std = flat_ospec.maximum - flat_ospec.minimum
-    action_std = action_spec.maximum - action_spec.minimum
+    action_std = np.array(action_spec.maximum - action_spec.minimum)
+    action_std = action_std.reshape((-1,))
 
     state_std = state_std_scale * state_std
     action_std = action_std_scale * action_std
@@ -63,13 +66,15 @@ def update_batch(density_state: DensityState, states, actions):
     obs_size = density_state.observations.shape[0]
 
     # double the size of observations if needed
-    if density_state.next_slot + states.shape[0] > obs_size:
+    # print(density_state.next_slot, states.shape[0], obs_size)
+    while density_state.next_slot + states.shape[0] >= obs_size:
         density_state = _grow_observations(density_state)
+        obs_size = density_state.observations.shape[0]
 
     return _update_batch(density_state, states, actions)
 
 
-@jax.jit
+# @jax.jit
 def _update_batch(density_state: DensityState, states, actions):
     bsize = states.shape[0]
     next_slot = density_state.next_slot
@@ -77,8 +82,8 @@ def _update_batch(density_state: DensityState, states, actions):
     obs_size = observations.shape[0]
 
     keys = _make_key_batch(states, actions)
-    indices = jnp.linspace(next_slot, next_slot + bsize - 1, bsize)
-    indices = indices.astype(jnp.int32) % obs_size
+    indices = jnp.arange(next_slot, next_slot + bsize)
+
     observations = jax.ops.index_update(observations, indices, keys)
     total = jnp.minimum(density_state.total + bsize, obs_size)
     next_slot = (next_slot + bsize) % obs_size
@@ -102,7 +107,8 @@ def _grow_observations(density_state: DensityState):
 
 def _make_key(s, a):
     flat_s = utils.flatten_observation(s)
-    return jnp.concatenate([flat_s, a], axis=0)
+    flat_a = jnp.array(a).reshape((-1,))
+    return jnp.concatenate([flat_s, flat_a], axis=0)
 _make_key_batch = jax.vmap(_make_key)
 
 
