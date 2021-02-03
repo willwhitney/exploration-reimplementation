@@ -112,6 +112,7 @@ TEST_FORMAT_STR = ', '.join((
 
 SUMMARY_FORMAT_STR = ', '.join((
     "Episode {values[train/episode]:4.0f}",
+    "Time {values[train/elapsed]:5.2f}",
     "Train score {values[train/score]:4.0f}",
     "Train nov score {values[train/novelty_score]:4.0f}",
     "Train policy ent {values[train/policy_entropy]:5.2f}",

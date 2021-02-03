@@ -45,9 +45,13 @@ def init_fn(state_spec, action_spec, seed,
                        temp=temp, test_temp=test_temp)
 
 
+@jax.profiler.trace_function
 def action_fn(policy_state: PolicyState, s, n=1, explore=True):
-    bsize = s.shape[0]
-    policy_rng, candidate_rng = random.split(policy_state.rng)
+    with jax.profiler.TraceContext("get action bsize"):
+        bsize = s.shape[0]
+    with jax.profiler.TraceContext("get action rng"):
+        # policy_rng, candidate_rng = random.PRNGKey(0), random.PRNGKey(1)
+        policy_rng, candidate_rng = random.split(policy_state.rng)
 
     with jax.profiler.TraceContext("sample uniform actions"):
         candidate_actions = utils.sample_uniform_actions(

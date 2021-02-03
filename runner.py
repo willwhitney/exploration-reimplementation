@@ -5,7 +5,7 @@ import yaml
 import copy
 import numpy as np
 
-GPUS = 3
+GPUS = 4
 MULTIPLEX = 4
 
 # jobs = [
@@ -47,17 +47,32 @@ jobs = [
 
     # "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel_count --max_steps 100 --name explore_pv100_kcount_clippednum",
 
-    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 100 --name epv100kcfix_sscale0.1_ascale1",
-    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-2 --density_action_scale 1 --max_steps 100 --name epv100kcfix_sscale0.01_ascale1",
-    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-3 --density_action_scale 1 --max_steps 100 --name epv100kcfix_sscale0.001_ascale1",
+    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 100 --name epv100kcdiag_sscale0.1_ascale1",
+    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-2 --density_action_scale 1 --max_steps 100 --name epv100kcdiag_sscale0.01_ascale1",
+    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-3 --density_action_scale 1 --max_steps 100 --name epv100kcdiag_sscale0.001_ascale1",
 
-    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-1 --density_action_scale 1e-1 --max_steps 100 --name epv100kcfix_sscale0.1_ascale0.1",
-    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-2 --density_action_scale 1e-1 --max_steps 100 --name epv100kcfix_sscale0.01_ascale0.1",
-    "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-3 --density_action_scale 1e-1 --max_steps 100 --name epv100kcfix_sscale0.001_ascale0.1",
+    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-1 --density_action_scale 1e-1 --max_steps 100 --name epv100kcdiag_sscale0.1_ascale0.1",
+    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-2 --density_action_scale 1e-1 --max_steps 100 --name epv100kcdiag_sscale0.01_ascale0.1",
+    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-3 --density_action_scale 1e-1 --max_steps 100 --name epv100kcdiag_sscale0.001_ascale0.1",
 
     # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-1 --density_action_scale 1e-2 --max_steps 100 --name epv100kc_sscale0.1_ascale0.01",
     # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-2 --density_action_scale 1e-2 --max_steps 100 --name epv100kc_sscale0.01_ascale0.01",
     # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-3 --density_action_scale 1e-2 --max_steps 100 --name epv100kc_sscale0.001_ascale0.01",
+
+    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --name ecpkcdiagfix_sscale0.1_ascale1",
+    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 1 --max_steps 1000 --name ecpkcdiagfix_sscale0.01_ascale1",
+    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 0.1 --max_steps 1000 --name ecpkcdiagfix_sscale0.1_ascale0.1",
+    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 0.1 --max_steps 1000 --name ecpkcdiagfix_sscale0.01_ascale0.1",
+
+    "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.1_ascale1",
+    "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.01_ascale1",
+    "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 0.1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.1_ascale0.1",
+    "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 0.1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.01_ascale0.1",
+
+    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 1e-1 --max_steps 1000 --name ecpkcdiagfix_sscale0.1_ascale0.1",
+    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 1e-1 --max_steps 1000 --name ecpkcdiagfix_sscale0.01_ascale0.1",
+    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-3 --density_action_scale 1e-1 --max_steps 1000 --name ecpkcdiagfix_sscale0.001_ascale0.1",
+
 
 ]
 

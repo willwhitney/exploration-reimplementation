@@ -86,48 +86,51 @@ def train_step_candidates(exploration_state: ExplorationState,
     # else:
     #     target_q_state = exploration_state.novq_state
 
-    if use_optimistic_updates:
-        next_values = predict_optimistic_values_batch(
-            exploration_state.novq_state,
-            exploration_state.density_state,
-            exploration_state.prior_count,
-            next_states, candidate_next_actions)
-        next_values_target = predict_optimistic_values_batch(
-            exploration_state.target_novq_state,
-            exploration_state.density_state,
-            exploration_state.prior_count,
-            next_states, candidate_next_actions)
-    else:
-        next_values = q_learning.predict_action_values_batch(
-            exploration_state.novq_state,
-            next_states,
-            candidate_next_actions)
-        next_values_target = q_learning.predict_action_values_batch(
-            exploration_state.target_novq_state,
-            next_states,
-            candidate_next_actions)
+    with jax.profiler.TraceContext("compute next value"):
+        if use_optimistic_updates:
+            next_values = predict_optimistic_values_batch(
+                exploration_state.novq_state,
+                exploration_state.density_state,
+                exploration_state.prior_count,
+                next_states, candidate_next_actions)
+            next_values_target = predict_optimistic_values_batch(
+                exploration_state.target_novq_state,
+                exploration_state.density_state,
+                exploration_state.prior_count,
+                next_states, candidate_next_actions)
+        else:
+            next_values = q_learning.predict_action_values_batch(
+                exploration_state.novq_state,
+                next_states,
+                candidate_next_actions)
+            next_values_target = q_learning.predict_action_values_batch(
+                exploration_state.target_novq_state,
+                next_states,
+                candidate_next_actions)
 
-    # double DQN rule:
-    # - select next action according to current Q
-    # - evaluate it according to target Q
-    next_value_probs = nn.softmax(next_values / temp, axis=1)
-    next_value_elements = (next_value_probs * next_values_target)
-    expected_next_values = next_value_elements.sum(axis=1)
-    expected_next_values = expected_next_values.reshape(rewards.shape)
+    with jax.profiler.TraceContext("compute targets"):
+        # double DQN rule:
+        # - select next action according to current Q
+        # - evaluate it according to target Q
+        next_value_probs = nn.softmax(next_values / temp, axis=1)
+        next_value_elements = (next_value_probs * next_values_target)
+        expected_next_values = next_value_elements.sum(axis=1)
+        expected_next_values = expected_next_values.reshape(rewards.shape)
 
-    # compute targets and update
-    novelty_reward = compute_novelty_reward(
-        exploration_state, states, actions).reshape(rewards.shape)
-    q_targets = novelty_reward + discount * expected_next_values
+        # compute targets and update
+        novelty_reward = compute_novelty_reward(
+            exploration_state, states, actions).reshape(rewards.shape)
+        q_targets = novelty_reward + discount * expected_next_values
 
-    # clip targets to be within the feasible set
-    q_targets = jnp.minimum(q_targets, R_MAX)
+        # clip targets to be within the feasible set
+        q_targets = jnp.minimum(q_targets, R_MAX)
 
     # import ipdb; ipdb.set_trace()
 
-    novq_state, losses = q_functions.train_step(
-        exploration_state.novq_state,
-        states, actions, q_targets)
+    with jax.profiler.TraceContext("Q update"):
+        novq_state, losses = q_functions.train_step(
+            exploration_state.novq_state,
+            states, actions, q_targets)
 
     return exploration_state.replace(novq_state=novq_state), losses
 
@@ -138,10 +141,12 @@ def train_step(agent_state, transitions):
     states, actions, next_states, rewards = transitions
 
     # candidate actions should be (bsize x n_update_candidates x *action_shape)
+    with jax.profiler.TraceContext("get n_update_candidates"):
+        n_update_candidates = int(agent_state.n_update_candidates)
     with jax.profiler.TraceContext("get candidates"):
         policy_state, candidate_next_actions = policy.action_fn(
             agent_state.policy_state, next_states,
-            int(agent_state.n_update_candidates), True)
+            n_update_candidates, True)
         agent_state = agent_state.replace(policy_state=policy_state)
 
     # import ipdb; ipdb.set_trace()
@@ -400,7 +405,8 @@ def run_episode(agent_state: AgentState, rng, env,
     return agent_state, env, score, novelty_score
 
 
-# ----- Visualizations for gridworld ---------------------------------
+# ------------- Visualizations ---------------------------------
+@jax.profiler.trace_function
 def display_state(agent_state: AgentState, ospec, aspec,
                   max_steps=100, bins=20,
                   rendering='local', savedir=None, episode=None):
@@ -532,7 +538,12 @@ def main(args):
                              warmup_steps=args.warmup_steps,
                              optimistic_actions=args.optimistic_actions,)
 
+    current_time = time.time()
     for episode in range(1, 1000):
+        last_time = current_time
+        current_time = time.time()
+        logger.update('train/elapsed', current_time - last_time)
+
         # run an episode
         rng, episode_rng = random.split(rng)
         agent_state, env, score, novelty_score = run_episode(
@@ -550,13 +561,6 @@ def main(args):
             policy_state = policy.update_fn(
                 policy_state, transitions)
         agent_state = agent_state.replace(policy_state=policy_state)
-
-        # # hacky reset of targetq to q
-        # # TODO: pull this inside the policy.update_fn
-        # if episode % 1 == 0:
-        #     policy_state = agent_state.policy_state.replace(
-        #         targetq_state=policy_state.q_state)
-        #     agent_state = agent_state.replace(policy_state=policy_state)
 
         # output / visualize
         if episode % args.eval_every == 0:
