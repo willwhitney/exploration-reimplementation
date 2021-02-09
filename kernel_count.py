@@ -12,6 +12,7 @@ import utils
 class DensityState:
     kernel_cov: jnp.ndarray
     observations: jnp.ndarray
+    weights: jnp.ndarray
     total: int = 0
     next_slot: int = 0
     max_obs: int = 100000
@@ -38,8 +39,9 @@ def new(observation_spec, action_spec, max_obs=100000,
     # starting_size = 65536
     starting_size = 1024
     observations = jnp.zeros((starting_size, *concat_std.shape))
-    return DensityState(kernel_cov, observations, max_obs=max_obs,
-                        scale_factor=scale_factor)
+    weights = jnp.zeros((starting_size,))
+    return DensityState(kernel_cov, observations, weights,
+                        max_obs=max_obs, scale_factor=scale_factor)
 
 
 def _max_pdf_value(cov):
@@ -49,7 +51,7 @@ def _max_pdf_value(cov):
 
 @jax.profiler.trace_function
 @jax.jit
-def get_count(density_state: DensityState, state, action):
+def _similarity_per_obs(density_state: DensityState, state, action):
     """Put one unit of count on the space at every observation.
     Fall-off from that is specified by the covariance."""
     key = _make_key(state, action)
@@ -58,40 +60,76 @@ def get_count(density_state: DensityState, state, action):
 
     mask = jnp.linspace(0, obs_size - 1, obs_size) < density_state.total
     mask = mask.astype(jnp.int32)
-    # mask = jnp.ones((obs_size,))
 
     diag_probs_per_obs = _normal_diag_pdf_batchedmean(
         observations, density_state.kernel_cov, key)
     # probs_per_obs = _normal_pdf_batchedmean(
     #     observations, density_state.kernel_cov, key)
-    # print("diag", diag_probs_per_obs)
-    # print("full", probs_per_obs)
-    masked_obs = mask * diag_probs_per_obs
-    count = masked_obs.sum()
-    return count * density_state.scale_factor
+    weighted_obs = mask * diag_probs_per_obs * density_state.scale_factor
+    return weighted_obs
+_similarity_per_obs_batch = jax.vmap(_similarity_per_obs, in_axes=(None, 0, 0))
+
+
+@jax.profiler.trace_function
+@jax.jit
+def get_count(density_state: DensityState, state, action):
+    """Put one unit of count on the space at every observation.
+    Fall-off from that is specified by the covariance."""
+    sim_per_obs = _similarity_per_obs(density_state, state, action)
+    count_per_obs = density_state.weights * sim_per_obs
+    count = count_per_obs.sum()
+    return count
 get_count_batch = jax.vmap(get_count, in_axes=(None, 0, 0))
-# get_count_batch = jax.profiler.trace_function(get_count_batch, "get_count_batch")
 
 
 @jax.profiler.trace_function
 def update_batch(density_state: DensityState, states, actions):
     obs_size = density_state.observations.shape[0]
 
-    # double the size of observations if needed
-    # print(density_state.next_slot, states.shape[0], obs_size)
+    # increase the size of observations if needed
     while ((density_state.next_slot + states.shape[0] >= obs_size) and
            (obs_size < density_state.max_obs)):
         density_state = _grow_observations(density_state)
         obs_size = density_state.observations.shape[0]
 
-    return _update_batch(density_state, states, actions)
+    # compute which states/actions to add as observations vs as weights
+    sims_per_obs = _similarity_per_obs_batch(density_state, states, actions)
+    # counts = get_count_batch(density_state, states, actions)
+
+    new_states, new_actions = [], []
+    new_weights = np.zeros((obs_size,))
+    for (state, action, sims) in zip(states, actions, sims_per_obs):
+        similar_obs = sims > 0.95
+        n_similar_obs = similar_obs.sum()
+        if n_similar_obs >= 1:
+            new_weights += np.array(similar_obs) / n_similar_obs
+        else:
+            new_states.append(state)
+            new_actions.append(action)
+
+    if len(new_states) > 0:
+        new_states = jnp.stack(new_states)
+        new_actions = jnp.stack(new_actions)
+        density_state = _add_observations(density_state, new_states, new_actions)
+
+    if new_weights.sum() > 0:
+        # import ipdb; ipdb.set_trace()
+        density_state = _add_weights(density_state, new_weights)
+    return density_state
 
 
 @jax.jit
-def _update_batch(density_state: DensityState, states, actions):
+def _add_weights(density_state: DensityState, new_weights):
+    new_weights = density_state.weights + new_weights
+    return density_state.replace(weights=new_weights)
+
+
+@jax.jit
+def _add_observations(density_state: DensityState, states, actions):
     bsize = states.shape[0]
     next_slot = density_state.next_slot
     observations = density_state.observations
+    weights = density_state.weights
     obs_size = observations.shape[0]
 
     keys = _make_key_batch(states, actions)
@@ -101,9 +139,10 @@ def _update_batch(density_state: DensityState, states, actions):
     # indices = jnp.arange(next_slot, next_slot + bsize)
 
     observations = jax.ops.index_update(observations, indices, keys)
+    weights = jax.ops.index_update(weights, indices, 1)
     total = jnp.minimum(density_state.total + bsize, obs_size)
     next_slot = (next_slot + bsize) % obs_size
-    return density_state.replace(observations=observations,
+    return density_state.replace(observations=observations, weights=weights,
                                  total=total, next_slot=next_slot)
 
 
@@ -111,15 +150,25 @@ def _update_batch(density_state: DensityState, states, actions):
 def _grow_observations(density_state: DensityState):
     """An un-jittable function which grows the size of the observations array"""
     observations = density_state.observations
+    weights = density_state.weights
     obs_size = observations.shape[0]
     new_obs_size = jnp.minimum(density_state.max_obs, 2 * obs_size)
+    print(f"Growing KDE observations from {obs_size} to {new_obs_size}.")
+
+    # growing observations
     new_shape = (new_obs_size, *observations.shape[1:])
     new_observations = jnp.zeros(new_shape)
-    print(f"Growing KDE observations from {obs_size} to {new_obs_size}.")
     observations = jax.ops.index_update(new_observations,
                                         jax.ops.index[:obs_size],
                                         observations)
-    return density_state.replace(observations=observations)
+
+    # growing weights
+    new_weight_shape = (new_obs_size,)
+    new_weights = jnp.zeros(new_weight_shape)
+    weights = jax.ops.index_update(new_weights,
+                                   jax.ops.index[:obs_size],
+                                   weights)
+    return density_state.replace(observations=observations, weights=weights)
 
 
 def _make_key(s, a):

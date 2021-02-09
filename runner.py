@@ -64,19 +64,19 @@ jobs = [
     # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 0.1 --max_steps 1000 --name ecpkcdiagfix_sscale0.1_ascale0.1",
     # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 0.1 --max_steps 1000 --name ecpkcdiagfix_sscale0.01_ascale0.1",
 
-    "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.1_ascale1",
-    "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.01_ascale1",
-    "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 0.1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.1_ascale0.1",
-    "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 0.1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.01_ascale0.1",
+    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.1_ascale1",
+    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.01_ascale1",
+    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 0.1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.1_ascale0.1",
+    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 0.1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.01_ascale0.1",
 
     # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 1e-1 --max_steps 1000 --name ecpkcdiagfix_sscale0.1_ascale0.1",
     # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 1e-1 --max_steps 1000 --name ecpkcdiagfix_sscale0.01_ascale0.1",
     # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-3 --density_action_scale 1e-1 --max_steps 1000 --name ecpkcdiagfix_sscale0.001_ascale0.1",
 
-
+    "python main.py --eval_every 1 --env point --task velocity --max_steps 100 --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --name pv100_kcrevert"
 ]
 
-seeds = [0]
+seeds = [1, 2, 3, 4]
 
 seeded_jobs = []
 for seed in seeds:

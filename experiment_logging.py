@@ -112,13 +112,14 @@ TEST_FORMAT_STR = ', '.join((
 
 SUMMARY_FORMAT_STR = ', '.join((
     "Episode {values[train/episode]:4.0f}",
-    "Time {values[train/elapsed]:5.2f}",
     "Train score {values[train/score]:4.0f}",
     "Train nov score {values[train/novelty_score]:4.0f}",
-    "Train policy ent {values[train/policy_entropy]:5.2f}",
+    # "Train policy ent {values[train/policy_entropy]:5.2f}",
     "Test score {values[test/score]:4.0f}",
     "Test nov score {values[test/novelty_score]:4.0f}",
     "Test policy ent {values[test/policy_entropy]:5.2f}",
+    "Time {values[train/elapsed]:5.2f}",
+    "Density size {values[train/density_size]:5.0f}",
 ))
 
 default_logger = Logger()

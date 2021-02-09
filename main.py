@@ -539,7 +539,7 @@ def main(args):
                              optimistic_actions=args.optimistic_actions,)
 
     current_time = time.time()
-    for episode in range(1, 1000):
+    for episode in range(1, 1000 + 1):
         last_time = current_time
         current_time = time.time()
         logger.update('train/elapsed', current_time - last_time)
@@ -571,6 +571,10 @@ def main(args):
             logger.update('test/episode', episode)
             logger.update('test/score', test_score)
             logger.update('test/novelty_score', test_novelty_score)
+
+            density_state = agent_state.exploration_state.density_state
+            if hasattr(density_state, "total"):
+                logger.update('train/density_size', density_state.total)
 
             logger.write_all()
 
