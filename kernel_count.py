@@ -94,8 +94,6 @@ def update_batch(density_state: DensityState, states, actions):
 
     # compute which states/actions to add as observations vs as weights
     sims_per_obs = _similarity_per_obs_batch(density_state, states, actions)
-    # counts = get_count_batch(density_state, states, actions)
-
     new_states, new_actions = [], []
     new_weights = np.zeros((obs_size,))
     for (state, action, sims) in zip(states, actions, sims_per_obs):
@@ -217,42 +215,85 @@ if __name__ == "__main__":
     aspec = env.action_spec()
     j_aspec = jax_specs.convert_dm_spec(aspec)
     density_state = new(ospec, aspec, state_std_scale=1e-2, action_std_scale=1)
+    # import ipdb; ipdb.set_trace()
 
     timestep = env.reset()
     state = utils.flatten_observation(timestep.observation)
     actions = utils.sample_uniform_actions(j_aspec, jax.random.PRNGKey(0), 1)
     action = actions[0]
 
-    states = jnp.expand_dims(state, axis=0)
-    density_state = update_batch(density_state, states, actions)
+    # states = jnp.expand_dims(state, axis=0)
+    # density_state = update_batch(density_state, states, actions)
+
+    visited_states = []
+    visited_actions = []
+    for i in range(128):
+        timestep = env.step(action)
+        state = utils.flatten_observation(timestep.observation)
+        action = utils.sample_uniform_actions(j_aspec, jax.random.PRNGKey(i), 1)[0]
+        visited_states.append(state)
+        visited_actions.append(action)
+
+    density_state = update_batch(density_state,
+                                 jnp.stack(visited_states),
+                                 jnp.stack(visited_actions))
+    env.reset()
+
 
     # ---------- profiling speed ----------------------
+    # density_state = update_batch(density_state,
+    #                              jnp.repeat(states, 20000, axis=0),
+    #                              jnp.repeat(actions, 20000, axis=0))
+
+    import time
+    start = time.time()
+    for i in range(1000):
+        print(i)
+        timestep = env.step(action)
+        state = utils.flatten_observation(timestep.observation)
+        states = jnp.expand_dims(state, axis=0)
+
+        actions = utils.sample_uniform_actions(j_aspec, jax.random.PRNGKey(i), 1)
+        action = actions[0]
+        density_state = update_batch(density_state, states, actions)
+    end = time.time()
+    elapsed_building = end - start
+
+    N_extra = 50000
+    extra_states = jnp.repeat(states, N_extra, axis=0)
+    extra_actions = jnp.repeat(actions, N_extra, axis=0)
+    density_state = update_batch(density_state, extra_states, extra_actions)
+
+    start = time.time()
     N = 128 * 32
     query_states = jnp.repeat(states, N, axis=0)
     query_actions = jnp.repeat(actions, N, axis=0)
-    for _ in range(10000):
+    for _ in range(1000):
         count = get_count_batch(density_state, query_states, query_actions)
-        print(float(count.sum()))
+        _ = float(count.sum())
+    end = time.time()
+    print(f"Elapsed building: {elapsed_building :.2f}")
+    print(f"Elapsed evaluating: {end - start :.2f}")
 
     # ---------- sanity checking counts --------------------
-    timestep2 = env.step(jnp.ones(aspec.shape))
-    state2 = utils.flatten_observation(timestep2.observation)
+    # timestep2 = env.step(jnp.ones(aspec.shape))
+    # state2 = utils.flatten_observation(timestep2.observation)
 
-    # print("S1 pdf:", pdf(density_state, state, action))
-    print("S1 count:", get_count(density_state, state, action))
-    density_state_updated = update_batch(density_state,
-                                         jnp.expand_dims(state, axis=0),
-                                         jnp.expand_dims(action, axis=0))
-    # print("S1 pdf after self update:", pdf(density_state_updated, state, action))
+    # # print("S1 pdf:", pdf(density_state, state, action))
+    # print("S1 count:", get_count(density_state, state, action))
 
-    # print("S2 pdf:", pdf(density_state, state2, action))
-    print("S2 count:", get_count(density_state, state2, action))
-    density_state_updated = update_batch(density_state,
-                                         jnp.expand_dims(state2, axis=0),
-                                         jnp.expand_dims(action, axis=0))
-    # print("S2 pdf after self update:", pdf(density_state_updated, state2, action))
-    print("S2 count after self update:", get_count(density_state_updated,
-                                                   state2, action))
+    # # print("S2 pdf:", pdf(density_state, state2, action))
+    # print("S2 count:", get_count(density_state, state2, action))
+    # density_state_updated = update_batch(density_state,
+    #                                      jnp.expand_dims(state2, axis=0),
+    #                                      jnp.expand_dims(action, axis=0))
+    # # print("S2 pdf after self update:", pdf(density_state_updated, state2, action))
+    # print("S2 count after self update:", get_count(density_state_updated,
+    #                                                state2, action))
+
+    # print("Batch of counts:", get_count_batch(density_state_updated,
+    #                                           jnp.stack([state, state2]),
+    #                                           jnp.stack([action, action])))
 
     # --------- plotting the kernel -----------------
     # from mpl_toolkits import mplot3d
@@ -276,6 +317,7 @@ if __name__ == "__main__":
     # ax.set_ylabel('y')
     # ax.set_zlabel('z')
     # fig.savefig('kernel_3d.png')
+
 
 
 

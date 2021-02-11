@@ -251,7 +251,7 @@ def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
         value which will represent that state.
     """
     rng = random.PRNGKey(0)
-    n_samples = min(5 * len(replay), 100000)
+    n_samples = min(5 * len(replay), 10000)
 
     action_shape = aspec.shape
     if len(action_shape) == 0:
