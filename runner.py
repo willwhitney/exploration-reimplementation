@@ -1,3 +1,4 @@
+import itertools
 import os
 import subprocess
 import asyncio
@@ -40,54 +41,108 @@ MULTIPLEX = 4
 #     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --no_exploration --name arxiv2_pv100_noexplore",
 # ]
 
-jobs = [
-    # "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel --max_steps 100 --name explore_pv100_kernel_clippednum",
-    # "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel --density_cov_scale 0.1 --max_steps 100 --name explore_pv100_kernelscale0.1_clippednum",
-    # "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel --density_cov_scale 0.01 --max_steps 100 --name explore_pv100_kernelscale0.01_clippednum",
 
-    # "python main.py --eval_every 1 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --density kernel_count --max_steps 100 --name explore_pv100_kcount_clippednum",
 
-    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 100 --name epv100kcdiag_sscale0.1_ascale1",
-    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-2 --density_action_scale 1 --max_steps 100 --name epv100kcdiag_sscale0.01_ascale1",
-    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-3 --density_action_scale 1 --max_steps 100 --name epv100kcdiag_sscale0.001_ascale1",
+# jobs = [
+#     "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density knn_kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecp_kkc_plr1e-4_sscale0.1_ascale1",
+#     "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density knn_kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecp_kkc_plr1e-4_sscale0.1_ascale1",
+#     "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density knn_kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecp_kkc_plr1e-4_sscale0.1_ascale1",
+#     "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density knn_kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecp_kkc_plr1e-4_sscale0.1_ascale1",
+# ]
 
-    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-1 --density_action_scale 1e-1 --max_steps 100 --name epv100kcdiag_sscale0.1_ascale0.1",
-    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-2 --density_action_scale 1e-1 --max_steps 100 --name epv100kcdiag_sscale0.01_ascale0.1",
-    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-3 --density_action_scale 1e-1 --max_steps 100 --name epv100kcdiag_sscale0.001_ascale0.1",
+excluded_flags = []
 
-    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-1 --density_action_scale 1e-2 --max_steps 100 --name epv100kc_sscale0.1_ascale0.01",
-    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-2 --density_action_scale 1e-2 --max_steps 100 --name epv100kc_sscale0.01_ascale0.01",
-    # "python main.py --eval_every 1 --env point --task velocity --density kernel_count --density_state_scale 1e-3 --density_action_scale 1e-2 --max_steps 100 --name epv100kc_sscale0.001_ascale0.01",
+basename = "cart_knn"
+grid = [
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [1],
+        "env": ["cartpole"],
+        "task": ["swingup_sparse"],
+        "max_steps": [1000],
 
-    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --name ecpkcdiagfix_sscale0.1_ascale1",
-    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 1 --max_steps 1000 --name ecpkcdiagfix_sscale0.01_ascale1",
-    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 0.1 --max_steps 1000 --name ecpkcdiagfix_sscale0.1_ascale0.1",
-    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 0.1 --max_steps 1000 --name ecpkcdiagfix_sscale0.01_ascale0.1",
+        # agent settings
+        "density": ["knn_kernel_count"],
+        "density_state_scale": [1e-1],
+        "density_action_scale": [1],
+        "policy_lr": [1e-4],
+        "policy_temperature": [3e-1],
+        "policy_test_temperature": [1e-1],
+    },
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [1],
+        "env": ["cartpole"],
+        "task": ["swingup_sparse"],
+        "max_steps": [1000],
 
-    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.1_ascale1",
-    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.01_ascale1",
-    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 0.1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.1_ascale0.1",
-    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 0.1 --max_steps 1000 --policy_lr 1e-4 --name ecpkcdiagfix_plr1e-4_sscale0.01_ascale0.1",
-
-    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 1e-1 --max_steps 1000 --name ecpkcdiagfix_sscale0.1_ascale0.1",
-    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-2 --density_action_scale 1e-1 --max_steps 1000 --name ecpkcdiagfix_sscale0.01_ascale0.1",
-    # "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-3 --density_action_scale 1e-1 --max_steps 1000 --name ecpkcdiagfix_sscale0.001_ascale0.1",
-
-    # "python main.py --eval_every 1 --env point --task velocity --max_steps 100 --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --name pv100_speed"
-
-    "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecp_kcweight_plr1e-4_sscale0.1_ascale1",
-    "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 3e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecp_kcweight_plr1e-4_sscale0.3_ascale1",
-    "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-5 --name ecp_kcweight_plr1e-5_sscale0.1_ascale1",
-    "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density kernel_count --density_state_scale 3e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-5 --name ecp_kcweight_plr1e-5_sscale0.3_ascale1",
+        # agent settings
+        "density": ["knn_kernel_count"],
+        "density_state_scale": [1e-1],
+        "density_action_scale": [1],
+        "policy_lr": [1e-4],
+        "policy_temperature": [1e-1],
+        "policy_test_temperature": [3e-2],
+    },
 ]
 
-seeds = [0]
 
-seeded_jobs = []
-for seed in seeds:
-    for job in jobs:
-        job = f"{job}_seed{seed} --seed {seed}"
-        seeded_jobs.append(job)
+def construct_varying_keys(grids):
+    all_keys = set().union(*[g.keys() for g in grids])
+    merged = {k: set() for k in all_keys}
+    for grid in grids:
+        for key in all_keys:
+            grid_key_value = grid[key] if key in grid else ["<<NONE>>"]
+            merged[key] = merged[key].union(grid_key_value)
+    varying_keys = {key for key in merged if len(merged[key]) > 1}
+    return varying_keys
+
+
+def construct_jobs(grids):
+    jobs = []
+    for grid in grids:
+        individual_options = [[{key: value} for value in values]
+                              for key, values in grid.items()]
+        product_options = list(itertools.product(*individual_options))
+        jobs += [{k: v for d in option_set for k, v in d.items()}
+                 for option_set in product_options]
+    return jobs
+
+
+def construct_job_string(job):
+    """construct the string to execute the job"""
+    flagstring = f"python {job['_main']}"
+    for flag in job:
+        if flag not in excluded_flags and not flag.startswith('_'):
+            if isinstance(job[flag], bool):
+                if job[flag]:
+                    flagstring = flagstring + " --" + flag
+                else:
+                    print("WARNING: Excluding 'False' flag " + flag)
+            else:
+                flagstring = flagstring + " --" + flag + " " + str(job[flag])
+    return flagstring
+
+
+def construct_name(job, varying_keys):
+    """construct the job's name out of the varying keys in this sweep"""
+    jobname = basename
+    for flag in job:
+        if flag in varying_keys and not flag.startswith('_'):
+            jobname = jobname + "_" + flag + str(job[flag])
+    return jobname
+
+
+jobs = construct_jobs(grid)
+varying_keys = construct_varying_keys(grid)
+job_strings = []
+for job in jobs:
+    jobname = construct_name(job, varying_keys)
+    job_string = construct_job_string(job)
+    job_string = job_string + " --name " + jobname
+    job_strings.append(job_string)
 
 
 async def run_job(gpu_id, job):
@@ -110,7 +165,7 @@ async def worker_fn(gpu_id, queue):
 
 async def main():
     queue = asyncio.Queue()
-    for job in seeded_jobs:
+    for job in job_strings:
         queue.put_nowait(job)
 
     n_parallel = MULTIPLEX * GPUS

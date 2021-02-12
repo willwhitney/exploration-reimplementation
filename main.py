@@ -56,7 +56,8 @@ class AgentState():
     steps_since_tupdate: int = 0
 
 
-@jax.jit
+# @jax.jit
+@jax.profiler.trace_function
 def compute_novelty_reward(exploration_state, states, actions):
     """Returns a novelty reward in [0, 1] for each (s, a) pair."""
     counts = density.get_count_batch(
@@ -69,8 +70,8 @@ def compute_novelty_reward(exploration_state, states, actions):
     return jnp.min(options, axis=1)
 
 
+# @jax.partial(jax.jit, static_argnums=(3, 4))
 @jax.profiler.trace_function
-@jax.partial(jax.jit, static_argnums=(3, 4))
 def train_step_candidates(exploration_state: ExplorationState,
                           transitions,
                           candidate_next_actions,
@@ -234,6 +235,7 @@ def prioritized_update(agent_state: AgentState, last_transition_id):
     return agent_state
 
 
+@jax.profiler.trace_function
 def update_target_q(agent_state: AgentState):
     exploration_state = agent_state.exploration_state.replace(
         target_novq_state=agent_state.exploration_state.novq_state)
@@ -242,6 +244,7 @@ def update_target_q(agent_state: AgentState):
     return agent_state
 
 
+@jax.profiler.trace_function
 def uniform_update(agent_state, rng):
     for _ in range(10):
         transitions = tuple((jnp.array(el)
@@ -280,39 +283,75 @@ def update_exploration(agent_state, rng, transition_id):
     return agent_state
 
 
+@jax.profiler.trace_function
+@jax.jit
 def compute_weight(prior_count, count):
     root_real_count = count ** 0.5
-    # root_prior_count = prior_count ** 0.5
-    # return root_real_count / (root_real_count + root_prior_count)
     root_total_count = (count + prior_count) ** 0.5
     return root_real_count / root_total_count
+compute_weight_batch = jax.vmap(compute_weight, in_axes=(None, 0))
 
 
 @jax.profiler.trace_function
-@jax.jit
 def predict_optimistic_value(novq_state, density_state, prior_count,
                              state, action):
     expanded_state = jnp.expand_dims(state, axis=0)
     expanded_action = jnp.expand_dims(action, axis=0)
-    predicted_value = q_learning.predict_value(novq_state,
-                                               expanded_state,
-                                               expanded_action)
-    predicted_value = predicted_value.reshape(tuple())
-    count = density.get_count(density_state,
-                              state, action)
-    weight = compute_weight(prior_count, count)
-    optimistic_value = weight * predicted_value + (1 - weight) * R_MAX
-    return optimistic_value
-predict_optimistic_value_batch = jax.vmap(  # noqa: E305
-    predict_optimistic_value, in_axes=(None, None, None, 0, 0))
-predict_optimistic_values = jax.vmap(
-    predict_optimistic_value, in_axes=(None, None, None, None, 0))
-predict_optimistic_values_batch = jax.vmap(  # noqa: E305
-    predict_optimistic_values, in_axes=(None, None, None, 0, 0))
+    return predict_optimistic_value_batch(novq_state, density_state,
+                                          prior_count,
+                                          expanded_state, expanded_action)
 
 
 @jax.profiler.trace_function
-@jax.jit
+def predict_optimistic_value_batch(novq_state, density_state, prior_count,
+                                   states, actions):
+    predicted_values = q_learning.predict_value(novq_state, states, actions)
+    predicted_values = predicted_values.reshape((-1,))
+    counts = density.get_count_batch(density_state, states, actions)
+    weights = compute_weight_batch(prior_count, counts)
+    optimistic_values = weights * predicted_values + (1 - weights) * R_MAX
+    # import ipdb; ipdb.set_trace()
+    return optimistic_values
+
+
+@jax.profiler.trace_function
+def predict_optimistic_values(novq_state, density_state, prior_count,
+                              state, actions):
+    expanded_state = jnp.expand_dims(state, axis=0)
+    repeated_state = expanded_state.repeat(len(actions), axis=0)
+    return predict_optimistic_value_batch(novq_state, density_state,
+                                          prior_count,
+                                          repeated_state, actions)
+
+
+@jax.profiler.trace_function
+def predict_optimistic_values_batch(novq_state, density_state, prior_count,
+                                   states, actions_per_state):
+    # actions_per_state is len(states) x n_actions_per_state x action_dim
+    # idea is to flatten actions to a single batch dim and repeat each state
+    bsize = len(states)
+    asize = actions_per_state.shape[1]
+    action_shape = actions_per_state.shape[2:]
+    flat_actions = actions_per_state.reshape((bsize * asize, *action_shape))
+    repeated_states = states.repeat(asize, axis=0)
+    values = predict_optimistic_value_batch(novq_state, density_state,
+                                            prior_count,
+                                            repeated_states, flat_actions)
+
+    # now reshape the values to match the shape of actions_per_state
+    return values.reshape((bsize, asize))
+
+
+# predict_optimistic_value_batch = jax.vmap(  # noqa: E305
+#     predict_optimistic_value, in_axes=(None, None, None, 0, 0))
+# predict_optimistic_values = jax.vmap(
+#     predict_optimistic_value, in_axes=(None, None, None, None, 0))
+# predict_optimistic_values_batch = jax.vmap(  # noqa: E305
+#     predict_optimistic_values, in_axes=(None, None, None, 0, 0))
+
+
+# @jax.jit
+@jax.profiler.trace_function
 def select_candidate_optimistic(exploration_state, rng,
                                 state, candidate_actions):
     optimistic_values = predict_optimistic_values(
@@ -680,6 +719,10 @@ if __name__ == '__main__':
         import kernel_density as density
     elif args.density == 'kernel_count':
         import kernel_count as density
+    elif args.density == 'knn_kernel_count':
+        import knn_kernel_count as density
+    elif args.density == 'dummy':
+        import dummy_density as density
     else:
         raise Exception("Argument --density was invalid.")
 

@@ -22,62 +22,55 @@ class DensityState:
     k: int = 16
 
 
-# class KnnKernelCount():
-#     def __init__(self, observation_spec, action_spec, max_obs=100000,
-#                  state_std_scale=1, action_std_scale=1, **kwargs):
-#         flat_ospec = utils.flatten_observation_spec(observation_spec)
-#         state_std = flat_ospec.maximum - flat_ospec.minimum
-#         action_std = np.array(action_spec.maximum - action_spec.minimum)
-#         action_std = action_std.reshape((-1,))
-
-#         state_std = state_std_scale * state_std
-#         action_std = action_std_scale * action_std
-#         concat_std = jnp.concatenate([state_std, action_std], axis=0)
-#         self.kernel_cov = jnp.diag(concat_std ** 2)
-#         self.key_dim = self.kernel_cov.shape[0]
-
-#         # calculate a scalar to shift the max to 1
-#         max_pdf = _max_pdf_value(kernel_cov)
-#         self.scale_factor = 1 / max_pdf
-
-#         # initialize this to some reasonable size
-#         # starting_size = 65536
-#         starting_size = 1024
-#         self.weights = jnp.zeros((starting_size,))
-#         self.total = 0
-#         self.next_slot = 0
-#         self.max_obs = max_obs
-
-#         self.index = faiss.IndexFlatL2(self.key_dim)
-
-
 def new(observation_spec, action_spec, max_obs=100000,
         state_std_scale=1, action_std_scale=1, **kwargs):
-        flat_ospec = utils.flatten_observation_spec(observation_spec)
-        state_std = flat_ospec.maximum - flat_ospec.minimum
-        action_std = np.array(action_spec.maximum - action_spec.minimum)
-        action_std = action_std.reshape((-1,))
+    flat_ospec = utils.flatten_observation_spec(observation_spec)
+    state_std = flat_ospec.maximum - flat_ospec.minimum
+    action_std = np.array(action_spec.maximum - action_spec.minimum)
+    action_std = action_std.reshape((-1,))
 
-        state_std = state_std_scale * state_std
-        action_std = action_std_scale * action_std
-        concat_std = jnp.concatenate([state_std, action_std], axis=0)
-        kernel_cov = jnp.diag(concat_std ** 2)
-        key_dim = kernel_cov.shape[0]
+    state_std = state_std_scale * state_std
+    action_std = action_std_scale * action_std
+    concat_std = jnp.concatenate([state_std, action_std], axis=0)
+    kernel_cov = jnp.diag(concat_std ** 2)
+    key_dim = kernel_cov.shape[0]
 
-        # calculate a scalar to shift the max to 1
-        max_pdf = _max_pdf_value(kernel_cov)
-        scale_factor = 1 / max_pdf
+    # calculate a scalar to shift the max to 1
+    max_pdf = _max_pdf_value(kernel_cov)
+    scale_factor = 1 / max_pdf
 
-        # initialize this to some reasonable size
-        # starting_size = 65536
-        starting_size = 1024
-        weights = np.zeros((starting_size,))
-        max_obs = max_obs
-        # import ipdb; ipdb.set_trace()
-        # index = faiss.IndexFlatL2(key_dim)
-        index = faiss.IndexHNSWFlat(key_dim, 32)
-        return DensityState(kernel_cov, index, weights,
-                            max_obs=max_obs, scale_factor=scale_factor)
+    # initialize this to some reasonable size
+    # starting_size = 65536
+    starting_size = 1024
+    weights = np.zeros((starting_size,))
+    max_obs = max_obs
+
+    faiss.omp_set_num_threads(8)
+
+    # index = faiss.IndexFlatL2(key_dim)
+
+    # index = faiss.IndexHNSWFlat(key_dim, 32)
+    # index.hnsw.efConstruction = 20
+
+    index = faiss.index_factory(key_dim, "IVF1024,Flat")
+
+    # quantizer = faiss.IndexHNSWFlat(key_dim, 32)
+    # index = faiss.IndexIVFFlat(quantizer, key_dim, 1024)
+    # index.cp.min_points_per_centroid = 5   # quiet warning
+    # index.quantizer_trains_alone = 2
+
+    n_index_train = 16384
+    train_states = np.random.uniform(low=flat_ospec.minimum,
+                                     high=flat_ospec.maximum,
+                                     size=(n_index_train, *flat_ospec.shape))
+    train_actions = np.random.uniform(low=action_spec.minimum,
+                                      high=action_spec.maximum,
+                                      size=(n_index_train, *action_spec.shape))
+    train_keys = _make_key_batch(train_states, train_actions)
+    index.train(np.array(train_keys))
+
+    return DensityState(kernel_cov, index, weights,
+                        max_obs=max_obs, scale_factor=scale_factor)
 
 
 def _max_pdf_value(cov):
@@ -85,6 +78,7 @@ def _max_pdf_value(cov):
     return (2 * jnp.pi) ** (-k / 2) * jnp.linalg.det(cov) ** (- 1/2)
 
 
+@jax.profiler.trace_function
 def update_batch(density_state: DensityState, states, actions):
     # increase the size of weights vector if needed
     weights = density_state.weights
@@ -112,6 +106,8 @@ def update_batch(density_state: DensityState, states, actions):
 
     return density_state
 
+
+@jax.profiler.trace_function
 def _compute_updates(density_state: DensityState, states, actions):
     weights_size = density_state.weights.shape[0]
     if density_state.index.ntotal <= 0:
@@ -136,6 +132,7 @@ def _compute_updates(density_state: DensityState, states, actions):
     return new_states, new_actions, weight_updates
 
 
+@jax.profiler.trace_function
 def _add_observations(density_state: DensityState, states, actions):
     bsize = states.shape[0]
     next_slot = density_state.next_slot
@@ -210,6 +207,9 @@ def get_count(density_state: DensityState, state, action):
 
 @jax.profiler.trace_function
 def get_count_batch(density_state: DensityState, states, actions):
+    # prevent the index from segfaulting if queried when empty
+    if density_state.index.ntotal <= 0:
+        return jnp.zeros((states.shape[0],))
     # sims_per_neighbor is len(states) x density_state.k
     sims_per_neighbor, indx = _find_similarities_batch(density_state, states, actions)
     neighbor_weights = density_state.weights[indx]
@@ -218,6 +218,7 @@ def get_count_batch(density_state: DensityState, states, actions):
     return counts
 
 
+@jax.profiler.trace_function
 def _make_key(s, a):
     flat_s = utils.flatten_observation(s)
     flat_a = jnp.array(a).reshape((-1,))
@@ -238,6 +239,9 @@ _make_key_batch = jax.vmap(_make_key)
 
 
 _batched_norm_pdf = jax.vmap(jax.scipy.stats.norm.pdf)
+
+
+@jax.profiler.trace_function
 @jax.jit
 def _normal_diag_pdf(mean, cov, x):
     diag_indices = jnp.diag_indices(cov.shape[0])
@@ -248,7 +252,6 @@ def _normal_diag_pdf(mean, cov, x):
 _normal_diag_pdf_batchedmean = jax.vmap(_normal_diag_pdf, in_axes=(0, None, None))
 # for evaluating many xs at a single mean:
 _normal_diag_pdf_batchedx = jax.vmap(_normal_diag_pdf, in_axes=(None, None, 0))
-
 # for many xs and a batch of means per x
 _normal_diag_pdf_batchedmeanx = jax.vmap(_normal_diag_pdf_batchedmean,
                                          in_axes=(0, None, 0))
@@ -383,9 +386,3 @@ if __name__ == "__main__":
     # ax.set_ylabel('y')
     # ax.set_zlabel('z')
     # fig.savefig('kernel_3d.png')
-
-
-
-
-
-
