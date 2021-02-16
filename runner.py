@@ -6,82 +6,49 @@ import yaml
 import copy
 import numpy as np
 
-GPUS = 4
-MULTIPLEX = 4
-
-# jobs = [
-#     # no rewards
-#     ## gridworld 40
-#     "python main.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --policy uniform --name arxiv2_grid40_puniform",
-#     "python main.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --policy uniform --no_optimistic_updates --no_optimistic_actions --name arxiv2_grid40_noopt_puniform",
-#     "python main_ablation_slow.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --policy uniform --name arxiv2_grid40_slow_puniform",
-#     "python main_ablation_intrinsic.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --explore_only --name arxiv2_grid40_intrinsic_noreward",
-#     "python main.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --policy uniform --no_exploration --name arxiv2_grid40_puniform_noexplore",
-
-#     ## point velocity
-#     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --policy uniform --name arxiv2_pv100_puniform",
-#     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --policy uniform --no_optimistic_updates --no_optimistic_actions --name arxiv2_pv100_noopt_puniform",
-#     "python main_ablation_slow.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --policy uniform --name arxiv2_pv100_slow_puniform",
-#     "python main_ablation_intrinsic.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --explore_only --name arxiv2_pv100_intrinsic_noreward",
-#     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --policy uniform --no_exploration --name arxiv2_pv100_puniform_noexplore",
-
-#     # with rewards
-#     ## gridworld 40
-#     "python main.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --name arxiv2_grid40",
-#     "python main.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --no_optimistic_updates --no_optimistic_actions --name arxiv2_grid40_noopt",
-#     "python main_ablation_slow.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --name arxiv2_grid40_slow",
-#     "python main_ablation_intrinsic.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --name arxiv2_grid40_intrinsic",
-#     "python main.py --eval_every 5 --env gridworld --task default --n_state_bins 40 --env_size 40 --n_action_bins 4 --max_steps 100 --no_exploration --name arxiv2_grid40_noexplore",
-
-#     ## point velocity
-#     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --name arxiv2_pv100",
-#     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --no_optimistic_updates --no_optimistic_actions --name arxiv2_pv100_noopt",
-#     "python main_ablation_slow.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --name arxiv2_pv100_slow",
-#     "python main_ablation_intrinsic.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --name arxiv2_pv100_intrinsic",
-#     "python main.py --eval_every 5 --env point --task velocity --n_state_bins 20 --n_action_bins 2 --max_steps 100 --no_exploration --name arxiv2_pv100_noexplore",
-# ]
-
-
-
-# jobs = [
-#     "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density knn_kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecp_kkc_plr1e-4_sscale0.1_ascale1",
-#     "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density knn_kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecp_kkc_plr1e-4_sscale0.1_ascale1",
-#     "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density knn_kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecp_kkc_plr1e-4_sscale0.1_ascale1",
-#     "python main.py --eval_every 1 --env cartpole --task swingup_sparse --density knn_kernel_count --density_state_scale 1e-1 --density_action_scale 1 --max_steps 1000 --policy_lr 1e-4 --name ecp_kkc_plr1e-4_sscale0.1_ascale1",
-# ]
+GPUS = [0, 1, 2, 3]
+MULTIPLEX = 1
 
 excluded_flags = []
 
-basename = "cart_knn"
+basename = "cart_temp"
 grid = [
     {
         # define the task
-        "_main": ["main.py"],
+        "_main": ["main_jit_density.py"],
         "eval_every": [1],
         "env": ["cartpole"],
         "task": ["swingup_sparse"],
         "max_steps": [1000],
 
-        # agent settings
-        "density": ["knn_kernel_count"],
+        # density settings
+        "density": ["kernel_count"],
         "density_state_scale": [1e-1],
         "density_action_scale": [1],
+        "density_max_obs": [65536],
+        "density_tolerance": [0.6],
+
+        # task policy settings
         "policy_lr": [1e-4],
         "policy_temperature": [3e-1],
         "policy_test_temperature": [1e-1],
     },
     {
         # define the task
-        "_main": ["main.py"],
+        "_main": ["main_jit_density.py"],
         "eval_every": [1],
         "env": ["cartpole"],
         "task": ["swingup_sparse"],
         "max_steps": [1000],
 
-        # agent settings
-        "density": ["knn_kernel_count"],
+        # density settings
+        "density": ["kernel_count"],
         "density_state_scale": [1e-1],
         "density_action_scale": [1],
+        "density_max_obs": [65536],
+        "density_tolerance": [0.6],
+
+        # task policy settings
         "policy_lr": [1e-4],
         "policy_temperature": [1e-1],
         "policy_test_temperature": [3e-2],
@@ -168,10 +135,11 @@ async def main():
     for job in job_strings:
         queue.put_nowait(job)
 
-    n_parallel = MULTIPLEX * GPUS
+    n_parallel = MULTIPLEX * len(GPUS)
     workers = []
     for i in range(n_parallel):
-        worker = asyncio.create_task(worker_fn(i % GPUS, queue))
+        gpu_id = GPUS[i % len(GPUS)]
+        worker = asyncio.create_task(worker_fn(gpu_id, queue))
         workers.append(worker)
 
     await queue.join()

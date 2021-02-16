@@ -201,6 +201,7 @@ def sample_uniform_actions(action_spec, rng, n):
     return actions.reshape((n, *aspec_shape))
 
 
+# @jax.partial(jax.jit, static_argnums=(2,))
 def sample_uniform_single(spec, rng, n):
     aspec_shape = spec.minimum.shape
     if len(aspec_shape) > 0:

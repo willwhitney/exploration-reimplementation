@@ -507,7 +507,9 @@ def main(args):
                                 state_bins=args.n_state_bins,
                                 action_bins=args.n_action_bins,
                                 state_std_scale=args.density_state_scale,
-                                action_std_scale=args.density_action_scale)
+                                action_std_scale=args.density_action_scale,
+                                max_obs=args.density_max_obs,
+                                tolerance=args.density_tolerance,)
 
     # for gridworld we can discretize with one bit per dimension
     replay = replay_buffer.LowPrecisionTracingReplay(
@@ -614,6 +616,8 @@ if __name__ == '__main__':
     parser.add_argument('--density', type=str, default='tabular')
     parser.add_argument('--density_state_scale', type=float, default=1.)
     parser.add_argument('--density_action_scale', type=float, default=1.)
+    parser.add_argument('--density_max_obs', type=float, default=1e5)
+    parser.add_argument('--density_tolerance', type=float, default=0.95)
 
     parser.add_argument('--novelty_q_function', type=str, default='deep')
     parser.add_argument('--temperature', type=float, default=1e-1)

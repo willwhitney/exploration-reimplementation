@@ -49,25 +49,41 @@ def new(observation_spec, action_spec, max_obs=100000,
 
     # index = faiss.IndexFlatL2(key_dim)
 
-    # index = faiss.IndexHNSWFlat(key_dim, 32)
-    # index.hnsw.efConstruction = 20
+    index = faiss.IndexHNSWFlat(key_dim, 32)
+    index.hnsw.efConstruction = 20
 
-    index = faiss.index_factory(key_dim, "IVF1024,Flat")
+    # index = faiss.index_factory(key_dim, "IVF1024,HNSW")
 
     # quantizer = faiss.IndexHNSWFlat(key_dim, 32)
     # index = faiss.IndexIVFFlat(quantizer, key_dim, 1024)
     # index.cp.min_points_per_centroid = 5   # quiet warning
     # index.quantizer_trains_alone = 2
 
-    n_index_train = 16384
-    train_states = np.random.uniform(low=flat_ospec.minimum,
-                                     high=flat_ospec.maximum,
-                                     size=(n_index_train, *flat_ospec.shape))
-    train_actions = np.random.uniform(low=action_spec.minimum,
-                                      high=action_spec.maximum,
-                                      size=(n_index_train, *action_spec.shape))
-    train_keys = _make_key_batch(train_states, train_actions)
-    index.train(np.array(train_keys))
+    # index = faiss.index_factory(key_dim, "IVF4096,PQ64")
+    # res = faiss.StandardGpuResources()
+    # index = faiss.index_factory(key_dim, "IVF16384,Flat")
+
+    # co = faiss.GpuClonerOptions()
+    # here we are using a 64-byte PQ, so we must set the lookup tables to
+    # 16 bit float (this is due to the limited temporary memory).
+    # co.useFloat16 = True
+    # index = faiss.index_cpu_to_gpu(res, 0, index, co)
+
+    # res = faiss.StandardGpuResources()
+    # flat_config = faiss.GpuIndexFlatConfig()
+    # flat_config.device = 0
+    # index = faiss.GpuIndexFlatL2(res, key_dim, flat_config)
+
+    if not index.is_trained:
+        n_index_train = 2**16
+        train_states = np.random.uniform(low=flat_ospec.minimum,
+                                        high=flat_ospec.maximum,
+                                        size=(n_index_train, *flat_ospec.shape))
+        train_actions = np.random.uniform(low=action_spec.minimum,
+                                        high=action_spec.maximum,
+                                        size=(n_index_train, *action_spec.shape))
+        train_keys = _make_key_batch(train_states, train_actions)
+        index.train(np.array(train_keys))
 
     return DensityState(kernel_cov, index, weights,
                         max_obs=max_obs, scale_factor=scale_factor)
@@ -283,7 +299,7 @@ if __name__ == "__main__":
 
     aspec = env.action_spec()
     j_aspec = jax_specs.convert_dm_spec(aspec)
-    density_state = new(ospec, aspec, state_std_scale=1e-2, action_std_scale=1)
+    density_state = new(ospec, aspec, state_std_scale=1e-1, action_std_scale=1)
     # import ipdb; ipdb.set_trace()
 
     timestep = env.reset()
@@ -294,55 +310,19 @@ if __name__ == "__main__":
     # states = jnp.expand_dims(state, axis=0)
     # density_state = update_batch(density_state, states, actions)
 
-    visited_states = []
-    visited_actions = []
-    for i in range(128):
-        timestep = env.step(action)
-        state = utils.flatten_observation(timestep.observation)
-        action = utils.sample_uniform_actions(j_aspec, jax.random.PRNGKey(i), 1)[0]
-        visited_states.append(state)
-        visited_actions.append(action)
+    # visited_states = []
+    # visited_actions = []
+    # for i in range(128):
+    #     timestep = env.step(action)
+    #     state = utils.flatten_observation(timestep.observation)
+    #     action = utils.sample_uniform_actions(j_aspec, jax.random.PRNGKey(i), 1)[0]
+    #     visited_states.append(state)
+    #     visited_actions.append(action)
 
-    density_state = update_batch(density_state,
-                                 jnp.stack(visited_states),
-                                 jnp.stack(visited_actions))
-    env.reset()
-
-
-    # ---------- profiling speed ----------------------
     # density_state = update_batch(density_state,
-    #                              jnp.repeat(states, 20000, axis=0),
-    #                              jnp.repeat(actions, 20000, axis=0))
-
-    import time
-    start = time.time()
-    for i in range(1000):
-        print(i)
-        timestep = env.step(action)
-        state = utils.flatten_observation(timestep.observation)
-        states = jnp.expand_dims(state, axis=0)
-
-        actions = utils.sample_uniform_actions(j_aspec, jax.random.PRNGKey(i), 1)
-        action = actions[0]
-        density_state = update_batch(density_state, states, actions)
-    end = time.time()
-    elapsed_building = end - start
-
-    N_extra = 50000
-    extra_states = jnp.repeat(states, N_extra, axis=0)
-    extra_actions = jnp.repeat(actions, N_extra, axis=0)
-    density_state = update_batch(density_state, extra_states, extra_actions)
-
-    start = time.time()
-    N = 128 * 32
-    query_states = jnp.repeat(states, N, axis=0)
-    query_actions = jnp.repeat(actions, N, axis=0)
-    for _ in range(1000):
-        count = get_count_batch(density_state, query_states, query_actions)
-        _ = float(count.sum())
-    end = time.time()
-    print(f"Elapsed building: {elapsed_building :.2f}")
-    print(f"Elapsed evaluating: {end - start :.2f}")
+    #                              jnp.stack(visited_states),
+    #                              jnp.stack(visited_actions))
+    # env.reset()
 
     # ---------- sanity checking counts --------------------
     # timestep2 = env.step(jnp.ones(aspec.shape))
