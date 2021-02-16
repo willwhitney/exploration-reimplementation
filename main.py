@@ -718,15 +718,15 @@ if __name__ == '__main__':
         raise Exception("Argument --policy was invalid.")
 
     if args.density == 'tabular':
-        import tabular_density as density
+        from densities import tabular_density as density
     elif args.density == 'kernel':
-        import kernel_density as density
+        from densities import kernel_density as density
     elif args.density == 'kernel_count':
-        import kernel_count as density
+        from densities import kernel_count as density
     elif args.density == 'knn_kernel_count':
-        import knn_kernel_count as density
+        from densities import knn_kernel_count as density
     elif args.density == 'dummy':
-        import dummy_density as density
+        from densities import dummy_density as density
     else:
         raise Exception("Argument --density was invalid.")
 
