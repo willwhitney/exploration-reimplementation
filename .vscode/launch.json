@@ -12,81 +12,17 @@
             "console": "internalConsole"
         },
         {
-            "name": "q_learning.py deep",
+            "name": "sac",
             "type": "python",
             "request": "launch",
-            "program": "q_learning.py",
+            "program": "main_jit_density.py",
             "console": "internalConsole",
             "args": [
-                "--debug",
-                "--name", "debug",
-                // "--no_vis"
-            ],
-            "env": {
-                "CUDA_VISIBLE_DEVICES": "3"
-            }
-        },
-        {
-            "name": "main.py deep",
-            "type": "python",
-            "request": "launch",
-            "program": "main.py",
-            "console": "internalConsole",
-            "args": [
-                // "--env_size", "10",
-                // "--debug",
-                // "--vis", "disk",
                 "--env", "point",
                 "--task", "velocity",
-                "--eval_every", "1",
-                "--vis", "disk",
-                "--name", "debug",
-                "--no_prioritized_update",
-                // "--target_network",
-                "--n_state_bins", "20",
-                "--n_action_bins", "2",
-                "--max_steps", "100"
-            ],
-            "env": {
-                "CUDA_VISIBLE_DEVICES": "3"
-            }
-        },
-        {
-            "name": "gridworld deep",
-            "type": "python",
-            "request": "launch",
-            "program": "main.py",
-            "console": "internalConsole",
-            "args": [
-                // "--env_size", "10",
-                // "--debug",
-                // "--vis", "disk",
-                "--env", "gridworld",
-                "--task", "default",
-                "--eval_every", "1",
-                "--vis", "disk",
-                "--name", "debug_gridworld",
-                "--no_prioritized_update",
-                // "--target_network",
-                "--n_state_bins", "20",
-                "--n_action_bins", "4",
-                "--max_steps", "100"
-            ],
-            "env": {
-                "CUDA_VISIBLE_DEVICES": "3"
-            }
-        },
-        {
-            "name": "main.py tabular",
-            "type": "python",
-            "request": "launch",
-            "program": "main.py",
-            "console": "internalConsole",
-            "args": [
-                "--env_size", "2",
-                "--tabular",
-                // "--debug",
-                // "--no_vis"
+                "--max_steps", "100",
+                "--density", "kernel_count",
+                "--policy", "sac",
             ],
             "env": {
                 "CUDA_VISIBLE_DEVICES": "3"

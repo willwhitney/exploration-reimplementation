@@ -455,6 +455,20 @@ def display_state(agent_state: AgentState, ospec, aspec,
             agent_state.replay,
             ospec, aspec, reduction=jnp.max, bins=bins)
         subfigs.append((taskq_map, "Task value (max)"))
+    elif policy.__name__ == 'policies.sac_policy':
+        import torch
+        def get_task_value(s, a):
+            s = torch.FloatTensor(np.array(s)).to(policy_state.device)
+            a = torch.FloatTensor(np.array(a)).to(policy_state.device)
+            with torch.no_grad():
+                v = policy_state.critic.Q1(torch.cat([s, a], dim=-1))
+            return v.cpu().detach().numpy()
+        taskq_map = utils.render_function(
+            get_task_value,
+            agent_state.replay,
+            ospec, aspec, reduction=jnp.max, bins=bins)
+        subfigs.append((taskq_map, "Task value (max)"))
+
 
     # dump the raw data for later rendering
     raw_path = f"{savedir}/data/{episode}.pkl"
@@ -607,7 +621,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval_every', type=int, default=10)
     parser.add_argument('--save_replay_every', type=int, default=10)
 
-    parser.add_argument('--policy', type=str, default='deep')
+    parser.add_argument('--policy', type=str, default='deep_q')
     parser.add_argument('--policy_update', type=str, default='ddqn')
     parser.add_argument('--policy_lr', type=float, default=1e-3)
     parser.add_argument('--policy_temperature', type=float, default=3e-1)
@@ -669,8 +683,10 @@ if __name__ == '__main__':
     else:
         raise Exception("Argument --novelty_q_function was invalid.")
 
-    if args.policy == 'deep':
+    if args.policy == 'deep_q':
         import policies.deep_q_policy as policy
+    elif args.policy == 'sac':
+        import policies.sac_policy as policy
     elif args.policy == 'uniform':
         import policies.uniform_policy as policy
     elif args.policy == 'tabular':
@@ -679,13 +695,13 @@ if __name__ == '__main__':
         raise Exception("Argument --policy was invalid.")
 
     if args.density == 'tabular':
-        import tabular_density as density
+        import densities.tabular_density as density
     elif args.density == 'kernel':
-        import kernel_density as density
+        import densities.kernel_density as density
     elif args.density == 'kernel_count':
-        import kernel_count as density
+        import densities.kernel_count as density
     elif args.density == 'dummy':
-        import dummy_density as density
+        import densities.dummy_density as density
     else:
         raise Exception("Argument --density was invalid.")
 
