@@ -30,8 +30,9 @@ grid = [
 
         # task policy settings
         "policy": ["sac"],
-        # "policy_temperature": [3e-1],
-        # "policy_test_temperature": [1e-1],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True, False],
     },
     # {
     #     # define the task

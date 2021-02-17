@@ -47,12 +47,14 @@ class AgentState():
     exploration_state: ExplorationState
     policy_state: Any = struct.field(pytree_node=False)
     replay: Any = struct.field(pytree_node=False)
+    j_action_spec: Any
     n_candidates: int
     n_update_candidates: int
     prioritized_update: bool
     update_target_every: int
     warmup_steps: int
     optimistic_actions: bool
+    uniform_update_candidates: bool
     steps_since_tupdate: int = 0
 
 
@@ -136,7 +138,7 @@ def train_step_candidates(exploration_state: ExplorationState,
 
 
 @jax.profiler.trace_function
-def train_step(agent_state, transitions):
+def train_step(agent_state: AgentState, transitions, rng):
     """A full (optimistic) training step for the exploration Q function."""
     states, actions, next_states, rewards = transitions
 
@@ -144,10 +146,18 @@ def train_step(agent_state, transitions):
     with jax.profiler.TraceContext("get n_update_candidates"):
         n_update_candidates = int(agent_state.n_update_candidates)
     with jax.profiler.TraceContext("get candidates"):
-        policy_state, candidate_next_actions = policy.action_fn(
-            agent_state.policy_state, next_states,
-            n_update_candidates, True)
-        agent_state = agent_state.replace(policy_state=policy_state)
+        if agent_state.uniform_update_candidates:
+            total_actions = states.shape[0] * n_update_candidates
+            candidate_next_actions = utils.sample_uniform_actions(
+                agent_state.j_action_spec, rng, total_actions)
+            candidate_next_actions = candidate_next_actions.reshape((
+                states.shape[0], n_update_candidates,
+                *candidate_next_actions.shape[1:]))
+        else:
+            policy_state, candidate_next_actions = policy.action_fn(
+                agent_state.policy_state, next_states,
+                n_update_candidates, True)
+            agent_state = agent_state.replace(policy_state=policy_state)
 
     # import ipdb; ipdb.set_trace()
     # somehow if I don't cast these to bool JAX will recompile the jitted
@@ -172,10 +182,12 @@ def update_target_q(agent_state: AgentState):
 
 
 def uniform_update(agent_state, rng):
-    for _ in range(10):
+    n_updates = 10
+    rngs = random.split(rng, n_updates)
+    for step_rng in rngs:
         transitions = tuple((jnp.array(el)
                              for el in agent_state.replay.sample(128)))
-        agent_state, losses = train_step(agent_state, transitions)
+        agent_state, losses = train_step(agent_state, transitions, step_rng)
         agent_state = agent_state.replace(
             steps_since_tupdate=agent_state.steps_since_tupdate + 1)
         if agent_state.steps_since_tupdate >= agent_state.update_target_every:
@@ -476,12 +488,14 @@ def main(args):
     agent_state = AgentState(exploration_state=exploration_state,
                              policy_state=policy_state,
                              replay=replay,
+                             j_action_spec=j_action_spec,
                              n_candidates=n_candidates,
                              n_update_candidates=args.n_update_candidates,
                              prioritized_update=args.prioritized_update,
                              update_target_every=args.update_target_every,
                              warmup_steps=args.warmup_steps,
-                             optimistic_actions=args.optimistic_actions,)
+                             optimistic_actions=args.optimistic_actions,
+                             uniform_update_candidates=args.uniform_update_candidates)
 
     current_time = time.time()
     for episode in range(1, 1000 + 1):
@@ -539,6 +553,8 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
+
+    # basic environment settings
     parser.add_argument('--name', default='default')
     parser.add_argument('--env', default='gridworld')
     parser.add_argument('--task', default='default')
@@ -546,30 +562,41 @@ if __name__ == '__main__':
     parser.add_argument('--env_size', type=int, default=20)
     parser.add_argument('--max_steps', type=int, default=1000)
 
+    # visualization and logging
     parser.add_argument('--debug', action='store_true', default=False)
     parser.add_argument('--vis', default='disk')
     parser.add_argument('--eval_every', type=int, default=10)
     parser.add_argument('--save_replay_every', type=int, default=10)
 
+    # policy settings
     parser.add_argument('--policy', type=str, default='deep_q')
     parser.add_argument('--policy_update', type=str, default='ddqn')
     parser.add_argument('--policy_lr', type=float, default=1e-3)
     parser.add_argument('--policy_temperature', type=float, default=3e-1)
     parser.add_argument('--policy_test_temperature', type=float, default=1e-1)
 
+    # count settings
     parser.add_argument('--density', type=str, default='tabular')
     parser.add_argument('--density_state_scale', type=float, default=1.)
     parser.add_argument('--density_action_scale', type=float, default=1.)
     parser.add_argument('--density_max_obs', type=float, default=1e5)
     parser.add_argument('--density_tolerance', type=float, default=0.95)
 
+    # novelty q learning
     parser.add_argument('--novelty_q_function', type=str, default='deep')
     parser.add_argument('--temperature', type=float, default=1e-1)
     parser.add_argument('--update_temperature', type=float, default=None)
     parser.add_argument('--prior_count', type=float, default=1e-3)
     parser.add_argument('--n_update_candidates', type=int, default=64)
+    parser.add_argument('--update_target_every', type=int, default=10)
+    parser.add_argument('--warmup_steps', type=int, default=128)
+    parser.add_argument('--uniform_update_candidates', action='store_true')
+
+    # tabular settings (also for vis)
     parser.add_argument('--n_state_bins', type=int, default=20)
     parser.add_argument('--n_action_bins', type=int, default=2)
+
+    # ablations
     parser.add_argument('--no_optimistic_updates', dest='optimistic_updates',
                         action='store_false', default=True)
     parser.add_argument('--no_optimistic_actions', dest='optimistic_actions',
@@ -577,9 +604,6 @@ if __name__ == '__main__':
     parser.add_argument('--target_network', action='store_true', default=True)
     parser.add_argument('--no_target_network', dest='target_network',
                         action='store_false')
-    parser.add_argument('--update_target_every', type=int, default=10)
-    parser.add_argument('--warmup_steps', type=int, default=128)
-
     parser.add_argument('--no_exploration', dest='use_exploration',
                         action='store_false', default=True)
     parser.add_argument('--prioritized_update', dest='prioritized_update',
