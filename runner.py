@@ -20,7 +20,6 @@ grid = [
         "env": ["point"],
         "task": ["velocity"],
         "max_steps": [100],
-        "no_exploration": [True, False]
 
         # density settings
         "density": ["kernel_count"],
@@ -38,21 +37,22 @@ grid = [
     #     # define the task
     #     "_main": ["main_jit_density.py"],
     #     "eval_every": [1],
-    #     "env": ["cartpole"],
-    #     "task": ["swingup_sparse"],
+    #     "env": ["hopper"],
+    #     "task": ["hop"],
     #     "max_steps": [1000],
+    #     "no_exploration": [False],
 
     #     # density settings
     #     "density": ["kernel_count"],
-    #     "density_state_scale": [1e-1],
+    #     "density_state_scale": [1, 1e-1, 1e-2],
     #     "density_action_scale": [1],
     #     "density_max_obs": [65536],
-    #     "density_tolerance": [0.6],
+    #     "density_tolerance": [0.4],
 
     #     # task policy settings
-    #     "policy_lr": [1e-4],
-    #     "policy_temperature": [1e-1],
-    #     "policy_test_temperature": [3e-2],
+    #     "policy": ["sac"],
+    #     # "policy_temperature": [3e-1],
+    #     # "policy_test_temperature": [1e-1],
     # },
 ]
 

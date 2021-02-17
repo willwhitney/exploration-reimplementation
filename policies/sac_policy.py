@@ -51,7 +51,7 @@ def init_fn(state_spec, action_spec, seed,
     sac_args['critic_target_update_frequency'] = 2  # // 2
     sac_args['batch_size'] = 1024
     sac_args['learnable_temperature'] = True
-    sac_args['num_seed_steps'] = 500  # // 2
+    sac_args['num_seed_steps'] = 5000  # // 2
     return sac.SACAgent(**sac_args)
 
 

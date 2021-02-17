@@ -73,4 +73,20 @@ DOMAINS = {
                                      maximum=np.array([5, 5])),
         }),
     },
+    'hopper': {
+        'hop': OrderedDict({
+            'position': BoundedArray(name='position', shape=(6,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-5, -5, -5, -5, -5, -5]),
+                                     maximum=np.array([5, 5, 5, 5, 5, 5])),
+            'velocity': BoundedArray(name='velocity', shape=(7,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-5, -10, -10, -10, -10, -10, -10]),
+                                     maximum=np.array([5, 10, 10, 10, 10, 10, 10])),
+            'touch': BoundedArray(name='touch', shape=(2,),
+                                  dtype=np.float32,
+                                  minimum=np.array([0, 0]),
+                                  maximum=np.array([10, 10])),
+        }),
+    },
 }
