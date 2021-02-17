@@ -484,7 +484,7 @@ def display_state(agent_state: AgentState, ospec, aspec,
         ax.set_title(title)
     fig.set_size_inches(4 * len(subfigs), 3)
 
-    fig_path = f"{savedir}/{episode}.png"
+    fig_path = f"{savedir}/vis/{episode}.png"
     utils.display_figure(fig, rendering, savepath=fig_path)
 # -------------------------------------------------------------------
 
@@ -571,8 +571,9 @@ def main(args):
         # update the task policy
         # TODO: pull this loop inside the policy.update_fn
         policy_state = agent_state.policy_state
-        for _ in range(args.max_steps // 2):
-            transitions = agent_state.replay.sample(batch_size)
+        for _ in range(args.max_steps):
+            # transitions = agent_state.replay.sample(batch_size)
+            transitions = agent_state.replay.sample(1024)
             transitions = tuple((jnp.array(el) for el in transitions))
             policy_state = policy.update_fn(
                 policy_state, transitions)

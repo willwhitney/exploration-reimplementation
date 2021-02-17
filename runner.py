@@ -6,53 +6,54 @@ import yaml
 import copy
 import numpy as np
 
-GPUS = [0, 1, 2, 3]
+GPUS = [0, 1]
 MULTIPLEX = 1
 
 excluded_flags = []
 
-basename = "cart_temp"
+basename = "pv100_sac_2x"
 grid = [
     {
         # define the task
         "_main": ["main_jit_density.py"],
         "eval_every": [1],
-        "env": ["cartpole"],
-        "task": ["swingup_sparse"],
-        "max_steps": [1000],
+        "env": ["point"],
+        "task": ["velocity"],
+        "max_steps": [100],
+        "no_exploration": [True, False]
 
         # density settings
         "density": ["kernel_count"],
-        "density_state_scale": [1e-1],
+        "density_state_scale": [1e-2],
         "density_action_scale": [1],
         "density_max_obs": [65536],
-        "density_tolerance": [0.6],
+        "density_tolerance": [0.95],
 
         # task policy settings
-        "policy_lr": [1e-4],
-        "policy_temperature": [3e-1],
-        "policy_test_temperature": [1e-1],
+        "policy": ["sac"],
+        # "policy_temperature": [3e-1],
+        # "policy_test_temperature": [1e-1],
     },
-    {
-        # define the task
-        "_main": ["main_jit_density.py"],
-        "eval_every": [1],
-        "env": ["cartpole"],
-        "task": ["swingup_sparse"],
-        "max_steps": [1000],
+    # {
+    #     # define the task
+    #     "_main": ["main_jit_density.py"],
+    #     "eval_every": [1],
+    #     "env": ["cartpole"],
+    #     "task": ["swingup_sparse"],
+    #     "max_steps": [1000],
 
-        # density settings
-        "density": ["kernel_count"],
-        "density_state_scale": [1e-1],
-        "density_action_scale": [1],
-        "density_max_obs": [65536],
-        "density_tolerance": [0.6],
+    #     # density settings
+    #     "density": ["kernel_count"],
+    #     "density_state_scale": [1e-1],
+    #     "density_action_scale": [1],
+    #     "density_max_obs": [65536],
+    #     "density_tolerance": [0.6],
 
-        # task policy settings
-        "policy_lr": [1e-4],
-        "policy_temperature": [1e-1],
-        "policy_test_temperature": [3e-2],
-    },
+    #     # task policy settings
+    #     "policy_lr": [1e-4],
+    #     "policy_temperature": [1e-1],
+    #     "policy_test_temperature": [3e-2],
+    # },
 ]
 
 
