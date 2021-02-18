@@ -6,55 +6,56 @@ import yaml
 import copy
 import numpy as np
 
-GPUS = [0, 1]
+GPUS = [0, 1, 2]
 MULTIPLEX = 1
 
 excluded_flags = []
 
-basename = "pv100_sac_2x"
+basename = "hopper_sac2x_uniform_fixobsscale"
 grid = [
+    # {
+    #     # define the task
+    #     "_main": ["main_jit_density.py"],
+    #     "eval_every": [1],
+    #     "env": ["point"],
+    #     "task": ["velocity"],
+    #     "max_steps": [100],
+
+    #     # density settings
+    #     "density": ["kernel_count"],
+    #     "density_state_scale": [1e-2],
+    #     "density_action_scale": [1],
+    #     "density_max_obs": [65536],
+    #     "density_tolerance": [0.95],
+
+    #     # task policy settings
+    #     "policy": ["sac"],
+
+    #     # novelty Q settings
+    #     "uniform_update_candidates": [True, False],
+    # },
     {
         # define the task
         "_main": ["main_jit_density.py"],
         "eval_every": [1],
-        "env": ["point"],
-        "task": ["velocity"],
-        "max_steps": [100],
+        "env": ["hopper"],
+        "task": ["hop"],
+        "max_steps": [1000],
+        "no_exploration": [False],
 
         # density settings
         "density": ["kernel_count"],
-        "density_state_scale": [1e-2],
+        "density_state_scale": [3e-1, 1e-1],
         "density_action_scale": [1],
-        "density_max_obs": [65536],
-        "density_tolerance": [0.95],
+        "density_max_obs": [16384],
+        "density_tolerance": [0.4],
 
         # task policy settings
         "policy": ["sac"],
 
         # novelty Q settings
-        "uniform_update_candidates": [True, False],
+        "uniform_update_candidates": [True],
     },
-    # {
-    #     # define the task
-    #     "_main": ["main_jit_density.py"],
-    #     "eval_every": [1],
-    #     "env": ["hopper"],
-    #     "task": ["hop"],
-    #     "max_steps": [1000],
-    #     "no_exploration": [False],
-
-    #     # density settings
-    #     "density": ["kernel_count"],
-    #     "density_state_scale": [1, 1e-1, 1e-2],
-    #     "density_action_scale": [1],
-    #     "density_max_obs": [65536],
-    #     "density_tolerance": [0.4],
-
-    #     # task policy settings
-    #     "policy": ["sac"],
-    #     # "policy_temperature": [3e-1],
-    #     # "policy_test_temperature": [1e-1],
-    # },
 ]
 
 
