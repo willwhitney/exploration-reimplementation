@@ -110,10 +110,22 @@ def update_batch(density_state: DensityState, states, actions):
     if len(new_states) > 0:
         new_states = jnp.stack(new_states)
         new_actions = jnp.stack(new_actions)
-        prev_next_slot = density_state.next_slot
-        density_state = _add_observations(density_state, new_states, new_actions)
-        if density_state.next_slot < prev_next_slot:
-            print(f"Density wrapped next_slot from {prev_next_slot} to "
+        next_slot = density_state.next_slot
+
+        if density_state.total < density_state.max_obs:
+            indices = jnp.arange(next_slot, next_slot + len(new_states))
+            indices = indices % density_state.max_obs
+        else:
+            # use random indices to avoid overwriting whole blocks
+            # TODO: pass an RNG key in here
+            rng = random.PRNGKey(density_state.next_slot)
+            indices = random.randint(rng, shape=(len(new_states),),
+                                     minval=0, maxval=density_state.max_obs)
+        density_state = _add_observations(density_state, indices,
+                                          new_states, new_actions)
+
+        if density_state.next_slot < next_slot:
+            print(f"Density wrapped next_slot from {next_slot} to "
                   f"{density_state.next_slot}.")
 
     if new_weights.sum() > 0:
@@ -128,7 +140,7 @@ def _add_weights(density_state: DensityState, new_weights):
 
 
 @jax.jit
-def _add_observations(density_state: DensityState, states, actions):
+def _add_observations(density_state: DensityState, indices, states, actions):
     bsize = states.shape[0]
     next_slot = density_state.next_slot
     observations = density_state.observations
@@ -136,8 +148,7 @@ def _add_observations(density_state: DensityState, states, actions):
     obs_size = observations.shape[0]
 
     keys = _make_key_batch(states, actions)
-    indices = jnp.linspace(next_slot, next_slot + bsize - 1, bsize)
-    indices = indices.round().astype(int) % density_state.max_obs
+
     # don't use arange because then you can't jit — size depends on next_slot
     # indices = jnp.arange(next_slot, next_slot + bsize)
 

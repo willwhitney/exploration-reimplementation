@@ -297,7 +297,7 @@ def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
         for j in range(bins):
             l = value_lists[i][j]
             if len(l) > 0:
-                rendered_values[i, j] = reduction(l)
+                rendered_values[i, j] = reduction(jnp.stack(l))
     return rendered_values
 
 

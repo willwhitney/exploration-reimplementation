@@ -13,6 +13,7 @@ import jax_specs
 import point
 import utils
 
+
 env_name = 'point'
 task_name = 'velocity'
 env = suite.load(env_name, task_name)
@@ -67,14 +68,14 @@ def fill(density, density_state, n=50000, bsize=1):
     return density_state
 
 
-import kernel_count
-import knn_kernel_count
+from densities import kernel_count
+from densities import knn_kernel_count
 
 for density in [kernel_count]:
-    fill_bsize = 1
+    fill_bsize = 1024
     # for max_obs in [1024, 4096, 16384, 65536]:
-    max_obs = 65536
-    for tolerance in [0.96, 0.97, 0.98, 0.99]:
+    max_obs = 1024
+    for tolerance in [0.99]:
         print(f"{density.__name__} with max_obs={max_obs} and tolerance={tolerance}")
         density_state = density.new(ospec, aspec,
                                         state_std_scale=1e-1, action_std_scale=1,
@@ -86,6 +87,7 @@ for density in [kernel_count]:
 
         density_state = fill(density, density_state,
                             n=min(50000, max_obs), bsize=fill_bsize)
+        # print(density_state.total)
 
         density_state, elapsed_write_full = profile_write(density,
                                                         density_state)

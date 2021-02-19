@@ -2,16 +2,15 @@ import itertools
 import os
 import subprocess
 import asyncio
-import yaml
 import copy
 import numpy as np
 
-GPUS = [0, 1, 2]
+GPUS = [2, 3]
 MULTIPLEX = 1
 
 excluded_flags = []
 
-basename = "hopper_sac2x_uniform_fixobsscale"
+basename = "hopper_sac_max8192_seed2"
 grid = [
     # {
     #     # define the task
@@ -42,12 +41,13 @@ grid = [
         "task": ["hop"],
         "max_steps": [1000],
         "no_exploration": [False],
+        "seed": [2],
 
         # density settings
         "density": ["kernel_count"],
-        "density_state_scale": [3e-1, 1e-1],
+        "density_state_scale": [1, 3e-1],
         "density_action_scale": [1],
-        "density_max_obs": [16384],
+        "density_max_obs": [8192],
         "density_tolerance": [0.4],
 
         # task policy settings
@@ -56,6 +56,27 @@ grid = [
         # novelty Q settings
         "uniform_update_candidates": [True],
     },
+    # {
+    #     # define the task
+    #     "_main": ["main_jit_density.py"],
+    #     "eval_every": [1],
+    #     "env": ["acrobot"],
+    #     "task": ["swingup"],
+    #     "max_steps": [1000],
+
+    #     # density settings
+    #     "density": ["kernel_count"],
+    #     "density_state_scale": [3e-1, 1e-1],
+    #     "density_action_scale": [1],
+    #     "density_max_obs": [16384],
+    #     "density_tolerance": [0.4],
+
+    #     # task policy settings
+    #     "policy": ["sac"],
+
+    #     # novelty Q settings
+    #     "uniform_update_candidates": [True],
+    # },
 ]
 
 

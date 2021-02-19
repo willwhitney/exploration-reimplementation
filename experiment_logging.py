@@ -118,7 +118,7 @@ SUMMARY_FORMAT_STR = ', '.join((
     "Test score {values[test/score]:4.0f}",
     "Test nov score {values[test/novelty_score]:4.0f}",
     "Test policy ent {values[test/policy_entropy]:5.2f}",
-    "Time {values[train/elapsed]:5.2f}",
+    "Time {values[train/elapsed]:6.2f}",
     "Density size {values[train/density_size]:5.0f}",
 ))
 
