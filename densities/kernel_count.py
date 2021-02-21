@@ -8,6 +8,9 @@ from flax import struct
 import utils
 
 
+DTYPE = jnp.float16
+
+
 @struct.dataclass
 class DensityState:
     kernel_cov: jnp.ndarray
@@ -39,7 +42,7 @@ def new(observation_spec, action_spec, max_obs=100000,
     # initialize this to some reasonable size
     # starting_size = 65536
     starting_size = 1024
-    observations = jnp.zeros((starting_size, *concat_std.shape))
+    observations = jnp.zeros((starting_size, *concat_std.shape), dtype=DTYPE)
     weights = jnp.zeros((starting_size,))
     return DensityState(kernel_cov, observations, weights,
                         max_obs=int(max_obs), scale_factor=scale_factor,
@@ -171,14 +174,14 @@ def _grow_observations(density_state: DensityState):
 
     # growing observations
     new_shape = (new_obs_size, *observations.shape[1:])
-    new_observations = jnp.zeros(new_shape)
+    new_observations = jnp.zeros(new_shape, dtype=DTYPE)
     observations = jax.ops.index_update(new_observations,
                                         jax.ops.index[:obs_size],
                                         observations)
 
     # growing weights
     new_weight_shape = (new_obs_size,)
-    new_weights = jnp.zeros(new_weight_shape)
+    new_weights = jnp.zeros(new_weight_shape, dtype=DTYPE)
     weights = jax.ops.index_update(new_weights,
                                    jax.ops.index[:obs_size],
                                    weights)
@@ -188,7 +191,7 @@ def _grow_observations(density_state: DensityState):
 def _make_key(s, a):
     flat_s = utils.flatten_observation(s)
     flat_a = jnp.array(a).reshape((-1,))
-    return jnp.concatenate([flat_s, flat_a], axis=0)
+    return jnp.concatenate([flat_s, flat_a], axis=0).astype(DTYPE)
 _make_key_batch = jax.vmap(_make_key)
 
 

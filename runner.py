@@ -5,12 +5,12 @@ import asyncio
 import copy
 import numpy as np
 
-GPUS = [2, 3]
+GPUS = [0, 1, 2, 3]
 MULTIPLEX = 1
 
 excluded_flags = []
 
-basename = "hopper_sac_max8192_seed2"
+basename = "hopper_sac_max8192_seed3"
 grid = [
     # {
     #     # define the task
@@ -33,6 +33,29 @@ grid = [
     #     # novelty Q settings
     #     "uniform_update_candidates": [True, False],
     # },
+    # {
+    #     # define the task
+    #     "_main": ["main_jit_density.py"],
+    #     "eval_every": [1],
+    #     "env": ["hopper"],
+    #     "task": ["hop"],
+    #     "max_steps": [1000],
+    #     "no_exploration": [False],
+    #     "seed": [3, 4],
+
+    #     # density settings
+    #     "density": ["kernel_count"],
+    #     "density_state_scale": [0.3, 0.1],
+    #     "density_action_scale": [1],
+    #     "density_max_obs": [8192],
+    #     "density_tolerance": [0.4],
+
+    #     # task policy settings
+    #     "policy": ["sac"],
+
+    #     # novelty Q settings
+    #     "uniform_update_candidates": [True],
+    # },
     {
         # define the task
         "_main": ["main_jit_density.py"],
@@ -41,14 +64,14 @@ grid = [
         "task": ["hop"],
         "max_steps": [1000],
         "no_exploration": [False],
-        "seed": [2],
+        "seed": [3],
 
         # density settings
         "density": ["kernel_count"],
-        "density_state_scale": [1, 3e-1],
+        "density_state_scale": [1e-1],
         "density_action_scale": [1],
         "density_max_obs": [8192],
-        "density_tolerance": [0.4],
+        "density_tolerance": [0.1, 0.4],
 
         # task policy settings
         "policy": ["sac"],
@@ -137,13 +160,13 @@ for job in jobs:
 
 
 async def run_job(gpu_id, job):
-    command = job.split(' ')
-
-    print("Dispatching `{}`".format(command))
-    env = {'CUDA_VISIBLE_DEVICES': str(gpu_id),
-           'XLA_PYTHON_CLIENT_PREALLOCATE': 'false',
-           **os.environ}
-    proc = await asyncio.create_subprocess_shell(' '.join(command), env=env)
+    print("Dispatching `{}`".format(job))
+    env = {
+        **os.environ,
+        'CUDA_VISIBLE_DEVICES': str(gpu_id),
+        'XLA_PYTHON_CLIENT_PREALLOCATE': 'false',
+    }
+    proc = await asyncio.create_subprocess_shell(job, env=env)
     stdout, stderr = await proc.communicate()
 
 

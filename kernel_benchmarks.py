@@ -73,9 +73,10 @@ from densities import knn_kernel_count
 
 for density in [kernel_count]:
     fill_bsize = 1024
-    # for max_obs in [1024, 4096, 16384, 65536]:
-    max_obs = 1024
-    for tolerance in [0.99]:
+    tolerance = 1.0
+    for max_obs in [1024, 4096, 16384, 65536]:
+    # max_obs =
+    # for tolerance in [0.99]:
         print(f"{density.__name__} with max_obs={max_obs} and tolerance={tolerance}")
         density_state = density.new(ospec, aspec,
                                         state_std_scale=1e-1, action_std_scale=1,
