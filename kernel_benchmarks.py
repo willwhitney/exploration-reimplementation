@@ -14,8 +14,8 @@ import point
 import utils
 
 
-env_name = 'point'
-task_name = 'velocity'
+env_name = 'hopper'
+task_name = 'hop'
 env = suite.load(env_name, task_name)
 ospec = DOMAINS[env_name][task_name]
 
@@ -71,13 +71,14 @@ def fill(density, density_state, n=50000, bsize=1):
 from densities import kernel_count
 from densities import knn_kernel_count
 
-for density in [kernel_count]:
-    fill_bsize = 1024
+for density in [knn_kernel_count]:
+    fill_bsize = 4096
     tolerance = 1.0
-    for max_obs in [1024, 4096, 16384, 65536]:
+    for max_obs in [4096, 16384, 65536]:
     # max_obs =
     # for tolerance in [0.99]:
-        print(f"{density.__name__} with max_obs={max_obs} and tolerance={tolerance}")
+        print((f"{env_name} {task_name} {density.__name__} "
+               f"with max_obs={max_obs} and tolerance={tolerance}"))
         density_state = density.new(ospec, aspec,
                                         state_std_scale=1e-1, action_std_scale=1,
                                         max_obs=max_obs, tolerance=tolerance)

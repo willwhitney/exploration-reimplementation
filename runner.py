@@ -5,73 +5,54 @@ import asyncio
 import copy
 import numpy as np
 
-GPUS = [0, 1, 2, 3]
+GPUS = [3]
 MULTIPLEX = 1
 
 excluded_flags = []
 
-basename = "hopper_sac_max8192_seed3"
+# basename = "dummy"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main_jit_density.py"],
+#         "eval_every": [1],
+#         "env": ["hopper"],
+#         "task": ["hop"],
+#         "max_steps": [1000],
+#         "no_exploration": [False],
+#         "seed": [3],
+
+#         # density settings
+#         "density": ["kernel_count"],
+#         "density_state_scale": [1e-1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [8192],
+#         "density_tolerance": [0.1, 0.4],
+
+#         # task policy settings
+#         "policy": ["deep_q"],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#     },
+# ]
+
+basename = "acrobot_swingup"
 grid = [
-    # {
-    #     # define the task
-    #     "_main": ["main_jit_density.py"],
-    #     "eval_every": [1],
-    #     "env": ["point"],
-    #     "task": ["velocity"],
-    #     "max_steps": [100],
-
-    #     # density settings
-    #     "density": ["kernel_count"],
-    #     "density_state_scale": [1e-2],
-    #     "density_action_scale": [1],
-    #     "density_max_obs": [65536],
-    #     "density_tolerance": [0.95],
-
-    #     # task policy settings
-    #     "policy": ["sac"],
-
-    #     # novelty Q settings
-    #     "uniform_update_candidates": [True, False],
-    # },
-    # {
-    #     # define the task
-    #     "_main": ["main_jit_density.py"],
-    #     "eval_every": [1],
-    #     "env": ["hopper"],
-    #     "task": ["hop"],
-    #     "max_steps": [1000],
-    #     "no_exploration": [False],
-    #     "seed": [3, 4],
-
-    #     # density settings
-    #     "density": ["kernel_count"],
-    #     "density_state_scale": [0.3, 0.1],
-    #     "density_action_scale": [1],
-    #     "density_max_obs": [8192],
-    #     "density_tolerance": [0.4],
-
-    #     # task policy settings
-    #     "policy": ["sac"],
-
-    #     # novelty Q settings
-    #     "uniform_update_candidates": [True],
-    # },
     {
         # define the task
         "_main": ["main_jit_density.py"],
         "eval_every": [1],
-        "env": ["hopper"],
-        "task": ["hop"],
+        "env": ["acrobot"],
+        "task": ["swingup"],
         "max_steps": [1000],
-        "no_exploration": [False],
-        "seed": [3],
 
         # density settings
         "density": ["kernel_count"],
-        "density_state_scale": [1e-1],
+        "density_state_scale": [3e-1],
         "density_action_scale": [1],
-        "density_max_obs": [8192],
-        "density_tolerance": [0.1, 0.4],
+        "density_max_obs": [4096],
+        "density_tolerance": [0.4],
 
         # task policy settings
         "policy": ["sac"],
@@ -79,28 +60,57 @@ grid = [
         # novelty Q settings
         "uniform_update_candidates": [True],
     },
-    # {
-    #     # define the task
-    #     "_main": ["main_jit_density.py"],
-    #     "eval_every": [1],
-    #     "env": ["acrobot"],
-    #     "task": ["swingup"],
-    #     "max_steps": [1000],
-
-    #     # density settings
-    #     "density": ["kernel_count"],
-    #     "density_state_scale": [3e-1, 1e-1],
-    #     "density_action_scale": [1],
-    #     "density_max_obs": [16384],
-    #     "density_tolerance": [0.4],
-
-    #     # task policy settings
-    #     "policy": ["sac"],
-
-    #     # novelty Q settings
-    #     "uniform_update_candidates": [True],
-    # },
 ]
+
+# basename = "hopper_sizes"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main_jit_density.py"],
+#         "eval_every": [1],
+#         "env": ["hopper"],
+#         "task": ["hop"],
+#         "max_steps": [1000],
+#         "no_exploration": [False],
+#         "seed": [4],
+
+#         # density settings
+#         "density": ["kernel_count"],
+#         "density_state_scale": [0.3],
+#         "density_action_scale": [1],
+#         "density_max_obs": [4096],
+#         "density_tolerance": [0.4],
+
+#         # task policy settings
+#         "policy": ["sac"],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#     },
+#     {
+#         # define the task
+#         "_main": ["main_jit_density.py"],
+#         "eval_every": [1],
+#         "env": ["hopper"],
+#         "task": ["hop"],
+#         "max_steps": [1000],
+#         "no_exploration": [False],
+#         "seed": [4],
+
+#         # density settings
+#         "density": ["kernel_count"],
+#         "density_state_scale": [1e-1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [4096],
+#         "density_tolerance": [0.1, 0.4],
+
+#         # task policy settings
+#         "policy": ["sac"],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#     },
+# ]
 
 
 def construct_varying_keys(grids):

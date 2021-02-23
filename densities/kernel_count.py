@@ -41,7 +41,7 @@ def new(observation_spec, action_spec, max_obs=100000,
 
     # initialize this to some reasonable size
     # starting_size = 65536
-    starting_size = 1024
+    starting_size = 4096
     observations = jnp.zeros((starting_size, *concat_std.shape), dtype=DTYPE)
     weights = jnp.zeros((starting_size,))
     return DensityState(kernel_cov, observations, weights,

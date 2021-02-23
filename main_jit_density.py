@@ -50,7 +50,6 @@ class AgentState():
     j_action_spec: Any
     n_candidates: int
     n_update_candidates: int
-    prioritized_update: bool
     update_target_every: int
     warmup_steps: int
     optimistic_actions: bool
@@ -213,11 +212,8 @@ def update_exploration(agent_state, rng, transition_id):
         # update exploration Q to consistency with new density
         rng, novq_rng = random.split(rng)
 
-        if agent_state.prioritized_update:
-            agent_state = prioritized_update(agent_state, transition_id)
-        else:
-            with jax.profiler.TraceContext("uniform update"):
-                agent_state = uniform_update(agent_state, novq_rng)
+        with jax.profiler.TraceContext("uniform update"):
+            agent_state = uniform_update(agent_state, novq_rng)
     return agent_state
 
 
@@ -491,7 +487,6 @@ def main(args):
                              j_action_spec=j_action_spec,
                              n_candidates=n_candidates,
                              n_update_candidates=args.n_update_candidates,
-                             prioritized_update=args.prioritized_update,
                              update_target_every=args.update_target_every,
                              warmup_steps=args.warmup_steps,
                              optimistic_actions=args.optimistic_actions,
@@ -606,10 +601,6 @@ if __name__ == '__main__':
                         action='store_false')
     parser.add_argument('--no_exploration', dest='use_exploration',
                         action='store_false', default=True)
-    parser.add_argument('--prioritized_update', dest='prioritized_update',
-                        action='store_true', default=False)
-    parser.add_argument('--no_prioritized_update', dest='prioritized_update',
-                        action='store_false')
 
     parser.add_subparsers()
     args = parser.parse_args()
@@ -658,6 +649,8 @@ if __name__ == '__main__':
         import densities.dummy_density as density
     else:
         raise Exception("Argument --density was invalid.")
+
+    print(f"CUDA_VISIBLE_DEVICES={os.environ['CUDA_VISIBLE_DEVICES']}")
 
     jit = not args.debug
     if jit:

@@ -276,7 +276,7 @@ def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
                                    actions], axis=0)
 
     values_list = []
-    bsize = 10000
+    bsize = 2000
     for i in range(0, states.shape[0], bsize):
         values_list.append(fn(states[i: i + bsize], actions[i: i + bsize]))
     values = jnp.concatenate(values_list, axis=0)
