@@ -5,54 +5,52 @@ import asyncio
 import copy
 import numpy as np
 
-GPUS = [3]
+GPUS = [2, 3]
 MULTIPLEX = 1
 
 excluded_flags = []
 
-# basename = "dummy"
-# grid = [
-#     {
-#         # define the task
-#         "_main": ["main_jit_density.py"],
-#         "eval_every": [1],
-#         "env": ["hopper"],
-#         "task": ["hop"],
-#         "max_steps": [1000],
-#         "no_exploration": [False],
-#         "seed": [3],
-
-#         # density settings
-#         "density": ["kernel_count"],
-#         "density_state_scale": [1e-1],
-#         "density_action_scale": [1],
-#         "density_max_obs": [8192],
-#         "density_tolerance": [0.1, 0.4],
-
-#         # task policy settings
-#         "policy": ["deep_q"],
-
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#     },
-# ]
-
-basename = "acrobot_swingup"
+basename = "pv100_updates"
 grid = [
     {
         # define the task
         "_main": ["main_jit_density.py"],
         "eval_every": [1],
-        "env": ["acrobot"],
-        "task": ["swingup"],
-        "max_steps": [1000],
+        "env": ["point"],
+        "task": ["velocity"],
+        "max_steps": [100],
 
         # density settings
         "density": ["kernel_count"],
-        "density_state_scale": [3e-1],
+        "density_state_scale": [1e-2],
         "density_action_scale": [1],
-        "density_max_obs": [4096],
-        "density_tolerance": [0.4],
+        "density_max_obs": [8192],
+        "density_tolerance": [0.95],
+        "n_updates_per_step": [5],
+        "update_target_every": [5],
+
+        # task policy settings
+        "policy": ["sac"],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+    },
+    {
+        # define the task
+        "_main": ["main_jit_density.py"],
+        "eval_every": [1],
+        "env": ["point"],
+        "task": ["velocity"],
+        "max_steps": [100],
+
+        # density settings
+        "density": ["kernel_count"],
+        "density_state_scale": [1e-2],
+        "density_action_scale": [1],
+        "density_max_obs": [8192],
+        "density_tolerance": [0.95],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
 
         # task policy settings
         "policy": ["sac"],
@@ -61,6 +59,32 @@ grid = [
         "uniform_update_candidates": [True],
     },
 ]
+
+
+# basename = "acrobot_swingup"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main_jit_density.py"],
+#         "eval_every": [1],
+#         "env": ["acrobot"],
+#         "task": ["swingup"],
+#         "max_steps": [1000],
+
+#         # density settings
+#         "density": ["kernel_count"],
+#         "density_state_scale": [3e-1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [4096],
+#         "density_tolerance": [0.4],
+
+#         # task policy settings
+#         "policy": ["sac"],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#     },
+# ]
 
 # basename = "hopper_sizes"
 # grid = [

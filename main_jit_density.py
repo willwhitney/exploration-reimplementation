@@ -36,8 +36,6 @@ class ExplorationState():
     temperature: float
     update_temperature: float
     prior_count: float
-    optimistic_updates: bool
-    target_network: bool
 
 
 @struct.dataclass
@@ -50,6 +48,7 @@ class AgentState():
     j_action_spec: Any
     n_candidates: int
     n_update_candidates: int
+    n_updates_per_step: int
     update_target_every: int
     warmup_steps: int
     optimistic_actions: bool
@@ -71,7 +70,7 @@ def compute_novelty_reward(exploration_state, states, actions):
 
 
 @jax.profiler.trace_function
-@jax.partial(jax.jit, static_argnums=(3, 4))
+# @jax.partial(jax.jit, static_argnums=(3, 4))
 def train_step_candidates(exploration_state: ExplorationState,
                           transitions,
                           candidate_next_actions,
@@ -146,28 +145,22 @@ def train_step(agent_state: AgentState, transitions, rng):
         n_update_candidates = int(agent_state.n_update_candidates)
     with jax.profiler.TraceContext("get candidates"):
         if agent_state.uniform_update_candidates:
-            total_actions = states.shape[0] * n_update_candidates
-            candidate_next_actions = utils.sample_uniform_actions(
-                agent_state.j_action_spec, rng, total_actions)
-            candidate_next_actions = candidate_next_actions.reshape((
-                states.shape[0], n_update_candidates,
-                *candidate_next_actions.shape[1:]))
+            candidate_next_actions = utils.sample_uniform_actions_batch(
+                agent_state.j_action_spec, rng,
+                states.shape[0], n_update_candidates)
         else:
             policy_state, candidate_next_actions = policy.action_fn(
                 agent_state.policy_state, next_states,
                 n_update_candidates, True)
             agent_state = agent_state.replace(policy_state=policy_state)
 
-    # import ipdb; ipdb.set_trace()
-    # somehow if I don't cast these to bool JAX will recompile the jitted
-    # function train_step_candidates on every call...
+    # if I don't cast these to bool JAX will recompile the jitted
+    # function train_step_candidates on every call
     with jax.profiler.TraceContext("train_step_candidates"):
         exploration_state, losses = train_step_candidates(
             agent_state.exploration_state,
             transitions,
-            candidate_next_actions,
-            bool(agent_state.exploration_state.target_network),
-            bool(agent_state.exploration_state.optimistic_updates))
+            candidate_next_actions)
     agent_state = agent_state.replace(exploration_state=exploration_state)
     return agent_state, losses
 
@@ -180,8 +173,8 @@ def update_target_q(agent_state: AgentState):
     return agent_state
 
 
-def uniform_update(agent_state, rng):
-    n_updates = 10
+def uniform_update(agent_state: AgentState, rng):
+    n_updates = agent_state.n_updates_per_step
     rngs = random.split(rng, n_updates)
     for step_rng in rngs:
         transitions = tuple((jnp.array(el)
@@ -202,8 +195,8 @@ def update_exploration(agent_state, rng, transition_id):
     with jax.profiler.TraceContext("update density"):
         exploration_state = agent_state.exploration_state
         density_state = density.update_batch(exploration_state.density_state,
-                                            jnp.expand_dims(s, axis=0),
-                                            jnp.expand_dims(a, axis=0))
+                                             np.expand_dims(s, axis=0),
+                                             np.expand_dims(a, axis=0))
         exploration_state = exploration_state.replace(
             density_state=density_state)
         agent_state = agent_state.replace(exploration_state=exploration_state)
@@ -292,6 +285,7 @@ def sample_exploration_action(agent_state: AgentState, rng, s, train=True):
     return agent_state, a
 
 
+@jax.profiler.trace_function
 def update_agent(agent_state: AgentState, rng, transition):
     # add transition to replay
     transition_id = agent_state.replay.append(*transition)
@@ -311,8 +305,11 @@ def run_episode(agent_state: AgentState, rng, env,
         rng, action_rng = random.split(rng)
         s = utils.flatten_observation(timestep.observation)
 
+        replay = agent_state.replay
+        warmup_steps = agent_state.warmup_steps
+
         # put some random steps in the replay buffer
-        if len(agent_state.replay) < agent_state.warmup_steps:
+        if len(replay) < warmup_steps:
             action_spec = jax_specs.convert_dm_spec(env.action_spec())
             a = utils.sample_uniform_actions(action_spec, action_rng, 1)[0]
             flag = 'train' if train else 'test'
@@ -462,9 +459,7 @@ def main(args):
                                 max_obs=args.density_max_obs,
                                 tolerance=args.density_tolerance,)
 
-    # for gridworld we can discretize with one bit per dimension
-    replay = replay_buffer.LowPrecisionTracingReplay(
-        state_shape, action_shape, min_s=0, max_s=1, n_bins=2)
+    replay = replay_buffer.Replay(state_shape, action_shape)
 
     policy_state = policy.init_fn(observation_spec, action_spec, args.seed,
                                   lr=args.policy_lr,
@@ -478,15 +473,14 @@ def main(args):
         density_state=density_state,
         temperature=args.temperature,
         update_temperature=args.update_temperature,
-        prior_count=args.prior_count,
-        optimistic_updates=args.optimistic_updates,
-        target_network=args.target_network)
+        prior_count=args.prior_count)
     agent_state = AgentState(exploration_state=exploration_state,
                              policy_state=policy_state,
                              replay=replay,
                              j_action_spec=j_action_spec,
                              n_candidates=n_candidates,
                              n_update_candidates=args.n_update_candidates,
+                             n_updates_per_step=args.n_updates_per_step,
                              update_target_every=args.update_target_every,
                              warmup_steps=args.warmup_steps,
                              optimistic_actions=args.optimistic_actions,
@@ -583,6 +577,7 @@ if __name__ == '__main__':
     parser.add_argument('--update_temperature', type=float, default=None)
     parser.add_argument('--prior_count', type=float, default=1e-3)
     parser.add_argument('--n_update_candidates', type=int, default=64)
+    parser.add_argument('--n_updates_per_step', type=int, default=10)
     parser.add_argument('--update_target_every', type=int, default=10)
     parser.add_argument('--warmup_steps', type=int, default=128)
     parser.add_argument('--uniform_update_candidates', action='store_true')
@@ -651,6 +646,11 @@ if __name__ == '__main__':
         raise Exception("Argument --density was invalid.")
 
     print(f"CUDA_VISIBLE_DEVICES={os.environ['CUDA_VISIBLE_DEVICES']}")
+
+    train_step_candidates = jax.partial(train_step_candidates,
+                                        use_target_network=args.target_network,
+                                        use_optimistic_updates=args.optimistic_updates)
+    train_step_candidates = jax.jit(train_step_candidates)
 
     jit = not args.debug
     if jit:

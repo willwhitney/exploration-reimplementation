@@ -41,7 +41,7 @@ def new(observation_spec, action_spec, max_obs=100000,
 
     # initialize this to some reasonable size
     # starting_size = 65536
-    starting_size = 4096
+    starting_size = 1024
     observations = jnp.zeros((starting_size, *concat_std.shape), dtype=DTYPE)
     weights = jnp.zeros((starting_size,))
     return DensityState(kernel_cov, observations, weights,
@@ -97,64 +97,85 @@ def update_batch(density_state: DensityState, states, actions):
         density_state = _grow_observations(density_state)
         obs_size = density_state.observations.shape[0]
 
-    # compute which states/actions to add as observations vs as weights
-    sims_per_obs = _similarity_per_obs_batch(density_state, states, actions)
-    new_states, new_actions = [], []
-    new_weights = np.zeros((obs_size,))
-    for (state, action, sims) in zip(states, actions, sims_per_obs):
-        similar_obs = sims > density_state.tolerance
-        n_similar_obs = similar_obs.sum()
-        if n_similar_obs >= 1:
-            new_weights += np.array(similar_obs) / n_similar_obs
-        else:
-            new_states.append(state)
-            new_actions.append(action)
+    with jax.profiler.TraceContext("kernel update similarity"):
+        # compute which states/actions to add as observations vs as weights
+        sims_per_obs = _similarity_per_obs_batch(density_state, states, actions)
+        sims_per_obs = np.array(sims_per_obs)
+
+    with jax.profiler.TraceContext("kernel update for"):
+        new_states, new_actions = [], []
+        new_weights = np.zeros((obs_size,))
+
+        for (state, action, sims) in zip(states, actions, sims_per_obs):
+            similar_obs = sims > density_state.tolerance
+            n_similar_obs = similar_obs.sum()
+            if n_similar_obs >= 1:
+                new_weights += np.array(similar_obs) / n_similar_obs
+            else:
+                new_states.append(state)
+                new_actions.append(action)
 
     if len(new_states) > 0:
-        new_states = jnp.stack(new_states)
-        new_actions = jnp.stack(new_actions)
-        next_slot = density_state.next_slot
+        with jax.profiler.TraceContext("kernel update new states"):
+            new_states = np.stack(new_states)
+            new_actions = np.stack(new_actions)
+            # next_slot = density_state.next_slot
 
-        if density_state.total < density_state.max_obs:
-            indices = jnp.arange(next_slot, next_slot + len(new_states))
-            indices = indices % density_state.max_obs
-        else:
-            # use random indices to avoid overwriting whole blocks
-            # TODO: pass an RNG key in here
-            rng = random.PRNGKey(density_state.next_slot)
-            indices = random.randint(rng, shape=(len(new_states),),
-                                     minval=0, maxval=density_state.max_obs)
-        density_state = _add_observations(density_state, indices,
-                                          new_states, new_actions)
+            # if density_state.total < density_state.max_obs:
+            #     indices = jnp.arange(next_slot, next_slot + len(new_states))
+            #     indices = indices % density_state.max_obs
+            # else:
+            #     # use random indices to avoid overwriting whole blocks
+            #     # TODO: pass an RNG key in here
+            #     rng = random.PRNGKey(density_state.next_slot)
+            #     indices = random.randint(rng, shape=(len(new_states),),
+            #                             minval=0, maxval=density_state.max_obs)
+            density_state = _add_observations(density_state,
+                                              new_states, new_actions)
 
-        if density_state.next_slot < next_slot:
-            print(f"Density wrapped next_slot from {next_slot} to "
-                  f"{density_state.next_slot}.")
+            # if density_state.next_slot < next_slot:
+            #     print(f"Density wrapped next_slot from {next_slot} to "
+            #         f"{density_state.next_slot}.")
 
     if new_weights.sum() > 0:
-        density_state = _add_weights(density_state, new_weights)
+        with jax.profiler.TraceContext("kernel update add weights"):
+            density_state = _add_weights(density_state, new_weights)
     return density_state
 
 
+@jax.profiler.trace_function
 @jax.jit
 def _add_weights(density_state: DensityState, new_weights):
     new_weights = density_state.weights + new_weights
     return density_state.replace(weights=new_weights)
 
 
+@jax.profiler.trace_function
 @jax.jit
-def _add_observations(density_state: DensityState, indices, states, actions):
+def _add_observations(density_state: DensityState, states, actions):
     bsize = states.shape[0]
     next_slot = density_state.next_slot
     observations = density_state.observations
     weights = density_state.weights
     obs_size = observations.shape[0]
 
+    use_linear_indices = density_state.total < density_state.max_obs
+    use_linear_indices = use_linear_indices.astype(int)
+
+    linear_indices = jnp.linspace(next_slot, next_slot + bsize - 1, bsize)
+    linear_indices = linear_indices.round().astype(int)
+    linear_indices = linear_indices % density_state.max_obs
+
+    # use random indices to avoid overwriting whole blocks
+    # TODO: pass an RNG key in here
+    rng = random.PRNGKey(density_state.next_slot)
+    random_indices = random.randint(rng, shape=(bsize,),
+                                    minval=0, maxval=density_state.max_obs)
+
+    indices = (use_linear_indices * linear_indices
+               + (1 - use_linear_indices) * random_indices)
+
     keys = _make_key_batch(states, actions)
-
-    # don't use arange because then you can't jit — size depends on next_slot
-    # indices = jnp.arange(next_slot, next_slot + bsize)
-
     observations = jax.ops.index_update(observations, indices, keys)
     weights = jax.ops.index_update(weights, indices, 1)
     total = jnp.minimum(density_state.total + bsize, obs_size)
@@ -188,6 +209,7 @@ def _grow_observations(density_state: DensityState):
     return density_state.replace(observations=observations, weights=weights)
 
 
+@jax.profiler.trace_function
 def _make_key(s, a):
     flat_s = utils.flatten_observation(s)
     flat_a = jnp.array(a).reshape((-1,))
@@ -207,6 +229,9 @@ _normal_pdf_batchedxmean = jax.vmap(_normal_pdf, in_axes=(0, None, 0))
 
 _batched_norm_pdf = jax.vmap(jax.scipy.stats.norm.pdf)
 
+
+@jax.profiler.trace_function
+@jax.jit
 def _normal_diag_pdf(mean, cov, x):
     diag_indices = jnp.diag_indices(cov.shape[0])
     variances = cov[diag_indices]

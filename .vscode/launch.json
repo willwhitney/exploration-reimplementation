@@ -4,12 +4,18 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
             "program": "${file}",
-            "console": "internalConsole"
+            "console": "internalConsole",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "3",
+                "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
+            }
+
         },
         {
             "name": "sac",

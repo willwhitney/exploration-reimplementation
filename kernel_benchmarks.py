@@ -71,7 +71,7 @@ def fill(density, density_state, n=50000, bsize=1):
 from densities import kernel_count
 from densities import knn_kernel_count
 
-for density in [knn_kernel_count]:
+for density in [kernel_count]:
     fill_bsize = 4096
     tolerance = 1.0
     for max_obs in [4096, 16384, 65536]:

@@ -200,6 +200,16 @@ def sample_uniform_actions(action_spec, rng, n):
                       minval=minval, maxval=maxval)
     return actions.reshape((n, *aspec_shape))
 
+@jax.partial(jax.jit, static_argnums=(2, 3))
+def sample_uniform_actions_batch(action_spec, rng, bsize, n):
+    total_actions = bsize * n
+    actions = sample_uniform_actions(
+        action_spec, rng, total_actions)
+    actions = actions.reshape((bsize, n, *actions.shape[1:]))
+    return actions
+
+# sample_uniform_actions_batch = jax.vmap(sample_uniform_actions,
+#                                         in_axes=(None, 0, None))
 
 # @jax.partial(jax.jit, static_argnums=(2,))
 def sample_uniform_single(spec, rng, n):
@@ -252,19 +262,19 @@ def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
         value which will represent that state.
     """
     rng = random.PRNGKey(0)
-    n_samples = min(5 * len(replay), 10000)
+    n_samples = min(2 * len(replay), 10000)
 
     action_shape = aspec.shape
     if len(action_shape) == 0:
         action_shape = (1,)
 
-    transitions = replay.sample(2 * n_samples)
+    transitions = replay.sample(5 * n_samples)
     states = transitions[0]
     actions = transitions[1]
     actions = actions.reshape((-1, *action_shape))
 
-    uniform_actions = sample_uniform_single(aspec, rng, n_samples)
-    actions[:n_samples] = uniform_actions
+    uniform_actions = sample_uniform_single(aspec, rng, 4 * n_samples)
+    actions[:len(uniform_actions)] = uniform_actions
 
     if use_uniform_states:
         sampled_flat_states = np.array(
