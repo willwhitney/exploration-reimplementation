@@ -53,6 +53,7 @@ class AgentState():
     warmup_steps: int
     optimistic_actions: bool
     uniform_update_candidates: bool
+    batch_size: int
     steps_since_tupdate: int = 0
 
 
@@ -175,10 +176,11 @@ def update_target_q(agent_state: AgentState):
 
 def uniform_update(agent_state: AgentState, rng):
     n_updates = agent_state.n_updates_per_step
+    batch_size = agent_state.batch_size
     rngs = random.split(rng, n_updates)
     for step_rng in rngs:
         transitions = tuple((jnp.array(el)
-                             for el in agent_state.replay.sample(128)))
+                             for el in agent_state.replay.sample(batch_size)))
         agent_state, losses = train_step(agent_state, transitions, step_rng)
         agent_state = agent_state.replace(
             steps_since_tupdate=agent_state.steps_since_tupdate + 1)
@@ -438,7 +440,6 @@ def main(args):
 
     state_shape = utils.flatten_spec_shape(j_observation_spec)
     action_shape = action_spec.shape
-    batch_size = 128
 
     # drawing only one candidate action sample from the policy
     # will result in following the policy directly
@@ -484,7 +485,8 @@ def main(args):
                              update_target_every=args.update_target_every,
                              warmup_steps=args.warmup_steps,
                              optimistic_actions=args.optimistic_actions,
-                             uniform_update_candidates=args.uniform_update_candidates)
+                             uniform_update_candidates=args.uniform_update_candidates,
+                             batch_size=args.batch_size)
 
     current_time = time.time()
     for episode in range(1, args.max_episodes + 1):
@@ -582,6 +584,7 @@ if __name__ == '__main__':
     parser.add_argument('--update_target_every', type=int, default=10)
     parser.add_argument('--warmup_steps', type=int, default=128)
     parser.add_argument('--uniform_update_candidates', action='store_true')
+    parser.add_argument('--batch_size', type=int, default=128)
 
     # tabular settings (also for vis)
     parser.add_argument('--n_state_bins', type=int, default=20)

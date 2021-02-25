@@ -68,8 +68,6 @@ def convert_dm_spec_single(spec):
         return BoundedArray(spec.shape,
                             spec.minimum,
                             spec.maximum)
-    elif isinstance(spec, dm_env.specs.BoundedArray):
-        return BoundedArray(spec.shape)
     else:
         # this case covers the fact that tree_map will apply this function
         # to the *properties* of a jax_specs.Array

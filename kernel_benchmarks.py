@@ -30,8 +30,8 @@ def profile_write(density, density_state, n=1000):
     rng = random.PRNGKey(0)
     states = utils.sample_uniform_actions(j_flat_ospec, rng, n)
     actions = utils.sample_uniform_actions(j_aspec, rng, n)
-    states = jnp.expand_dims(states, axis=1)
-    actions = jnp.expand_dims(actions, axis=1)
+    states = np.array(jnp.expand_dims(states, axis=1))
+    actions = np.array(jnp.expand_dims(actions, axis=1))
 
     start = time.time()
     for i in range(n):
@@ -45,18 +45,17 @@ def profile_read(density, density_state, n=1000, qsize=128*64):
     rng = random.PRNGKey(0)
     query_states = utils.sample_uniform_actions(j_flat_ospec, rng, qsize)
     query_actions = utils.sample_uniform_actions(j_aspec, rng, qsize)
-    # states = states.reshape((n, qsize, states.shape[1:]))
-    # actions = actions.reshape((n, qsize, actions.shape[1:]))
+    query_states = np.array(query_states)
+    query_actions = np.array(query_actions)
 
+    counts = []
     start = time.time()
     for i in range(n):
-        # query_states = states[i]
-        # query_actions = actions[i]
         count = density.get_count_batch(density_state, query_states, query_actions)
-        _ = float(count.sum())
+        counts.append(float(count.sum()))
     end = time.time()
     elapsed = end - start
-    return elapsed
+    return elapsed, np.array(counts).mean()
 
 
 def fill(density, density_state, n=50000, bsize=1):
@@ -71,10 +70,10 @@ def fill(density, density_state, n=50000, bsize=1):
 from densities import kernel_count
 from densities import knn_kernel_count
 
-for density in [kernel_count]:
+for density in [knn_kernel_count]:
     fill_bsize = 4096
     tolerance = 1.0
-    for max_obs in [4096, 16384, 65536]:
+    for max_obs in [4096, 16384]:
     # max_obs =
     # for tolerance in [0.99]:
         print((f"{env_name} {task_name} {density.__name__} "
@@ -85,7 +84,7 @@ for density in [kernel_count]:
 
         density_state, elapsed_write_empty = profile_write(density,
                                                         density_state)
-        elapsed_read_empty = profile_read(density, density_state)
+        elapsed_read_empty, mean_count_empty = profile_read(density, density_state)
 
         density_state = fill(density, density_state,
                             n=min(50000, max_obs), bsize=fill_bsize)
@@ -93,13 +92,13 @@ for density in [kernel_count]:
 
         density_state, elapsed_write_full = profile_write(density,
                                                         density_state)
-        elapsed_read_full = profile_read(density, density_state)
+        elapsed_read_full, mean_count_full = profile_read(density, density_state)
 
 
         print(f"Write empty: {elapsed_write_empty :.2f}")
-        print(f"Read empty: {elapsed_read_empty :.2f}")
+        print(f"Read empty: {elapsed_read_empty :.2f}, Count: {mean_count_empty :.8f}")
         print(f"Write full: {elapsed_write_full :.2f}")
-        print(f"Read full: {elapsed_read_full :.2f}")
+        print(f"Read full: {elapsed_read_full :.2f}, Count: {mean_count_full :.8f}")
         print()
 
 """

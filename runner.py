@@ -5,60 +5,62 @@ import asyncio
 import copy
 import numpy as np
 
-GPUS = [0, 1, 2, 3]
+GPUS = [2, 3]
 MULTIPLEX = 1
 
 excluded_flags = []
 
-# basename = "pv100_updates"
-# grid = [
-#     {
-#         # define the task
-#         "_main": ["main_jit_density.py"],
-#         "eval_every": [1],
-#         "env": ["point"],
-#         "task": ["velocity"],
-#         "max_steps": [100],
+basename = "pv100_500_updates_batch1024"
+grid = [
+    {
+        # define the task
+        "_main": ["main_jit_density.py"],
+        "eval_every": [1],
+        "env": ["point"],
+        "task": ["velocity"],
+        "max_steps": [100],
 
-#         # density settings
-#         "density": ["kernel_count"],
-#         "density_state_scale": [1e-2],
-#         "density_action_scale": [1],
-#         "density_max_obs": [8192],
-#         "density_tolerance": [0.95],
-#         "n_updates_per_step": [5],
-#         "update_target_every": [5],
+        # density settings
+        "density": ["kernel_count"],
+        "density_state_scale": [1e-2],
+        "density_action_scale": [1],
+        "density_max_obs": [8192],
+        "density_tolerance": [0.95],
+        "n_updates_per_step": [10],
+        "update_target_every": [10],
 
-#         # task policy settings
-#         "policy": ["sac"],
+        # task policy settings
+        "policy": ["sac"],
 
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#     },
-#     {
-#         # define the task
-#         "_main": ["main_jit_density.py"],
-#         "eval_every": [1],
-#         "env": ["point"],
-#         "task": ["velocity"],
-#         "max_steps": [100],
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "batch_size": [1024],
+    },
+    {
+        # define the task
+        "_main": ["main_jit_density.py"],
+        "eval_every": [1],
+        "env": ["point"],
+        "task": ["velocity"],
+        "max_steps": [100],
 
-#         # density settings
-#         "density": ["kernel_count"],
-#         "density_state_scale": [1e-2],
-#         "density_action_scale": [1],
-#         "density_max_obs": [8192],
-#         "density_tolerance": [0.95],
-#         "n_updates_per_step": [2],
-#         "update_target_every": [2],
+        # density settings
+        "density": ["kernel_count"],
+        "density_state_scale": [1e-2],
+        "density_action_scale": [1],
+        "density_max_obs": [8192],
+        "density_tolerance": [0.95],
+        "n_updates_per_step": [1],
+        "update_target_every": [1],
 
-#         # task policy settings
-#         "policy": ["sac"],
+        # task policy settings
+        "policy": ["sac"],
 
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#     },
-# ]
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "batch_size": [1024],
+    },
+]
 
 
 # basename = "acrobot_swingup"
@@ -86,7 +88,7 @@ excluded_flags = []
 #     },
 # ]
 
-# basename = "hopper_speedy_sizes"
+# basename = "hopper_derp"
 # grid = [
 #     {
 #         # define the task
@@ -140,35 +142,35 @@ excluded_flags = []
 #     },
 # ]
 
-basename = "manipulator"
-grid = [
-    {
-        # define the task
-        "_main": ["main_jit_density.py"],
-        "eval_every": [10],
-        "env": ["manipulator"],
-        "task": ["bring_ball"],
-        "max_steps": [1000],
-        "max_episodes": [10000],
-        "no_exploration": [False],
-        "seed": [0, 1],
+# basename = "manipulator_v1"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main_jit_density.py"],
+#         "eval_every": [10],
+#         "env": ["manipulator"],
+#         "task": ["bring_ball"],
+#         "max_steps": [1000],
+#         "max_episodes": [10000],
+#         "no_exploration": [False],
+#         "seed": [0, 1],
 
-        # density settings
-        "density": ["kernel_count"],
-        "density_state_scale": [1, 0.3],
-        "density_action_scale": [1],
-        "density_max_obs": [4096],
-        "density_tolerance": [0.2],
+#         # density settings
+#         "density": ["kernel_count"],
+#         "density_state_scale": [1, 0.3],
+#         "density_action_scale": [1],
+#         "density_max_obs": [4096],
+#         "density_tolerance": [0.2],
 
-        # task policy settings
-        "policy": ["sac"],
+#         # task policy settings
+#         "policy": ["sac"],
 
-        # novelty Q settings
-        "uniform_update_candidates": [True],
-        "n_updates_per_step": [5],
-        "update_target_every": [5],
-    },
-]
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [5],
+#         "update_target_every": [5],
+#     },
+# ]
 
 
 def construct_varying_keys(grids):

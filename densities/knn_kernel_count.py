@@ -15,14 +15,14 @@ class DensityState:
     kernel_cov: jnp.ndarray
     index: typing.Any
     weights: jnp.ndarray
-    max_obs: int = 100000
+    max_obs: int = 1000000
     scale_factor: float = 1.0
     total: int = 0
     next_slot: int = 0
     k: int = 16
 
 
-def new(observation_spec, action_spec, max_obs=100000,
+def new(observation_spec, action_spec, max_obs=1000000,
         state_std_scale=1, action_std_scale=1, **kwargs):
     flat_ospec = utils.flatten_observation_spec(observation_spec)
     state_std = flat_ospec.maximum - flat_ospec.minimum
@@ -49,8 +49,9 @@ def new(observation_spec, action_spec, max_obs=100000,
 
     # index = faiss.IndexFlatL2(key_dim)
 
-    index = faiss.IndexHNSWFlat(key_dim, 32)
-    index.hnsw.efConstruction = 20
+    index = faiss.IndexHNSWFlat(key_dim, 16)
+    index.hnsw.efConstruction = 40
+    index.hnsw.efSearch = 5
 
     # index = faiss.index_factory(key_dim, "IVF1024,HNSW")
 
@@ -216,8 +217,8 @@ def _find_similarities_batch(density_state: DensityState, states, actions):
 
 @jax.profiler.trace_function
 def get_count(density_state: DensityState, state, action):
-    states = jnp.expand_dims(state, axis=0)
-    actions = jnp.expand_dims(action, axis=0)
+    states = np.expand_dims(state, axis=0)
+    actions = np.expand_dims(action, axis=0)
     return get_count_batch(density_state, states, actions)[0]
 
 
@@ -235,6 +236,7 @@ def get_count_batch(density_state: DensityState, states, actions):
 
 
 @jax.profiler.trace_function
+@jax.jit
 def _make_key(s, a):
     flat_s = utils.flatten_observation(s)
     flat_a = jnp.array(a).reshape((-1,))

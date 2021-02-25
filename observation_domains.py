@@ -100,6 +100,7 @@ DOMAINS = {
                                      minimum=np.array([-20, -20]),
                                      maximum=np.array([20, 20])),
         }),
+    },
     'manipulator': {
         'bring_ball': OrderedDict({
             'arm_pos': BoundedArray(name='arm_pos', shape=(8, 2),
