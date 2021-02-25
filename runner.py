@@ -10,57 +10,33 @@ MULTIPLEX = 1
 
 excluded_flags = []
 
-# basename = "pv100_500_knn"
-# grid = [
-#     {
-#         # define the task
-#         "_main": ["main.py"],
-#         "eval_every": [1],
-#         "env": ["point"],
-#         "task": ["velocity"],
-#         "max_steps": [100],
+basename = "pv100_stabilize"
+grid = [
+    {
+        # define the task
+        "_main": ["main_jit_density.py"],
+        "eval_every": [1],
+        "env": ["point"],
+        "task": ["velocity"],
+        "max_steps": [100],
+        "seed": list(range(4)),
 
-#         # density settings
-#         "density": ["knn_kernel_count"],
-#         "density_state_scale": [1e-2],
-#         "density_action_scale": [1],
-#         "density_max_obs": [8192],
-#         "density_tolerance": [0.95],
-#         "n_updates_per_step": [10],
-#         "update_target_every": [10],
+        # density settings
+        "density": ["kernel_count"],
+        "density_state_scale": [1e-2],
+        "density_action_scale": [1],
+        "density_max_obs": [8192],
+        "density_tolerance": [0.95],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
 
-#         # task policy settings
-#         "policy": ["sac"],
+        # task policy settings
+        "policy": ["sac"],
 
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#         "batch_size": [1024],
-#     },
-#     {
-#         # define the task
-#         "_main": ["main.py"],
-#         "eval_every": [1],
-#         "env": ["point"],
-#         "task": ["velocity"],
-#         "max_steps": [100],
-
-#         # density settings
-#         "density": ["knn_kernel_count"],
-#         "density_state_scale": [1e-2],
-#         "density_action_scale": [1],
-#         "density_max_obs": [8192],
-#         "density_tolerance": [0.95],
-#         "n_updates_per_step": [1],
-#         "update_target_every": [1],
-
-#         # task policy settings
-#         "policy": ["sac"],
-
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#         "batch_size": [1024],
-#     },
-# ]
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+    },
+]
 
 
 # basename = "acrobot_swingup"
@@ -143,35 +119,35 @@ excluded_flags = []
 # ]
 
 
-basename = "manipulator_v2"
-grid = [
-    {
-        # define the task
-        "_main": ["main_jit_density.py"],
-        "eval_every": [1],
-        "env": ["manipulator"],
-        "task": ["bring_ball"],
-        "max_steps": [1000],
-        "max_episodes": [10000],
-        "no_exploration": [False],
-        "seed": [0],
+# basename = "manipulator_v3"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main_jit_density.py"],
+#         "eval_every": [1],
+#         "env": ["manipulator"],
+#         "task": ["bring_ball"],
+#         "max_steps": [1000],
+#         "max_episodes": [10000],
+#         "no_exploration": [False],
+#         "seed": [0],
 
-        # density settings
-        "density": ["kernel_count"],
-        "density_state_scale": [3, 1],
-        "density_action_scale": [1],
-        "density_max_obs": [4096],
-        "density_tolerance": [0.2, 0.1],
+#         # density settings
+#         "density": ["kernel_count"],
+#         "density_state_scale": [3, 1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [4096],
+#         "density_tolerance": [0.2, 0.1],
 
-        # task policy settings
-        "policy": ["sac"],
+#         # task policy settings
+#         "policy": ["sac"],
 
-        # novelty Q settings
-        "uniform_update_candidates": [True],
-        "n_updates_per_step": [5],
-        "update_target_every": [5],
-    },
-]
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [5],
+#         "update_target_every": [5],
+#     },
+# ]
 
 
 def construct_varying_keys(grids):

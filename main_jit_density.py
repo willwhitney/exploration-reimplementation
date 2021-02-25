@@ -458,8 +458,8 @@ def main(args):
     density_state = density.new(observation_spec, action_spec,
                                 state_bins=args.n_state_bins,
                                 action_bins=args.n_action_bins,
-                                state_std_scale=args.density_state_scale,
-                                action_std_scale=args.density_action_scale,
+                                state_scale=args.density_state_scale,
+                                action_scale=args.density_action_scale,
                                 max_obs=args.density_max_obs,
                                 tolerance=args.density_tolerance,)
 

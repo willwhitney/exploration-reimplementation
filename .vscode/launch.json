@@ -25,11 +25,12 @@
             "program": "main_jit_density.py",
             "console": "internalConsole",
             "args": [
-                "--env", "point",
-                "--task", "velocity",
+                "--env", "manipulator",
+                "--task", "bring_ball",
                 "--max_steps", "100",
                 "--density", "kernel_count",
                 "--policy", "sac",
+                "--debug"
             ],
             "env": {
                 "CUDA_VISIBLE_DEVICES": "3"

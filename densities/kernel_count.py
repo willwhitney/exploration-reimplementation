@@ -6,6 +6,7 @@ from jax import numpy as jnp, random, lax
 from flax import struct
 
 import utils
+import jax_specs
 
 
 DTYPE = jnp.float16
@@ -16,6 +17,10 @@ class DensityState:
     kernel_cov: jnp.ndarray
     observations: jnp.ndarray
     weights: jnp.ndarray
+    state_rescale: jnp.ndarray
+    action_rescale: jnp.ndarray
+    state_shift: jnp.ndarray
+    action_shift: jnp.ndarray
     total: int = 0
     next_slot: int = 0
     max_obs: int = 100000
@@ -24,17 +29,23 @@ class DensityState:
 
 
 def new(observation_spec, action_spec, max_obs=100000,
-        state_std_scale=1, action_std_scale=1, tolerance=0.95,
+        state_scale=1, action_scale=1, tolerance=0.95,
         **kwargs):
     flat_ospec = utils.flatten_observation_spec(observation_spec)
-    state_std = flat_ospec.maximum - flat_ospec.minimum
-    action_std = np.array(action_spec.maximum - action_spec.minimum)
-    action_std = action_std.reshape((-1,))
+    j_flat_ospec = jax_specs.convert_dm_spec(flat_ospec)
+    j_aspec = jax_specs.convert_dm_spec(action_spec)
 
-    state_std = state_std_scale * state_std
-    action_std = action_std_scale * action_std
-    concat_std = jnp.concatenate([state_std, action_std], axis=0)
-    kernel_cov = jnp.diag(concat_std ** 2)
+    state_rescale = state_scale * (j_flat_ospec.maximum - j_flat_ospec.minimum)
+    action_rescale = action_scale * (j_aspec.maximum - j_aspec.minimum)
+    state_shift = j_flat_ospec.minimum
+    action_shift = j_aspec.minimum
+
+    # print(state_scale)
+    # print(state_rescale)
+    # print(state_shift)
+
+    key_shape = j_flat_ospec.shape[0] + j_aspec.shape[0]
+    kernel_cov = jnp.eye(key_shape)
 
     # calculate a scalar to shift the max to 1
     max_pdf = _max_pdf_value(kernel_cov)
@@ -43,15 +54,19 @@ def new(observation_spec, action_spec, max_obs=100000,
     # initialize this to some reasonable size
     # starting_size = 65536
     starting_size = 1024
-    observations = jnp.zeros((starting_size, *concat_std.shape), dtype=DTYPE)
+    observations = jnp.zeros((starting_size, key_shape), dtype=DTYPE)
     weights = jnp.zeros((starting_size,))
     return DensityState(kernel_cov, observations, weights,
-                        max_obs=int(max_obs), scale_factor=scale_factor,
+                        state_rescale=state_rescale,
+                        action_rescale=action_rescale,
+                        state_shift=state_shift,
+                        action_shift=action_shift,
+                        max_obs=int(max_obs),
+                        scale_factor=scale_factor,
                         tolerance=tolerance)
 
 
 def _max_pdf_value(cov):
-    k = cov.shape[0]
     return jnp.linalg.det(cov) ** (- 1/2)
 
 
@@ -60,7 +75,7 @@ def _max_pdf_value(cov):
 def _similarity_per_obs(density_state: DensityState, state, action):
     """Put one unit of count on the space at every observation.
     Fall-off from that is specified by the covariance."""
-    key = _make_key(state, action)
+    key = _make_key(density_state, state, action)
     observations = density_state.observations
     obs_size = observations.shape[0]
 
@@ -69,8 +84,6 @@ def _similarity_per_obs(density_state: DensityState, state, action):
 
     diag_probs_per_obs = _scaled_normal_diag_pdf_batchedmean(
         observations, density_state.kernel_cov, key)
-    # probs_per_obs = _normal_pdf_batchedmean(
-    #     observations, density_state.kernel_cov, key)
     weighted_obs = mask * diag_probs_per_obs * density_state.scale_factor
     return weighted_obs
 _similarity_per_obs_batch = jax.profiler.trace_function(
@@ -124,23 +137,8 @@ def update_batch(density_state: DensityState, states, actions):
         with jax.profiler.TraceContext("kernel update new states"):
             new_states = np.stack(new_states)
             new_actions = np.stack(new_actions)
-            # next_slot = density_state.next_slot
-
-            # if density_state.total < density_state.max_obs:
-            #     indices = jnp.arange(next_slot, next_slot + len(new_states))
-            #     indices = indices % density_state.max_obs
-            # else:
-            #     # use random indices to avoid overwriting whole blocks
-            #     # TODO: pass an RNG key in here
-            #     rng = random.PRNGKey(density_state.next_slot)
-            #     indices = random.randint(rng, shape=(len(new_states),),
-            #                             minval=0, maxval=density_state.max_obs)
             density_state = _add_observations(density_state,
                                               new_states, new_actions)
-
-            # if density_state.next_slot < next_slot:
-            #     print(f"Density wrapped next_slot from {next_slot} to "
-            #         f"{density_state.next_slot}.")
 
     if new_weights.sum() > 0:
         with jax.profiler.TraceContext("kernel update add weights"):
@@ -180,7 +178,7 @@ def _add_observations(density_state: DensityState, states, actions):
     indices = (use_linear_indices * linear_indices
                + (1 - use_linear_indices) * random_indices)
 
-    keys = _make_key_batch(states, actions)
+    keys = _make_key_batch(density_state, states, actions)
     observations = jax.ops.index_update(observations, indices, keys)
     weights = jax.ops.index_update(weights, indices, 1)
     total = jnp.minimum(density_state.total + bsize, obs_size)
@@ -215,11 +213,14 @@ def _grow_observations(density_state: DensityState):
 
 
 @jax.profiler.trace_function
-def _make_key(s, a):
+def _make_key(density_state: DensityState, s, a):
     flat_s = utils.flatten_observation(s)
     flat_a = jnp.array(a).reshape((-1,))
-    return jnp.concatenate([flat_s, flat_a], axis=0).astype(DTYPE)
-_make_key_batch = jax.vmap(_make_key)
+    normalized_s = (flat_s - density_state.state_shift) / density_state.state_rescale
+    normalized_a = (flat_a - density_state.action_shift) / density_state.action_rescale
+    # normalized_a = utils.normalize(flat_a, density_state.j_aspec)
+    return jnp.concatenate([normalized_s, normalized_a], axis=0).astype(DTYPE)
+_make_key_batch = jax.vmap(_make_key, in_axes=(None, 0, 0))
 
 
 @jax.jit
@@ -260,15 +261,15 @@ if __name__ == "__main__":
     import jax_specs
     import point
 
-    # env = suite.load('point_mass', 'easy')
-    # ospec = DOMAINS['point_mass']['easy']
-    env = suite.load('point', 'velocity')
-    ospec = DOMAINS['point']['velocity']
+    env_name = 'point'
+    task_name = 'velocity'
+    env = suite.load(env_name, task_name)
+    ospec = DOMAINS[env_name][task_name]
 
     aspec = env.action_spec()
     j_aspec = jax_specs.convert_dm_spec(aspec)
     j_ospec = jax_specs.convert_dm_spec(ospec)
-    density_state = new(ospec, aspec, state_std_scale=1e-1, action_std_scale=1)
+    density_state = new(ospec, aspec, state_scale=0.01, action_scale=1)
     # import ipdb; ipdb.set_trace()
 
     timestep = env.reset()
@@ -299,17 +300,14 @@ if __name__ == "__main__":
     timestep2 = env.step(jnp.ones(aspec.shape))
     state2 = utils.flatten_observation(timestep2.observation)
 
-    # print("S1 pdf:", pdf(density_state, state, action))
     print("S1 count:", get_count(density_state, state, action))
 
-    # print("S2 pdf:", pdf(density_state, state2, action))
     print("S2 count:", get_count(density_state, state2, action))
     density_state_updated = update_batch(density_state,
                                          jnp.expand_dims(state2, axis=0),
                                          jnp.expand_dims(action, axis=0))
-    # print("S2 pdf after self update:", pdf(density_state_updated, state2, action))
     print("S2 count after self update:", get_count(density_state_updated,
-                                                   state2, action))
+                                                state2, action))
 
     print("Batch of counts:", get_count_batch(density_state_updated,
                                               jnp.stack([state, state2]),
@@ -336,7 +334,7 @@ if __name__ == "__main__":
     # ax.set_xlabel('x')
     # ax.set_ylabel('y')
     # ax.set_zlabel('z')
-    # fig.savefig('kernel_3d.png')
+    # fig.savefig('results/kernel_3d.png')
 
 
 
