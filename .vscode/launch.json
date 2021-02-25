@@ -5,6 +5,7 @@
     "version": "0.2.0",
     "configurations": [
 
+
         {
             "name": "Python: Current File",
             "type": "python",
@@ -28,6 +29,23 @@
                 "--task", "velocity",
                 "--max_steps", "100",
                 "--density", "kernel_count",
+                "--policy", "sac",
+            ],
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "3"
+            }
+        },
+        {
+            "name": "sac knn",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "console": "internalConsole",
+            "args": [
+                "--env", "point",
+                "--task", "velocity",
+                "--max_steps", "100",
+                "--density", "knn_kernel_count",
                 "--policy", "sac",
             ],
             "env": {

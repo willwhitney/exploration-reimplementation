@@ -52,7 +52,7 @@ def new(observation_spec, action_spec, max_obs=100000,
 
 def _max_pdf_value(cov):
     k = cov.shape[0]
-    return (2 * jnp.pi) ** (-k / 2) * jnp.linalg.det(cov) ** (- 1/2)
+    return jnp.linalg.det(cov) ** (- 1/2)
 
 
 @jax.profiler.trace_function
@@ -67,13 +67,15 @@ def _similarity_per_obs(density_state: DensityState, state, action):
     mask = jnp.linspace(0, obs_size - 1, obs_size) < density_state.total
     mask = mask.astype(jnp.int32)
 
-    diag_probs_per_obs = _normal_diag_pdf_batchedmean(
+    diag_probs_per_obs = _scaled_normal_diag_pdf_batchedmean(
         observations, density_state.kernel_cov, key)
     # probs_per_obs = _normal_pdf_batchedmean(
     #     observations, density_state.kernel_cov, key)
     weighted_obs = mask * diag_probs_per_obs * density_state.scale_factor
     return weighted_obs
-_similarity_per_obs_batch = jax.vmap(_similarity_per_obs, in_axes=(None, 0, 0))
+_similarity_per_obs_batch = jax.profiler.trace_function(
+    jax.vmap(_similarity_per_obs, in_axes=(None, 0, 0)),
+    name="_similarity_per_obs_batch")
 
 
 @jax.profiler.trace_function
@@ -85,7 +87,9 @@ def get_count(density_state: DensityState, state, action):
     count_per_obs = density_state.weights * sim_per_obs
     count = count_per_obs.sum()
     return count
-get_count_batch = jax.vmap(get_count, in_axes=(None, 0, 0))
+get_count_batch = jax.profiler.trace_function(
+    jax.vmap(get_count, in_axes=(None, 0, 0)),
+    name="get_count_batch")
 
 
 @jax.profiler.trace_function
@@ -233,16 +237,20 @@ _batched_norm_pdf = jax.vmap(jax.scipy.stats.norm.pdf)
 
 @jax.profiler.trace_function
 @jax.jit
-def _normal_diag_pdf(mean, cov, x):
+def _scaled_normal_diag_pdf(mean, cov, x):
     diag_indices = jnp.diag_indices(cov.shape[0])
     variances = cov[diag_indices]
-    axis_probs = _batched_norm_pdf(x, mean, variances**0.5)
+    scale = jnp.sqrt(2 * jnp.pi)
+    axis_probs = _batched_norm_pdf(x, mean, variances**0.5) * scale
     return axis_probs.prod()
 # for evaluating one x at many means:
-_normal_diag_pdf_batchedmean = jax.vmap(_normal_diag_pdf, in_axes=(0, None, None))
+_scaled_normal_diag_pdf_batchedmean = jax.vmap(_scaled_normal_diag_pdf,
+                                               in_axes=(0, None, None))
 # for evaluating many xs at a single mean:
-_normal_diag_pdf_batchedx = jax.vmap(_normal_diag_pdf, in_axes=(None, None, 0))
-_normal_diag_pdf_batchedxmean = jax.vmap(_normal_diag_pdf, in_axes=(0, None, 0))
+_scaled_normal_diag_pdf_batchedx = jax.vmap(_scaled_normal_diag_pdf,
+                                            in_axes=(None, None, 0))
+_scaled_normal_diag_pdf_batchedxmean = jax.vmap(_scaled_normal_diag_pdf,
+                                                in_axes=(0, None, 0))
 
 
 

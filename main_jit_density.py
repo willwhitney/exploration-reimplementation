@@ -155,8 +155,6 @@ def train_step(agent_state: AgentState, transitions, rng):
                 n_update_candidates, True)
             agent_state = agent_state.replace(policy_state=policy_state)
 
-    # if I don't cast these to bool JAX will recompile the jitted
-    # function train_step_candidates on every call
     with jax.profiler.TraceContext("train_step_candidates"):
         exploration_state, losses = train_step_candidates(
             agent_state.exploration_state,
@@ -166,6 +164,7 @@ def train_step(agent_state: AgentState, transitions, rng):
     return agent_state, losses
 
 
+@jax.profiler.trace_function
 def update_target_q(agent_state: AgentState):
     exploration_state = agent_state.exploration_state.replace(
         target_novq_state=agent_state.exploration_state.novq_state)
@@ -174,6 +173,7 @@ def update_target_q(agent_state: AgentState):
     return agent_state
 
 
+@jax.profiler.trace_function
 def uniform_update(agent_state: AgentState, rng):
     n_updates = agent_state.n_updates_per_step
     batch_size = agent_state.batch_size
@@ -212,6 +212,7 @@ def update_exploration(agent_state, rng, transition_id):
     return agent_state
 
 
+@jax.profiler.trace_function
 def compute_weight(prior_count, count):
     root_real_count = count ** 0.5
     # root_prior_count = prior_count ** 0.5
@@ -235,12 +236,15 @@ def predict_optimistic_value(novq_state, density_state, prior_count,
     weight = compute_weight(prior_count, count)
     optimistic_value = weight * predicted_value + (1 - weight) * R_MAX
     return optimistic_value
-predict_optimistic_value_batch = jax.vmap(  # noqa: E305
-    predict_optimistic_value, in_axes=(None, None, None, 0, 0))
-predict_optimistic_values = jax.vmap(
-    predict_optimistic_value, in_axes=(None, None, None, None, 0))
-predict_optimistic_values_batch = jax.vmap(  # noqa: E305
-    predict_optimistic_values, in_axes=(None, None, None, 0, 0))
+predict_optimistic_value_batch = jax.profiler.trace_function(
+    jax.vmap(predict_optimistic_value, in_axes=(None, None, None, 0, 0)),
+    name="predict_optimistic_value_batch")
+predict_optimistic_values = jax.profiler.trace_function(
+    jax.vmap(predict_optimistic_value, in_axes=(None, None, None, None, 0)),
+    name="predict_optimistic_values")
+predict_optimistic_values_batch = jax.profiler.trace_function(
+    jax.vmap(predict_optimistic_values, in_axes=(None, None, None, 0, 0)),
+    name="predict_optimistic_values_batch")
 
 
 @jax.profiler.trace_function
@@ -404,7 +408,6 @@ def display_state(agent_state: AgentState, ospec, aspec,
             agent_state.replay,
             ospec, aspec, bins=bins)
         subfigs.append((taskq_map, "Task value (max)"))
-
 
     # dump the raw data for later rendering
     raw_path = f"{savedir}/data/{episode}.pkl"

@@ -36,8 +36,6 @@ class ExplorationState():
     temperature: float
     update_temperature: float
     prior_count: float
-    optimistic_updates: bool
-    target_network: bool
 
 
 @struct.dataclass
@@ -47,12 +45,15 @@ class AgentState():
     exploration_state: ExplorationState
     policy_state: Any = struct.field(pytree_node=False)
     replay: Any = struct.field(pytree_node=False)
+    j_action_spec: Any
     n_candidates: int
     n_update_candidates: int
-    prioritized_update: bool
+    n_updates_per_step: int
     update_target_every: int
     warmup_steps: int
     optimistic_actions: bool
+    uniform_update_candidates: bool
+    batch_size: int
     steps_since_tupdate: int = 0
 
 
@@ -137,7 +138,7 @@ def train_step_candidates(exploration_state: ExplorationState,
 
 
 @jax.profiler.trace_function
-def train_step(agent_state, transitions):
+def train_step(agent_state: AgentState, transitions, rng):
     """A full (optimistic) training step for the exploration Q function."""
     states, actions, next_states, rewards = transitions
 
@@ -145,94 +146,23 @@ def train_step(agent_state, transitions):
     with jax.profiler.TraceContext("get n_update_candidates"):
         n_update_candidates = int(agent_state.n_update_candidates)
     with jax.profiler.TraceContext("get candidates"):
-        policy_state, candidate_next_actions = policy.action_fn(
-            agent_state.policy_state, next_states,
-            n_update_candidates, True)
-        agent_state = agent_state.replace(policy_state=policy_state)
+        if agent_state.uniform_update_candidates:
+            candidate_next_actions = utils.sample_uniform_actions_batch(
+                agent_state.j_action_spec, rng,
+                states.shape[0], n_update_candidates)
+        else:
+            policy_state, candidate_next_actions = policy.action_fn(
+                agent_state.policy_state, next_states,
+                n_update_candidates, True)
+            agent_state = agent_state.replace(policy_state=policy_state)
 
-    # import ipdb; ipdb.set_trace()
-    # somehow if I don't cast these to bool JAX will recompile the jitted
-    # function train_step_candidates on every call...
     with jax.profiler.TraceContext("train_step_candidates"):
         exploration_state, losses = train_step_candidates(
             agent_state.exploration_state,
             transitions,
-            candidate_next_actions,
-            bool(agent_state.exploration_state.target_network),
-            bool(agent_state.exploration_state.optimistic_updates))
+            candidate_next_actions)
     agent_state = agent_state.replace(exploration_state=exploration_state)
     return agent_state, losses
-
-
-@jax.profiler.trace_function
-def prioritized_update(agent_state: AgentState, last_transition_id):
-    pqueue = queue.PriorityQueue()
-    pqueue.put((0, last_transition_id))
-    replay = agent_state.replay
-
-    error_threshold = 1e-1
-    max_depth = 16
-    max_bsize = 128
-
-    visited = set()
-
-    def largest_pow(n):
-        if n == 0:
-            return 0
-        else:
-            return int(math.pow(2, int(math.log(n, 2))))
-
-    def next_batch():
-        queue_size = pqueue.qsize()
-
-        # only use power-of-two batch sizes to limit the number of JIT
-        # recompiles inside train_step
-        batch_size = min(largest_pow(queue_size), max_bsize)
-
-        transition_ids = []
-        while len(transition_ids) < batch_size:
-            try:
-                _, transition_id = pqueue.get_nowait()
-                # if transition_id not in visited:
-                transition_ids.append(transition_id)
-                # visited.add(transition_id)
-            except queue.Empty:
-                break
-
-        if len(transition_ids) > 0:
-            transitions = replay.get_transitions(np.array(transition_ids))
-            return transitions
-        else:
-            return None
-
-    def queue_predecessors(s, loss):
-        preceding_ids = replay.predecessors(s)
-        for preceding_id in preceding_ids:
-            if preceding_id not in visited:
-                pqueue.put((-loss, preceding_id))
-                visited.add(preceding_id)
-
-    n_updates = 0
-    # update the tree up to a max depth
-    for step in range(max_depth):
-        # get the highest-priority transitions from the queue
-        transitions = next_batch()
-        if transitions is None:
-            break
-
-        # update on the current batch of transitions
-        agent_state, losses = train_step(agent_state, transitions)
-        n_updates += len(losses)
-
-        # check the loss for each transition
-        for i, loss in enumerate(losses):
-            if loss > error_threshold:
-                start_state = transitions[0][i]
-
-                # add predecessors of transitions with large loss to the queue
-                queue_predecessors(start_state, loss)
-    # print(f"Max depth: {step}, total updates: {n_updates}")
-    return agent_state
 
 
 @jax.profiler.trace_function
@@ -245,11 +175,13 @@ def update_target_q(agent_state: AgentState):
 
 
 @jax.profiler.trace_function
-def uniform_update(agent_state, rng):
-    for _ in range(10):
-        transitions = tuple((jnp.array(el)
-                             for el in agent_state.replay.sample(128)))
-        agent_state, losses = train_step(agent_state, transitions)
+def uniform_update(agent_state: AgentState, rng):
+    n_updates = agent_state.n_updates_per_step
+    batch_size = agent_state.batch_size
+    rngs = random.split(rng, n_updates)
+    for step_rng in rngs:
+        transitions = agent_state.replay.sample(batch_size)
+        agent_state, losses = train_step(agent_state, transitions, step_rng)
         agent_state = agent_state.replace(
             steps_since_tupdate=agent_state.steps_since_tupdate + 1)
         if agent_state.steps_since_tupdate >= agent_state.update_target_every:
@@ -265,8 +197,8 @@ def update_exploration(agent_state, rng, transition_id):
     with jax.profiler.TraceContext("update density"):
         exploration_state = agent_state.exploration_state
         density_state = density.update_batch(exploration_state.density_state,
-                                            jnp.expand_dims(s, axis=0),
-                                            jnp.expand_dims(a, axis=0))
+                                             np.expand_dims(s, axis=0),
+                                             np.expand_dims(a, axis=0))
         exploration_state = exploration_state.replace(
             density_state=density_state)
         agent_state = agent_state.replace(exploration_state=exploration_state)
@@ -275,11 +207,8 @@ def update_exploration(agent_state, rng, transition_id):
         # update exploration Q to consistency with new density
         rng, novq_rng = random.split(rng)
 
-        if agent_state.prioritized_update:
-            agent_state = prioritized_update(agent_state, transition_id)
-        else:
-            with jax.profiler.TraceContext("uniform update"):
-                agent_state = uniform_update(agent_state, novq_rng)
+        with jax.profiler.TraceContext("uniform update"):
+            agent_state = uniform_update(agent_state, novq_rng)
     return agent_state
 
 
@@ -295,8 +224,8 @@ compute_weight_batch = jax.vmap(compute_weight, in_axes=(None, 0))
 @jax.profiler.trace_function
 def predict_optimistic_value(novq_state, density_state, prior_count,
                              state, action):
-    expanded_state = jnp.expand_dims(state, axis=0)
-    expanded_action = jnp.expand_dims(action, axis=0)
+    expanded_state = np.expand_dims(state, axis=0)
+    expanded_action = np.expand_dims(action, axis=0)
     return predict_optimistic_value_batch(novq_state, density_state,
                                           prior_count,
                                           expanded_state, expanded_action)
@@ -310,14 +239,13 @@ def predict_optimistic_value_batch(novq_state, density_state, prior_count,
     counts = density.get_count_batch(density_state, states, actions)
     weights = compute_weight_batch(prior_count, counts)
     optimistic_values = weights * predicted_values + (1 - weights) * R_MAX
-    # import ipdb; ipdb.set_trace()
     return optimistic_values
 
 
 @jax.profiler.trace_function
 def predict_optimistic_values(novq_state, density_state, prior_count,
                               state, actions):
-    expanded_state = jnp.expand_dims(state, axis=0)
+    expanded_state = np.expand_dims(state, axis=0)
     repeated_state = expanded_state.repeat(len(actions), axis=0)
     return predict_optimistic_value_batch(novq_state, density_state,
                                           prior_count,
@@ -340,14 +268,6 @@ def predict_optimistic_values_batch(novq_state, density_state, prior_count,
 
     # now reshape the values to match the shape of actions_per_state
     return values.reshape((bsize, asize))
-
-
-# predict_optimistic_value_batch = jax.vmap(  # noqa: E305
-#     predict_optimistic_value, in_axes=(None, None, None, 0, 0))
-# predict_optimistic_values = jax.vmap(
-#     predict_optimistic_value, in_axes=(None, None, None, None, 0))
-# predict_optimistic_values_batch = jax.vmap(  # noqa: E305
-#     predict_optimistic_values, in_axes=(None, None, None, 0, 0))
 
 
 # @jax.jit
@@ -413,8 +333,11 @@ def run_episode(agent_state: AgentState, rng, env,
         rng, action_rng = random.split(rng)
         s = utils.flatten_observation(timestep.observation)
 
+        replay = agent_state.replay
+        warmup_steps = agent_state.warmup_steps
+
         # put some random steps in the replay buffer
-        if len(agent_state.replay) < agent_state.warmup_steps:
+        if len(replay) < warmup_steps:
             action_spec = jax_specs.convert_dm_spec(env.action_spec())
             a = utils.sample_uniform_actions(action_spec, action_rng, 1)[0]
             flag = 'train' if train else 'test'
@@ -458,22 +381,22 @@ def display_state(agent_state: AgentState, ospec, aspec,
     count_map = utils.render_function(
         jax.partial(density.get_count_batch, exploration_state.density_state),
         agent_state.replay,
-        ospec, aspec, reduction=jnp.max, bins=bins)
+        ospec, aspec, bins=bins)
     novq_map = utils.render_function(
         jax.partial(q_learning.predict_value, exploration_state.novq_state),
         agent_state.replay,
-        ospec, aspec, reduction=jnp.max, bins=bins)
+        ospec, aspec, bins=bins)
     optimistic_novq_map = utils.render_function(
         jax.partial(predict_optimistic_value_batch,
                     exploration_state.novq_state,
                     exploration_state.density_state,
                     exploration_state.prior_count),
         agent_state.replay,
-        ospec, aspec, reduction=jnp.max, bins=bins)
+        ospec, aspec, bins=bins)
     novelty_reward_map = utils.render_function(
         jax.partial(compute_novelty_reward, exploration_state),
         agent_state.replay,
-        ospec, aspec, reduction=jnp.max, bins=bins)
+        ospec, aspec, bins=bins)
     traj_map = replay_buffer.render_trajectory(
         agent_state.replay, max_steps, ospec, bins=bins)
 
@@ -492,7 +415,20 @@ def display_state(agent_state: AgentState, ospec, aspec,
         taskq_map = utils.render_function(
             jax.partial(q_learning.predict_value, policy_state.q_state),
             agent_state.replay,
-            ospec, aspec, reduction=jnp.max, bins=bins)
+            ospec, aspec, bins=bins)
+        subfigs.append((taskq_map, "Task value (max)"))
+    elif policy.__name__ == 'policies.sac_policy':
+        import torch
+        def get_task_value(s, a):
+            s = torch.FloatTensor(np.array(s)).to(policy_state.device)
+            a = torch.FloatTensor(np.array(a)).to(policy_state.device)
+            with torch.no_grad():
+                v = policy_state.critic.Q1(torch.cat([s, a], dim=-1))
+            return v.cpu().detach().numpy()
+        taskq_map = utils.render_function(
+            get_task_value,
+            agent_state.replay,
+            ospec, aspec, bins=bins)
         subfigs.append((taskq_map, "Task value (max)"))
 
     # dump the raw data for later rendering
@@ -509,7 +445,7 @@ def display_state(agent_state: AgentState, ospec, aspec,
         ax.set_title(title)
     fig.set_size_inches(4 * len(subfigs), 3)
 
-    fig_path = f"{savedir}/{episode}.png"
+    fig_path = f"{savedir}/vis/{episode}.png"
     utils.display_figure(fig, rendering, savepath=fig_path)
 # -------------------------------------------------------------------
 
@@ -529,7 +465,6 @@ def main(args):
 
     state_shape = utils.flatten_spec_shape(j_observation_spec)
     action_shape = action_spec.shape
-    batch_size = 128
 
     # drawing only one candidate action sample from the policy
     # will result in following the policy directly
@@ -550,9 +485,7 @@ def main(args):
                                 max_obs=args.density_max_obs,
                                 tolerance=args.density_tolerance,)
 
-    # for gridworld we can discretize with one bit per dimension
-    replay = replay_buffer.LowPrecisionTracingReplay(
-        state_shape, action_shape, min_s=0, max_s=1, n_bins=2)
+    replay = replay_buffer.Replay(state_shape, action_shape)
 
     policy_state = policy.init_fn(observation_spec, action_spec, args.seed,
                                   lr=args.policy_lr,
@@ -566,21 +499,22 @@ def main(args):
         density_state=density_state,
         temperature=args.temperature,
         update_temperature=args.update_temperature,
-        prior_count=args.prior_count,
-        optimistic_updates=args.optimistic_updates,
-        target_network=args.target_network)
+        prior_count=args.prior_count)
     agent_state = AgentState(exploration_state=exploration_state,
                              policy_state=policy_state,
                              replay=replay,
+                             j_action_spec=j_action_spec,
                              n_candidates=n_candidates,
                              n_update_candidates=args.n_update_candidates,
-                             prioritized_update=args.prioritized_update,
+                             n_updates_per_step=args.n_updates_per_step,
                              update_target_every=args.update_target_every,
                              warmup_steps=args.warmup_steps,
-                             optimistic_actions=args.optimistic_actions,)
+                             optimistic_actions=args.optimistic_actions,
+                             uniform_update_candidates=args.uniform_update_candidates,
+                             batch_size=args.batch_size)
 
     current_time = time.time()
-    for episode in range(1, 1000 + 1):
+    for episode in range(1, args.max_episodes + 1):
         last_time = current_time
         current_time = time.time()
         logger.update('train/elapsed', current_time - last_time)
@@ -596,8 +530,9 @@ def main(args):
         # update the task policy
         # TODO: pull this loop inside the policy.update_fn
         policy_state = agent_state.policy_state
-        for _ in range(args.max_steps // 2):
-            transitions = agent_state.replay.sample(batch_size)
+        for _ in range(args.max_steps):
+            # transitions = agent_state.replay.sample(batch_size)
+            transitions = agent_state.replay.sample(1024)
             transitions = tuple((jnp.array(el) for el in transitions))
             policy_state = policy.update_fn(
                 policy_state, transitions)
@@ -634,37 +569,53 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
+
+    # basic environment settings
     parser.add_argument('--name', default='default')
     parser.add_argument('--env', default='gridworld')
     parser.add_argument('--task', default='default')
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--env_size', type=int, default=20)
     parser.add_argument('--max_steps', type=int, default=1000)
+    parser.add_argument('--max_episodes', type=int, default=1000)
 
+    # visualization and logging
     parser.add_argument('--debug', action='store_true', default=False)
     parser.add_argument('--vis', default='disk')
     parser.add_argument('--eval_every', type=int, default=10)
     parser.add_argument('--save_replay_every', type=int, default=10)
 
-    parser.add_argument('--policy', type=str, default='deep')
+    # policy settings
+    parser.add_argument('--policy', type=str, default='deep_q')
     parser.add_argument('--policy_update', type=str, default='ddqn')
     parser.add_argument('--policy_lr', type=float, default=1e-3)
     parser.add_argument('--policy_temperature', type=float, default=3e-1)
     parser.add_argument('--policy_test_temperature', type=float, default=1e-1)
 
+    # count settings
     parser.add_argument('--density', type=str, default='tabular')
     parser.add_argument('--density_state_scale', type=float, default=1.)
     parser.add_argument('--density_action_scale', type=float, default=1.)
     parser.add_argument('--density_max_obs', type=float, default=1e5)
     parser.add_argument('--density_tolerance', type=float, default=0.95)
 
+    # novelty q learning
     parser.add_argument('--novelty_q_function', type=str, default='deep')
     parser.add_argument('--temperature', type=float, default=1e-1)
     parser.add_argument('--update_temperature', type=float, default=None)
     parser.add_argument('--prior_count', type=float, default=1e-3)
     parser.add_argument('--n_update_candidates', type=int, default=64)
+    parser.add_argument('--n_updates_per_step', type=int, default=10)
+    parser.add_argument('--update_target_every', type=int, default=10)
+    parser.add_argument('--warmup_steps', type=int, default=128)
+    parser.add_argument('--uniform_update_candidates', action='store_true')
+    parser.add_argument('--batch_size', type=int, default=128)
+
+    # tabular settings (also for vis)
     parser.add_argument('--n_state_bins', type=int, default=20)
     parser.add_argument('--n_action_bins', type=int, default=2)
+
+    # ablations
     parser.add_argument('--no_optimistic_updates', dest='optimistic_updates',
                         action='store_false', default=True)
     parser.add_argument('--no_optimistic_actions', dest='optimistic_actions',
@@ -672,15 +623,8 @@ if __name__ == '__main__':
     parser.add_argument('--target_network', action='store_true', default=True)
     parser.add_argument('--no_target_network', dest='target_network',
                         action='store_false')
-    parser.add_argument('--update_target_every', type=int, default=10)
-    parser.add_argument('--warmup_steps', type=int, default=128)
-
     parser.add_argument('--no_exploration', dest='use_exploration',
                         action='store_false', default=True)
-    parser.add_argument('--prioritized_update', dest='prioritized_update',
-                        action='store_true', default=False)
-    parser.add_argument('--no_prioritized_update', dest='prioritized_update',
-                        action='store_false')
 
     parser.add_subparsers()
     args = parser.parse_args()
@@ -708,8 +652,10 @@ if __name__ == '__main__':
     else:
         raise Exception("Argument --novelty_q_function was invalid.")
 
-    if args.policy == 'deep':
+    if args.policy == 'deep_q':
         import policies.deep_q_policy as policy
+    elif args.policy == 'sac':
+        import policies.sac_policy as policy
     elif args.policy == 'uniform':
         import policies.uniform_policy as policy
     elif args.policy == 'tabular':
@@ -718,17 +664,24 @@ if __name__ == '__main__':
         raise Exception("Argument --policy was invalid.")
 
     if args.density == 'tabular':
-        from densities import tabular_density as density
+        import densities.tabular_density as density
     elif args.density == 'kernel':
-        from densities import kernel_density as density
+        import densities.kernel_density as density
     elif args.density == 'kernel_count':
-        from densities import kernel_count as density
+        import densities.kernel_count as density
     elif args.density == 'knn_kernel_count':
         from densities import knn_kernel_count as density
     elif args.density == 'dummy':
-        from densities import dummy_density as density
+        import densities.dummy_density as density
     else:
         raise Exception("Argument --density was invalid.")
+
+    print(f"CUDA_VISIBLE_DEVICES={os.environ['CUDA_VISIBLE_DEVICES']}")
+
+    train_step_candidates = jax.partial(train_step_candidates,
+                                        use_target_network=args.target_network,
+                                        use_optimistic_updates=args.optimistic_updates)
+    # train_step_candidates = jax.jit(train_step_candidates)
 
     jit = not args.debug
     if jit:
