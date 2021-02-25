@@ -153,6 +153,7 @@ def flatten_observation(obs, preserve_batch=False):
         return jnp.concatenate(flat_elements, axis=0)
 
 
+@jax.partial(jax.jit, static_argnums=(2, 3))
 def discretize_observation(obs, spec, bins, preserve_batch=False):
     discretize_bins = jax.partial(discretize, bins=bins)
     discrete_tree_obs = jax.tree_multimap(discretize_bins, obs, spec)
@@ -248,7 +249,8 @@ def sample_grid(spec, dims, bins):
     return grid
 
 
-def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
+@jax.profiler.trace_function
+def render_function(fn, replay, ospec, aspec, reduction=np.max,
                     vis_dims=(0, 1), bins=20, use_uniform_states=False):
     """Renders a given function at sampled (state, action) pairs.
 
@@ -262,19 +264,23 @@ def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
         value which will represent that state.
     """
     rng = random.PRNGKey(0)
-    n_samples = min(2 * len(replay), 10000)
+    j_aspec = jax_specs.convert_dm_spec(aspec)
+    n_samples = 1000
 
     action_shape = aspec.shape
     if len(action_shape) == 0:
         action_shape = (1,)
 
-    transitions = replay.sample(5 * n_samples)
-    states = transitions[0]
-    actions = transitions[1]
-    actions = actions.reshape((-1, *action_shape))
+    with jax.profiler.TraceContext("render sample states"):
+        transitions = replay.sample(5 * n_samples)
+        states = transitions[0]
+        actions = transitions[1]
+        actions = actions.reshape((-1, *action_shape))
 
-    uniform_actions = sample_uniform_single(aspec, rng, 4 * n_samples)
-    actions[:len(uniform_actions)] = uniform_actions
+    with jax.profiler.TraceContext("render sample actions"):
+        n_random_actions = 4 * n_samples
+        uniform_actions = sample_uniform_actions(j_aspec, rng, n_random_actions)
+        actions[:n_random_actions] = uniform_actions
 
     if use_uniform_states:
         sampled_flat_states = np.array(
@@ -288,26 +294,34 @@ def render_function(fn, replay, ospec, aspec, reduction=jnp.max,
     values_list = []
     bsize = 2000
     for i in range(0, states.shape[0], bsize):
-        values_list.append(fn(states[i: i + bsize], actions[i: i + bsize]))
-    values = jnp.concatenate(values_list, axis=0)
+        with jax.profiler.TraceContext("render fn"):
+            value = fn(states[i: i + bsize], actions[i: i + bsize])
+            values_list.append(np.array(value))
 
-    flat_ospec = flatten_observation_spec(ospec)
-    discrete_states = discretize(states, flat_ospec, bins)
-    discrete_actions = discretize(actions, aspec, bins)
+    with jax.profiler.TraceContext("render reshape discretize"):
+        values = np.concatenate(values_list, axis=0)
 
-    xs = jnp.concatenate([discrete_states, discrete_actions],
-                         axis=1)
-    value_lists = [[[] for _ in range(bins)] for _ in range(bins)]
-    for (x, value) in zip(xs, values):
-        i, j = x[vis_dims[0]], x[vis_dims[1]]
-        value_lists[i][j].append(value)
+        flat_ospec = flatten_observation_spec(ospec)
+        discrete_states = np.array(discretize(states, flat_ospec, bins))
+        discrete_actions = np.array(discretize(actions, aspec, bins))
 
-    rendered_values = np.zeros((bins, bins))
-    for i in range(bins):
-        for j in range(bins):
-            l = value_lists[i][j]
-            if len(l) > 0:
-                rendered_values[i, j] = reduction(jnp.stack(l))
+        xs = np.concatenate([discrete_states, discrete_actions],
+                            axis=1)
+
+    with jax.profiler.TraceContext("render value lists"):
+        value_lists = [[[] for _ in range(bins)] for _ in range(bins)]
+        for (x, value) in zip(xs, values):
+            i, j = x[vis_dims[0]], x[vis_dims[1]]
+            value_lists[i][j].append(value)
+
+    with jax.profiler.TraceContext("render image"):
+        rendered_values = np.zeros((bins, bins))
+        for i in range(bins):
+            for j in range(bins):
+                l = value_lists[i][j]
+                if len(l) > 0:
+                    with jax.profiler.TraceContext("render assign reduction"):
+                        rendered_values[i, j] = reduction(np.stack(l))
     return rendered_values
 
 

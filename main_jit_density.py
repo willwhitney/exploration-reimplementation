@@ -353,22 +353,22 @@ def display_state(agent_state: AgentState, ospec, aspec,
     count_map = utils.render_function(
         jax.partial(density.get_count_batch, exploration_state.density_state),
         agent_state.replay,
-        ospec, aspec, reduction=jnp.max, bins=bins)
+        ospec, aspec, bins=bins)
     novq_map = utils.render_function(
         jax.partial(q_learning.predict_value, exploration_state.novq_state),
         agent_state.replay,
-        ospec, aspec, reduction=jnp.max, bins=bins)
+        ospec, aspec, bins=bins)
     optimistic_novq_map = utils.render_function(
         jax.partial(predict_optimistic_value_batch,
                     exploration_state.novq_state,
                     exploration_state.density_state,
                     exploration_state.prior_count),
         agent_state.replay,
-        ospec, aspec, reduction=jnp.max, bins=bins)
+        ospec, aspec, bins=bins)
     novelty_reward_map = utils.render_function(
         jax.partial(compute_novelty_reward, exploration_state),
         agent_state.replay,
-        ospec, aspec, reduction=jnp.max, bins=bins)
+        ospec, aspec, bins=bins)
     traj_map = replay_buffer.render_trajectory(
         agent_state.replay, max_steps, ospec, bins=bins)
 
@@ -387,7 +387,7 @@ def display_state(agent_state: AgentState, ospec, aspec,
         taskq_map = utils.render_function(
             jax.partial(q_learning.predict_value, policy_state.q_state),
             agent_state.replay,
-            ospec, aspec, reduction=jnp.max, bins=bins)
+            ospec, aspec, bins=bins)
         subfigs.append((taskq_map, "Task value (max)"))
     elif policy.__name__ == 'policies.sac_policy':
         import torch
@@ -400,7 +400,7 @@ def display_state(agent_state: AgentState, ospec, aspec,
         taskq_map = utils.render_function(
             get_task_value,
             agent_state.replay,
-            ospec, aspec, reduction=jnp.max, bins=bins)
+            ospec, aspec, bins=bins)
         subfigs.append((taskq_map, "Task value (max)"))
 
 
