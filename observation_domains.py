@@ -100,6 +100,37 @@ DOMAINS = {
                                      minimum=np.array([-20, -20]),
                                      maximum=np.array([20, 20])),
         }),
+    'manipulator': {
+        'bring_ball': OrderedDict({
+            'arm_pos': BoundedArray(name='arm_pos', shape=(8, 2),
+                                     dtype=np.float32,
+                                     minimum=-np.ones((8, 2)),
+                                     maximum=np.ones((8, 2)),),
+            'arm_vel': BoundedArray(name='arm_vel', shape=(8,),
+                                     dtype=np.float32,
+                                     minimum=-10 * np.ones((8,)),
+                                     maximum=10 * np.ones((8,)),),
+            'touch': BoundedArray(name='touch', shape=(5,),
+                                     dtype=np.float32,
+                                     minimum=np.zeros((5,)),
+                                     maximum=5 * np.ones((5,)),),
+            'hand_pos': BoundedArray(name='hand_pos', shape=(4,),
+                                     dtype=np.float32,
+                                     minimum=-np.ones((4,)),
+                                     maximum=np.ones((4,)),),
+            'object_pos': BoundedArray(name='object_pos', shape=(4,),
+                                     dtype=np.float32,
+                                     minimum=-np.ones((4,)),
+                                     maximum=np.ones((4,)),),
+            'object_vel': BoundedArray(name='object_vel', shape=(3,),
+                                     dtype=np.float32,
+                                     minimum=-10 * np.ones((3,)),
+                                     maximum=10 * np.ones((3,)),),
+            'target_pos': BoundedArray(name='target_pos', shape=(4,),
+                                     dtype=np.float32,
+                                     minimum=-np.ones((4,)),
+                                     maximum=np.ones((4,)),),
+        }),
     }
 }
 
@@ -109,8 +140,8 @@ if __name__ == '__main__':
     from dm_control import suite
     import utils
 
-    env_name = 'hopper'
-    task_name = 'hop'
+    env_name = 'manipulator'
+    task_name = 'bring_ball'
     env = suite.load(env_name, task_name)
     ospec = env.observation_spec()
     aspec = env.action_spec()

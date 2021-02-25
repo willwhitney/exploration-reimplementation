@@ -265,7 +265,7 @@ def render_function(fn, replay, ospec, aspec, reduction=np.max,
     """
     rng = random.PRNGKey(0)
     j_aspec = jax_specs.convert_dm_spec(aspec)
-    n_samples = 1000
+    n_samples = 2000
 
     action_shape = aspec.shape
     if len(action_shape) == 0:
@@ -292,7 +292,7 @@ def render_function(fn, replay, ospec, aspec, reduction=np.max,
                                    actions], axis=0)
 
     values_list = []
-    bsize = 2000
+    bsize = 10000
     for i in range(0, states.shape[0], bsize):
         with jax.profiler.TraceContext("render fn"):
             value = fn(states[i: i + bsize], actions[i: i + bsize])

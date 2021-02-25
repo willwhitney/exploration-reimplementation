@@ -487,7 +487,7 @@ def main(args):
                              uniform_update_candidates=args.uniform_update_candidates)
 
     current_time = time.time()
-    for episode in range(1, 1000 + 1):
+    for episode in range(1, args.max_episodes + 1):
         last_time = current_time
         current_time = time.time()
         logger.update('train/elapsed', current_time - last_time)
@@ -550,6 +550,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--env_size', type=int, default=20)
     parser.add_argument('--max_steps', type=int, default=1000)
+    parser.add_argument('--max_episodes', type=int, default=1000)
 
     # visualization and logging
     parser.add_argument('--debug', action='store_true', default=False)

@@ -24,7 +24,8 @@ class DensityState:
 
 
 def new(observation_spec, action_spec, max_obs=100000,
-        state_std_scale=1, action_std_scale=1, tolerance=0.95, **kwargs):
+        state_std_scale=1, action_std_scale=1, tolerance=0.95,
+        **kwargs):
     flat_ospec = utils.flatten_observation_spec(observation_spec)
     state_std = flat_ospec.maximum - flat_ospec.minimum
     action_std = np.array(action_spec.maximum - action_spec.minimum)
