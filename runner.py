@@ -10,11 +10,11 @@ MULTIPLEX = 1
 
 excluded_flags = []
 
-basename = "pv100_stabilize"
+basename = "pv100_keops"
 grid = [
     {
         # define the task
-        "_main": ["main_jit_density.py"],
+        "_main": ["main.py"],
         "eval_every": [1],
         "env": ["point"],
         "task": ["velocity"],
@@ -22,7 +22,7 @@ grid = [
         "seed": list(range(4)),
 
         # density settings
-        "density": ["kernel_count"],
+        "density": ["keops_kernel_count"],
         "density_state_scale": [1e-2],
         "density_action_scale": [1],
         "density_max_obs": [8192],
@@ -119,7 +119,7 @@ grid = [
 # ]
 
 
-# basename = "manipulator_v3"
+# basename = "manipulator_v5"
 # grid = [
 #     {
 #         # define the task
@@ -134,10 +134,10 @@ grid = [
 
 #         # density settings
 #         "density": ["kernel_count"],
-#         "density_state_scale": [3, 1],
+#         "density_state_scale": [3, 1, 0.3, 0.1],
 #         "density_action_scale": [1],
 #         "density_max_obs": [4096],
-#         "density_tolerance": [0.2, 0.1],
+#         "density_tolerance": [0.4],
 
 #         # task policy settings
 #         "policy": ["sac"],

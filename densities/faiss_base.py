@@ -29,3 +29,7 @@ def update_batch(index, data):
 
 def get_nn_batch(index, queries, n_neighbors=16):
     return index.search_and_reconstruct(queries, n_neighbors)
+
+
+def convert_array(x):
+    return x

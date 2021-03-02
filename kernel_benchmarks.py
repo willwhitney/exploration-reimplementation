@@ -14,8 +14,8 @@ import point
 import utils
 
 
-env_name = 'hopper'
-task_name = 'hop'
+env_name = 'manipulator'
+task_name = 'bring_ball'
 env = suite.load(env_name, task_name)
 ospec = DOMAINS[env_name][task_name]
 
@@ -41,7 +41,7 @@ def profile_write(density, density_state, n=1000):
     return density_state, elapsed
 
 
-def profile_read(density, density_state, n=1000, qsize=128*64):
+def profile_read(density, density_state, n=100, qsize=128*64):
     rng = random.PRNGKey(0)
     query_states = utils.sample_uniform_actions(j_flat_ospec, rng, qsize)
     query_actions = utils.sample_uniform_actions(j_aspec, rng, qsize)
@@ -68,12 +68,14 @@ def fill(density, density_state, n=50000, bsize=1):
 
 
 from densities import kernel_count
-from densities import knn_kernel_count
+from densities import faiss_kernel_count
+from densities import keops_kernel_count
 
-for density in [knn_kernel_count]:
+# for density in [kernel_count, keops_kernel_count]:
+for density in [keops_kernel_count]:
     fill_bsize = 4096
     tolerance = 1.0
-    for max_obs in [4096, 16384]:
+    for max_obs in [65536]:
     # max_obs =
     # for tolerance in [0.99]:
         print((f"{env_name} {task_name} {density.__name__} "

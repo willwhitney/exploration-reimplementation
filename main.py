@@ -669,8 +669,10 @@ if __name__ == '__main__':
         import densities.kernel_density as density
     elif args.density == 'kernel_count':
         import densities.kernel_count as density
-    elif args.density == 'knn_kernel_count':
-        from densities import knn_kernel_count as density
+    elif args.density == 'faiss_kernel_count':
+        from densities import faiss_kernel_count as density
+    elif args.density == 'keops_kernel_count':
+        from densities import keops_kernel_count as density
     elif args.density == 'dummy':
         import densities.dummy_density as density
     else:
