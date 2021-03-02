@@ -237,6 +237,7 @@ def predict_optimistic_value_batch(novq_state, density_state, prior_count,
     predicted_values = q_learning.predict_value(novq_state, states, actions)
     predicted_values = predicted_values.reshape((-1,))
     counts = density.get_count_batch(density_state, states, actions)
+    # import ipdb; ipdb.set_trace()
     weights = compute_weight_batch(prior_count, counts)
     optimistic_values = weights * predicted_values + (1 - weights) * R_MAX
     return optimistic_values
@@ -473,15 +474,14 @@ def main(args):
     novq_state = q_functions.init_fn(args.seed,
                                      observation_spec,
                                      action_spec,
-                                    #  env_size=env.size,
                                      discount=0.97,
                                      max_value=R_MAX)
 
     density_state = density.new(observation_spec, action_spec,
                                 state_bins=args.n_state_bins,
                                 action_bins=args.n_action_bins,
-                                state_std_scale=args.density_state_scale,
-                                action_std_scale=args.density_action_scale,
+                                state_scale=args.density_state_scale,
+                                action_scale=args.density_action_scale,
                                 max_obs=args.density_max_obs,
                                 tolerance=args.density_tolerance,)
 

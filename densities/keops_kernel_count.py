@@ -87,7 +87,7 @@ def update_batch(density_state: DensityState, states, actions):
 
     # update weights
     if weight_updates.sum() > 0:
-        weights = density_state.weights + weight_updates
+        weights = density_state.weights + weight_updates.to(density_state.device)
         density_state = density_state.replace(weights=weights)
 
     return density_state
@@ -95,12 +95,41 @@ def update_batch(density_state: DensityState, states, actions):
 
 @jax.profiler.trace_function
 def _compute_updates(density_state: DensityState, keys):
-    if True:
-    # if density_state.index.ntotal <= 0:
+    if density_state.total <= 0:
         weight_update = torch.zeros_like(density_state.weights)
         return keys, weight_update
 
-    # # computes, new_actions, weight_updates
+    obs = density_state.observations
+
+    x_o = LazyTensor( obs[:, None, :] )  # obs_size x 1 x dim
+    x_q = LazyTensor( keys[None, :, :] )  # 1 x batch_size x dim
+
+    D_oq = ((x_o - x_q)**2).sum(dim=2)  # obs_size x batch_size
+    K_oq = (-0.5 * D_oq).exp()
+
+    # want:
+    #   (1) the keys that have no close neighbors,
+    #   (2) the close neighbors & distances of the others
+
+    mins, inds = (-K_oq).Kmin_argKmin(16, dim=1)
+    sims_per_neighbor = -mins.cpu().numpy()
+    new_keys = []
+    weight_updates = torch.zeros((obs.shape[0],))
+
+    for (key, sims, ind) in zip(keys, sims_per_neighbor, inds):
+        similar_mask = sims > density_state.tolerance
+        n_similar_obs = similar_mask.sum()
+
+        if n_similar_obs >= 1:
+            similar_meta_indices = np.flatnonzero(similar_mask)
+            similar_indices = ind[similar_meta_indices]
+            weight_updates[similar_indices] += 1 / n_similar_obs
+        else:
+            new_keys.append(key)
+
+    if len(new_keys) > 0:
+        new_keys = torch.stack(new_keys)
+    return new_keys, weight_updates
 
 
 @jax.profiler.trace_function
@@ -111,7 +140,7 @@ def _add_observations(density_state: DensityState, keys):
     weights = density_state.weights
 
     if density_state.total == density_state.max_obs:
-        indices = torch.randint(low=0, high=density_state.max_obs - 1,
+        indices = torch.randint(low=0, high=int(density_state.max_obs - 1),
                                 size=(bsize,))
     else:
         indices = torch.arange(next_slot, next_slot + bsize)
@@ -138,26 +167,6 @@ def _grow_observations(observations, weights, max_size):
     return observations, weights
 
 
-# @jax.profiler.trace_function
-# def _find_similarities_batch(density_state: DensityState, states, actions):
-#     """Put one unit of count on the space at every observation.
-#     Fall-off from that is specified by the covariance."""
-#     keys = _make_key_batch(states, actions)
-
-#     # dists is a len(states) x density_state.k array of distances
-#     # indices is the same shape and contains the indices of the matching keys
-#     dists, indices, neighbors = density_state.index.search_and_reconstruct(
-#         keys, density_state.k)
-
-#     probs = _normal_diag_pdf_batchedmeanx(
-#         neighbors, density_state.kernel_cov, keys)
-#     similarities = probs * density_state.scale_factor
-
-#     # a similarity of nan is invalid, e.g. we asked for more neighbors than exist
-#     similarities = np.nan_to_num(similarities, nan=0.0)
-#     return similarities, indices
-
-
 @jax.profiler.trace_function
 def get_count(density_state: DensityState, state, action):
     states = np.expand_dims(state, axis=0)
@@ -182,9 +191,8 @@ def get_count_batch(density_state: DensityState, states, actions):
     D_oq = ((x_o - x_q)**2).sum(dim=2)  # obs_size x batch_size
     K_oq = (-0.5 * D_oq).exp()
     C_oq = x_w * K_oq  # multiply the row for each obs by its weight
-    C_oq = K_oq
     counts = C_oq.sum(dim=0)  # batch_size
-    return np.array(counts.cpu())
+    return counts.cpu().reshape(-1).numpy()
 
 
 @jax.profiler.trace_function
