@@ -57,18 +57,42 @@ class AgentState():
     steps_since_tupdate: int = 0
 
 
-# @jax.jit
-@jax.profiler.trace_function
-def compute_novelty_reward(exploration_state, states, actions):
-    """Returns a novelty reward in [0, 1] for each (s, a) pair."""
-    counts = density.get_count_batch(
-        exploration_state.density_state, states, actions)
+
+@jax.jit
+def _novelty_given_counts(counts):
     ones = jnp.ones(jnp.array(counts).shape)
     rewards = (counts + 1e-8) ** (-0.5)
     options = jnp.stack([ones, rewards], axis=1)
 
     # Clip rewards to be at most 1 (when count is 0)
     return jnp.min(options, axis=1)
+
+# @jax.jit
+@jax.profiler.trace_function
+def compute_novelty_reward(exploration_state, states, actions):
+    """Returns a novelty reward in [0, 1] for each (s, a) pair."""
+    counts = density.get_count_batch(
+        exploration_state.density_state, states, actions)
+
+    return _novelty_given_counts(counts)
+
+
+@jax.jit
+def _targets_given_values(next_values, next_values_target,
+                          novelty_reward, temp, discount):
+    # double DQN rule:
+    # - select next action according to current Q
+    # - evaluate it according to target Q
+    next_value_probs = nn.softmax(next_values / temp, axis=1)
+    next_value_elements = (next_value_probs * next_values_target)
+    expected_next_values = next_value_elements.sum(axis=1)
+    expected_next_values = expected_next_values.reshape(novelty_reward.shape)
+
+    # compute targets and update
+    q_targets = novelty_reward + discount * expected_next_values
+
+    # clip targets to be within the feasible set
+    return jnp.minimum(q_targets, R_MAX)
 
 
 # @jax.partial(jax.jit, static_argnums=(3, 4))
@@ -111,21 +135,11 @@ def train_step_candidates(exploration_state: ExplorationState,
                 candidate_next_actions)
 
     with jax.profiler.TraceContext("compute targets"):
-        # double DQN rule:
-        # - select next action according to current Q
-        # - evaluate it according to target Q
-        next_value_probs = nn.softmax(next_values / temp, axis=1)
-        next_value_elements = (next_value_probs * next_values_target)
-        expected_next_values = next_value_elements.sum(axis=1)
-        expected_next_values = expected_next_values.reshape(rewards.shape)
-
-        # compute targets and update
         novelty_reward = compute_novelty_reward(
             exploration_state, states, actions).reshape(rewards.shape)
-        q_targets = novelty_reward + discount * expected_next_values
 
-        # clip targets to be within the feasible set
-        q_targets = jnp.minimum(q_targets, R_MAX)
+        q_targets = _targets_given_values(next_values, next_values_target,
+                                          novelty_reward, temp, discount)
 
     # import ipdb; ipdb.set_trace()
 
@@ -234,13 +248,21 @@ def predict_optimistic_value(novq_state, density_state, prior_count,
 @jax.profiler.trace_function
 def predict_optimistic_value_batch(novq_state, density_state, prior_count,
                                    states, actions):
+    counts = density.get_count_batch(density_state, states, actions)
+    return optimistic_value_batch_given_count(novq_state, prior_count,
+                                              states, actions, counts)
+
+
+@jax.profiler.trace_function
+@jax.jit
+def optimistic_value_batch_given_count(novq_state, prior_count,
+                                       states, actions, counts):
     predicted_values = q_learning.predict_value(novq_state, states, actions)
     predicted_values = predicted_values.reshape((-1,))
-    counts = density.get_count_batch(density_state, states, actions)
-    # import ipdb; ipdb.set_trace()
     weights = compute_weight_batch(prior_count, counts)
     optimistic_values = weights * predicted_values + (1 - weights) * R_MAX
     return optimistic_values
+
 
 
 @jax.profiler.trace_function

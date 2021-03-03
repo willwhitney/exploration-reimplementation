@@ -9,6 +9,7 @@ from torch.utils import dlpack as tdlpack
 from jax import dlpack as jdlpack
 
 from flax import struct
+import pykeops
 from pykeops.torch import LazyTensor
 
 import jax_specs
@@ -49,6 +50,7 @@ def new(observation_spec, action_spec, max_obs=100000,
     else:
         device = torch.device('cpu')
 
+    # pykeops.clean_pykeops()  # just in case old build files are still present
 
     # initialize this to some reasonable size
     # starting_size = 65536
@@ -176,27 +178,42 @@ def get_count(density_state: DensityState, state, action):
 
 @jax.profiler.trace_function
 def get_count_batch(density_state: DensityState, states, actions):
-    # prevent the index from segfaulting if queried when empty
-    if density_state.total <= 0:
-        return np.zeros((states.shape[0],))
 
-    obs = density_state.observations
-    weights = density_state.weights
-    keys = _make_key_batch(density_state, states, actions)
+    with jax.profiler.TraceContext("check density size"):
+        # prevent the index from segfaulting if queried when empty
+        if density_state.total <= 0:
+            return np.zeros((states.shape[0],))
 
-    x_o = LazyTensor( obs[:, None, :] )  # obs_size x 1 x dim
-    x_q = LazyTensor( keys[None, :, :] )  # 1 x batch_size x dim
-    x_w = LazyTensor( weights[:, None], axis=0 )  # obs_size x 1
 
-    D_oq = ((x_o - x_q)**2).sum(dim=2)  # obs_size x batch_size
-    K_oq = (-0.5 * D_oq).exp()
-    C_oq = x_w * K_oq  # multiply the row for each obs by its weight
-    counts = C_oq.sum(dim=0)  # batch_size
-    return counts.cpu().reshape(-1).numpy()
+    with jax.profiler.TraceContext("access density obs + weights"):
+        obs = density_state.observations
+        weights = density_state.weights
+
+
+    with jax.profiler.TraceContext("make keys"):
+        keys = _make_key_batch(density_state, states, actions)
+
+
+    with jax.profiler.TraceContext("construct keops computation"):
+        x_o = LazyTensor( obs[:, None, :] )  # obs_size x 1 x dim
+        x_q = LazyTensor( keys[None, :, :] )  # 1 x batch_size x dim
+        x_w = LazyTensor( weights[:, None], axis=0 )  # obs_size x 1
+
+        D_oq = ((x_o - x_q)**2).sum(dim=2)  # obs_size x batch_size
+        K_oq = (-0.5 * D_oq).exp()
+        C_oq = x_w * K_oq  # multiply the row for each obs by its weight
+
+
+    with jax.profiler.TraceContext("do keops computation"):
+        counts = C_oq.sum(dim=0)  # batch_size
+
+    with jax.profiler.TraceContext("convert types"):
+        counts = utils.t_to_j(counts.reshape(-1))
+    return counts
 
 
 @jax.profiler.trace_function
-@jax.partial(jax.jit, backend='cpu')
+@jax.jit
 def _make_key_jax(state_rescale, action_rescale, state_shift, action_shift,
                   s, a):
     flat_s = utils.flatten_observation(s)
@@ -206,19 +223,18 @@ def _make_key_jax(state_rescale, action_rescale, state_shift, action_shift,
     return jnp.concatenate([normalized_s, normalized_a], axis=0).astype(jnp.float32)
 _make_key_jax_batch = jax.vmap(_make_key_jax, in_axes=(None, None, None, None,
                                                        0, 0))
+_make_key_jax_batch = jax.profiler.trace_function(_make_key_jax_batch,
+                                                  "_make_key_jax_batch")
 
 
-def j_to_t(x):
-    return tdlpack.from_dlpack(jdlpack.to_dlpack(x))
-
-
+@jax.profiler.trace_function
 def _make_key_batch(density_state: DensityState, s, a):
     j_key = _make_key_jax_batch(density_state.state_rescale,
                                 density_state.action_rescale,
                                 density_state.state_shift,
                                 density_state.action_shift,
                                 s, a)
-    return j_to_t(j_key).to(density_state.device)
+    return utils.j_to_t(j_key).to(density_state.device)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import collections
 
+from torch.utils import dlpack as tdlpack
+from jax import dlpack as jdlpack
+
 import jax
 from jax import numpy as jnp, random
 from jax.lib import pytree
@@ -232,6 +235,15 @@ def sample_uniform_single(spec, rng, n):
     samples = sampler(rng, shape=shape,
                       minval=minval, maxval=maxval)
     return samples.reshape(shape)
+
+
+def j_to_t(x):
+    return tdlpack.from_dlpack(jdlpack.to_dlpack(x))
+
+
+def t_to_j(x):
+    return jdlpack.from_dlpack(tdlpack.to_dlpack(x))
+
 
 
 def sample_flat_uniform(spec, rng, n):

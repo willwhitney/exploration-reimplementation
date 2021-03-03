@@ -64,80 +64,24 @@ excluded_flags = []
 #     },
 # ]
 
-# basename = "hopper_knntest"
-# grid = [
-#     {
-#         # define the task
-#         "_main": ["main_jit_density.py"],
-#         "eval_every": [5],
-#         "env": ["hopper"],
-#         "task": ["hop"],
-#         "max_steps": [1000],
-#         "no_exploration": [False],
-#         "seed": [0],
-
-#         # density settings
-#         "density": ["kernel_count"],
-#         "density_state_scale": [0.3],
-#         "density_action_scale": [1],
-#         "density_max_obs": [8192],
-#         "density_tolerance": [0.4],
-
-#         # task policy settings
-#         "policy": ["sac"],
-
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#         "n_updates_per_step": [10],
-#         "update_target_every": [10],
-#     },
-#     {
-#         # define the task
-#         "_main": ["main.py"],
-#         "eval_every": [5],
-#         "env": ["hopper"],
-#         "task": ["hop"],
-#         "max_steps": [1000],
-#         "no_exploration": [False],
-#         "seed": [0],
-
-#         # density settings
-#         "density": ["knn_kernel_count"],
-#         "density_state_scale": [0.3],
-#         "density_action_scale": [1],
-#         "density_max_obs": [8192],
-#         "density_tolerance": [0.4],
-
-#         # task policy settings
-#         "policy": ["sac"],
-
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#         "n_updates_per_step": [10],
-#         "update_target_every": [10],
-#     },
-# ]
-
-
-basename = "manipulator_keops_v1"
+basename = "hopper_keops_v1"
 grid = [
     {
         # define the task
-        "_main": ["main_jit_density.py"],
-        "eval_every": [1],
-        "env": ["manipulator"],
-        "task": ["bring_ball"],
+        "_main": ["main.py"],
+        "eval_every": [5],
+        "env": ["hopper"],
+        "task": ["hop"],
         "max_steps": [1000],
-        "max_episodes": [10000],
         "no_exploration": [False],
         "seed": [0],
 
         # density settings
-        "density": ["kernel_count"],
-        "density_state_scale": [3, 1, 0.3, 0.1],
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.3, 0.1],
         "density_action_scale": [1],
-        "density_max_obs": [65536],
-        "density_tolerance": [0.5],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.4],
 
         # task policy settings
         "policy": ["sac"],
@@ -147,7 +91,63 @@ grid = [
         "n_updates_per_step": [10],
         "update_target_every": [10],
     },
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [5],
+        "env": ["hopper"],
+        "task": ["hop"],
+        "max_steps": [1000],
+        "no_exploration": [False],
+        "seed": [0],
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.3, 0.1],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.4],
+
+        # task policy settings
+        "policy": ["sac"],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
+    },
 ]
+
+
+# basename = "manipulator_keops_v2"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["manipulator"],
+#         "task": ["bring_ball"],
+#         "max_steps": [1000],
+#         "max_episodes": [10000],
+#         "no_exploration": [False],
+#         "seed": [0],
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [3, 1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5, 0.1],
+
+#         # task policy settings
+#         "policy": ["sac"],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [5],
+#         "update_target_every": [5],
+#     },
+# ]
 
 
 def construct_varying_keys(grids):
