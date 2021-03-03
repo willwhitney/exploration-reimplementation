@@ -75,7 +75,7 @@ from densities import keops_kernel_count
 for density in [keops_kernel_count]:
     fill_bsize = 4096
     tolerance = 1.0
-    for max_obs in [65536]:
+    for max_obs in [16384]:
     # max_obs =
     # for tolerance in [0.99]:
         print((f"{env_name} {task_name} {density.__name__} "

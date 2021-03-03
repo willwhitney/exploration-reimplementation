@@ -16,6 +16,10 @@ import jax_specs
 import utils
 
 
+J_DTYPE = jnp.float32
+T_DTYPE = torch.float32
+
+
 @struct.dataclass
 class DensityState:
     observations: Any
@@ -43,6 +47,15 @@ def new(observation_spec, action_spec, max_obs=100000,
     state_shift = j_flat_ospec.minimum
     action_shift = j_aspec.minimum
 
+    state_rescale = jax.device_put(state_rescale,
+                                   jax.local_devices(backend='cpu')[0])
+    action_rescale = jax.device_put(action_rescale,
+                                    jax.local_devices(backend='cpu')[0])
+    state_shift = jax.device_put(state_shift,
+                                 jax.local_devices(backend='cpu')[0])
+    action_shift = jax.device_put(action_shift,
+                                  jax.local_devices(backend='cpu')[0])
+
     key_dim = j_flat_ospec.shape[0] + j_aspec.shape[0]
 
     if torch.cuda.is_available():
@@ -50,15 +63,15 @@ def new(observation_spec, action_spec, max_obs=100000,
     else:
         device = torch.device('cpu')
 
-    # pykeops.clean_pykeops()  # just in case old build files are still present
+    pykeops.clean_pykeops()  # just in case old build files are still present
 
     # initialize this to some reasonable size
     # starting_size = 65536
     starting_size = 1024
     observations = torch.zeros((starting_size, key_dim))
-    observations = observations.type(torch.float32).to(device)
+    observations = observations.type(T_DTYPE).to(device)
     weights = torch.zeros((starting_size,))
-    weights = weights.type(torch.float32).to(device)
+    weights = weights.type(T_DTYPE).to(device)
 
     return DensityState(observations, weights, device,
                         state_rescale, action_rescale,
@@ -97,7 +110,8 @@ def update_batch(density_state: DensityState, states, actions):
 
 @jax.profiler.trace_function
 def _compute_updates(density_state: DensityState, keys):
-    if density_state.total <= 0:
+    # if density_state.total <= 0:
+    if True:
         weight_update = torch.zeros_like(density_state.weights)
         return keys, weight_update
 
@@ -213,14 +227,14 @@ def get_count_batch(density_state: DensityState, states, actions):
 
 
 @jax.profiler.trace_function
-@jax.jit
+@jax.partial(jax.jit, backend='cpu')
 def _make_key_jax(state_rescale, action_rescale, state_shift, action_shift,
                   s, a):
     flat_s = utils.flatten_observation(s)
     flat_a = jnp.array(a).reshape((-1,))
     normalized_s = (flat_s - state_shift) / state_rescale
     normalized_a = (flat_a - action_shift) / action_rescale
-    return jnp.concatenate([normalized_s, normalized_a], axis=0).astype(jnp.float32)
+    return jnp.concatenate([normalized_s, normalized_a], axis=0).astype(J_DTYPE)
 _make_key_jax_batch = jax.vmap(_make_key_jax, in_axes=(None, None, None, None,
                                                        0, 0))
 _make_key_jax_batch = jax.profiler.trace_function(_make_key_jax_batch,
