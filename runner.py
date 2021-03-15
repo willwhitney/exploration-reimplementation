@@ -10,6 +10,37 @@ MULTIPLEX = 1
 
 excluded_flags = []
 
+basename = "reacher_explore"
+grid = [
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [1],
+        "env": ["reacher_explore"],
+        "task": ["hard", "hard_fixed_init"],
+        "max_steps": [1000],
+        "no_exploration": [True, False],
+        "seed": [0],
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.1],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.5],
+
+        # task policy settings
+        "policy": ["sac"],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "n_updates_per_step": [5],
+        "update_target_every": [5],
+    },
+]
+
+
+
 # basename = "pv100_keops_v2_updates"
 # grid = [
 #     {
@@ -119,35 +150,35 @@ excluded_flags = []
 # ]
 
 
-basename = "manipulator_keops_v4_updates1"
-grid = [
-    {
-        # define the task
-        "_main": ["main.py"],
-        "eval_every": [1],
-        "env": ["manipulator"],
-        "task": ["bring_ball"],
-        "max_steps": [1000],
-        "max_episodes": [10000],
-        "no_exploration": [False],
-        "seed": [0],
+# basename = "manipulator_keops_v4_updates1"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["manipulator"],
+#         "task": ["bring_ball"],
+#         "max_steps": [1000],
+#         "max_episodes": [10000],
+#         "no_exploration": [False],
+#         "seed": [0],
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [1, 0.5],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.1],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [1, 0.5],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.1],
 
-        # task policy settings
-        "policy": ["sac"],
+#         # task policy settings
+#         "policy": ["sac"],
 
-        # novelty Q settings
-        "uniform_update_candidates": [True],
-        "n_updates_per_step": [1],
-        "update_target_every": [1],
-    },
-]
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [1],
+#         "update_target_every": [1],
+#     },
+# ]
 
 
 def construct_varying_keys(grids):

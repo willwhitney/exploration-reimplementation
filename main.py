@@ -13,14 +13,12 @@ from jax import numpy as jnp, random
 from flax import nn, struct
 
 from dm_control import suite
-import point
 
-import dmcontrol_gridworld
 import replay_buffer
 import q_learning
 import utils
-from observation_domains import DOMAINS
-import jax_specs
+from environments.observation_domains import DOMAINS
+from environments import jax_specs
 
 
 R_MAX = 100
@@ -476,6 +474,7 @@ def display_state(agent_state: AgentState, ospec, aspec,
 def main(args):
     rng = random.PRNGKey(args.seed)
     if args.env == 'gridworld':
+        from environments import dmcontrol_gridworld
         env = dmcontrol_gridworld.GridWorld(args.env_size, args.max_steps)
         observation_spec = env.observation_spec()
     else:

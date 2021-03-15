@@ -11,7 +11,7 @@ import jax
 from jax import numpy as jnp, random
 from jax.lib import pytree
 from dm_env import specs
-import jax_specs
+from environments import jax_specs
 
 
 def one_hot(x, k, dtype=jnp.int16):
