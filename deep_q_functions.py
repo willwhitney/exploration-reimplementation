@@ -5,7 +5,7 @@ from flax import nn, optim
 
 import q_learning
 import utils
-import jax_specs
+from environments import jax_specs
 
 
 def fourier_code(x):

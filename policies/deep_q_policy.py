@@ -10,7 +10,7 @@ from flax import struct
 import q_learning
 import deep_q_functions as q_functions
 import utils
-import jax_specs
+from environments import jax_specs
 from experiment_logging import default_logger as logger
 
 

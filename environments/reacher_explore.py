@@ -146,5 +146,5 @@ suite._DOMAINS['reacher_explore'] = module
 if __name__ == '__main__':
   env = suite.load('reacher_explore', 'hard_fixed_init')
   print(env.reset())
-  for i in range(100):
-    print(env.step(np.ones(2)).observation)
+#   for i in range(100):
+#     print(env.step(np.ones(2)).observation)

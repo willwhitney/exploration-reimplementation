@@ -9,10 +9,10 @@ from jax import numpy as jnp, random, lax, profiler
 
 from flax import nn, struct
 
-import dmcontrol_gridworld
+from environments import dmcontrol_gridworld
 import utils
 import replay_buffer
-from observation_domains import DOMAINS
+from environments.observation_domains import DOMAINS
 
 
 @struct.dataclass

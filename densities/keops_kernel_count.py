@@ -12,7 +12,7 @@ from flax import struct
 import pykeops
 from pykeops.torch import LazyTensor
 
-import jax_specs
+from environments import jax_specs
 import utils
 
 
@@ -63,11 +63,11 @@ def new(observation_spec, action_spec, max_obs=100000,
     else:
         device = torch.device('cpu')
 
-    pykeops.clean_pykeops()  # just in case old build files are still present
+    # pykeops.clean_pykeops()  # just in case old build files are still present
 
     # initialize this to some reasonable size
     # starting_size = 65536
-    starting_size = 1024
+    starting_size = 4096
     observations = torch.zeros((starting_size, key_dim))
     observations = observations.type(T_DTYPE).to(device)
     weights = torch.zeros((starting_size,))

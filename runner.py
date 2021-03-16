@@ -10,14 +10,43 @@ MULTIPLEX = 1
 
 excluded_flags = []
 
-basename = "reacher_explore"
+# basename = "reacher_explore_v2"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["reacher_explore"],
+#         "task": ["hard", "hard_fixed_init"],
+#         "max_steps": [1000],
+#         "no_exploration": [True, False],
+#         "seed": [0],
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+
+#         # task policy settings
+#         "policy": ["sac"],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [5],
+#         "update_target_every": [5],
+#     },
+# ]
+
+basename = "hallway_v1"
 grid = [
     {
         # define the task
         "_main": ["main.py"],
         "eval_every": [1],
-        "env": ["reacher_explore"],
-        "task": ["hard", "hard_fixed_init"],
+        "env": ["hallway"],
+        "task": ["velocity_1", "velocity_4"],
         "max_steps": [1000],
         "no_exploration": [True, False],
         "seed": [0],
@@ -27,7 +56,7 @@ grid = [
         "density_state_scale": [0.1],
         "density_action_scale": [1],
         "density_max_obs": [2**15],
-        "density_tolerance": [0.5],
+        "density_tolerance": [0.95],
 
         # task policy settings
         "policy": ["sac"],

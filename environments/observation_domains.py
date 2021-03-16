@@ -139,12 +139,12 @@ DOMAINS = {
         'easy': OrderedDict({
             'position': BoundedArray(name='position', shape=(2,),
                                      dtype=np.float32,
-                                     minimum=np.array([0, 0]),
-                                     maximum=np.array([6.28, 6.28])),
+                                     minimum=np.array([0, -3]),
+                                     maximum=np.array([6.28, 3])),
             'to_target': BoundedArray(name='to_target', shape=(2,),
                                      dtype=np.float32,
-                                     minimum=np.array([-4, -4]),
-                                     maximum=np.array([4, 4])),
+                                     minimum=np.array([-0.4, -0.4]),
+                                     maximum=np.array([0.4, 0.4])),
             'velocity': BoundedArray(name='velocity', shape=(2,),
                                      dtype=np.float32,
                                      minimum=np.array([-5, -5]),
@@ -153,12 +153,12 @@ DOMAINS = {
         'hard': OrderedDict({
             'position': BoundedArray(name='position', shape=(2,),
                                      dtype=np.float32,
-                                     minimum=np.array([0, 0]),
-                                     maximum=np.array([6.28, 6.28])),
+                                     minimum=np.array([0, -3]),
+                                     maximum=np.array([6.28, 3])),
             'to_target': BoundedArray(name='to_target', shape=(2,),
                                      dtype=np.float32,
-                                     minimum=np.array([-4, -4]),
-                                     maximum=np.array([4, 4])),
+                                     minimum=np.array([-0.4, -0.4]),
+                                     maximum=np.array([0.4, 0.4])),
             'velocity': BoundedArray(name='velocity', shape=(2,),
                                      dtype=np.float32,
                                      minimum=np.array([-5, -5]),
@@ -167,18 +167,37 @@ DOMAINS = {
         'hard_fixed_init': OrderedDict({
             'position': BoundedArray(name='position', shape=(2,),
                                      dtype=np.float32,
-                                     minimum=np.array([0, 0]),
-                                     maximum=np.array([6.28, 6.28])),
+                                     minimum=np.array([0, -3]),
+                                     maximum=np.array([6.28, 3])),
             'to_target': BoundedArray(name='to_target', shape=(2,),
                                      dtype=np.float32,
-                                     minimum=np.array([-4, -4]),
-                                     maximum=np.array([4, 4])),
+                                     minimum=np.array([-0.4, -0.4]),
+                                     maximum=np.array([0.4, 0.4])),
             'velocity': BoundedArray(name='velocity', shape=(2,),
                                      dtype=np.float32,
                                      minimum=np.array([-5, -5]),
                                      maximum=np.array([5, 5])),
         }),
     },
+    'hallway': {
+        'velocity_1': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.5, -0.1]),
+                                     maximum=np.array([0.5, 0.1])),
+        }),
+        # 'mass': OrderedDict({
+        #     'position': BoundedArray(name='position', shape=(2,),
+        #                              dtype=np.float32,
+        #                              minimum=np.array([-0.3, -0.3]),
+        #                              maximum=np.array([0.3, 0.3])),
+        #     'velocity': BoundedArray(name='velocity', shape=(2,),
+        #                              dtype=np.float32,
+        #                              minimum=np.array([-0.5, -0.5]),
+        #                              maximum=np.array([0.5, 0.5])),
+        # }),
+    },
+
 }
 
 
@@ -203,7 +222,7 @@ def estimate_domains(env_name, task_name):
 
     for policy in policies:
         timestep = env.reset()
-        for i in range(10000):
+        for i in range(100):
             observations.append(timestep.observation)
             a = policy()
             timestep = env.step(a)

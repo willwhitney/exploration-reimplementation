@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from jax import profiler
 
 import utils
-import jax_specs
+from environments import jax_specs
 
 
 class Replay:

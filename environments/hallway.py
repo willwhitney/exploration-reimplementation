@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 
-"""Point-mass domain."""
+"""Hallway domain."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -39,41 +39,64 @@ SUITE = containers.TaggedTasks()
 def get_model_and_assets():
   """Returns a tuple containing the model XML string and a dict of assets."""
   current_dir = pathlib.Path(__file__).parent.absolute()
-  return (resources.GetResource(f'{current_dir}/point.xml'),
+  return (resources.GetResource(f'{current_dir}/hallway.xml'),
           common.ASSETS)
 
 
 @SUITE.add()
-def velocity(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+def velocity_1(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
   physics = Physics.from_xml_string(*get_model_and_assets())
-  task = Point(velocity=True, vel_gain=1.0, random=random)
+  task = Hallway(velocity=True, vel_gain=1.0, length=1, distractor_scale=0,
+                 random=random)
   environment_kwargs = environment_kwargs or {}
   return control.Environment(
       physics, task, time_limit=time_limit, **environment_kwargs)
 
-
 @SUITE.add()
-def velocity_slow(time_limit=_DEFAULT_TIME_LIMIT, random=None,
-                  environment_kwargs=None):
-  """Returns the easy point_mass task."""
-  physics = Physics.from_xml_string(*get_model_and_assets())
-  task = Point(velocity=True, vel_gain=0.2, random=random)
-  environment_kwargs = environment_kwargs or {}
-  return control.Environment(
-      physics, task, time_limit=time_limit, **environment_kwargs)
-
-
-@SUITE.add()
-def mass(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+def velocity_4(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
   physics = Physics.from_xml_string(*get_model_and_assets())
-  task = Point(velocity=False, random=random)
+  task = Hallway(velocity=True, vel_gain=1.0, length=4, distractor_scale=0,
+                 random=random)
   environment_kwargs = environment_kwargs or {}
   return control.Environment(
       physics, task, time_limit=time_limit, **environment_kwargs)
+
+@SUITE.add()
+def velocity_1_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=1, distractor_scale=0.1,
+                 random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+@SUITE.add()
+def velocity_4_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=4, distractor_scale=0.1,
+                 random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+
+# @SUITE.add()
+# def mass(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+#              environment_kwargs=None):
+#   """Returns the easy point_mass task."""
+#   physics = Physics.from_xml_string(*get_model_and_assets())
+#   task = Hallway(velocity=False, random=random)
+#   environment_kwargs = environment_kwargs or {}
+#   return control.Environment(
+#       physics, task, time_limit=time_limit, **environment_kwargs)
 
 
 class Physics(mujoco.Physics):
@@ -88,12 +111,22 @@ class Physics(mujoco.Physics):
     """Returns the distance from mass to the target."""
     return np.linalg.norm(self.mass_to_target())
 
+  def mass_to_distractor(self):
+    """Returns the vector from mass to distractor in global coordinate."""
+    return (self.named.data.geom_xpos['distractor'] -
+            self.named.data.geom_xpos['pointmass'])
 
-class Point(base.Task):
+  def mass_to_distractor_dist(self):
+    """Returns the distance from mass to the distractor."""
+    return np.linalg.norm(self.mass_to_distractor())
+
+
+class Hallway(base.Task):
   """A point `Task` to reach target."""
 
-  def __init__(self, velocity=True, vel_gain=1, random=None):
-    """Initialize an instance of `Point`.
+  def __init__(self, velocity=True, vel_gain=1, length=6, distractor_scale=0,
+               random=None):
+    """Initialize an instance of `Hallway`.
 
     Args:
       randomize_gains: A `bool`, whether to randomize the actuator gains.
@@ -103,7 +136,9 @@ class Point(base.Task):
     """
     self.velocity = velocity
     self.vel_gain = vel_gain
-    super(Point, self).__init__(random=random)
+    self.length = length
+    self.distractor_scale = distractor_scale
+    super(Hallway, self).__init__(random=random)
 
   def initialize_episode(self, physics):
     """Sets the state of the environment at the start of each episode.
@@ -111,8 +146,12 @@ class Point(base.Task):
     Args:
       physics: An instance of `mujoco.Physics`.
     """
-    physics.named.data.qpos[:] = [-0.25, -0.25]
-    super(Point, self).initialize_episode(physics)
+    physics.named.data.qpos[:] = [-self.length + 0.2, 0]
+    physics.named.model.geom_pos['wall_x'][0] = -self.length
+    physics.named.model.geom_pos['wall_neg_x'][0] = self.length
+    physics.named.model.geom_pos['target'][0] = self.length - 0.2
+    physics.named.model.jnt_range['root_x'] = [-self.length, self.length]
+    super(Hallway, self).initialize_episode(physics)
 
   def before_step(self, action, physics):
     super().before_step(action, physics)
@@ -133,21 +172,30 @@ class Point(base.Task):
     target_size = physics.named.model.geom_size['target', 0]
     near_target = rewards.tolerance(physics.mass_to_target_dist(),
                                     bounds=(0, target_size), margin=target_size)
+
+    distractor_size = physics.named.model.geom_size['distractor', 0]
+    near_distractor = rewards.tolerance(physics.mass_to_distractor_dist(),
+                                        bounds=(0, distractor_size),
+                                        margin=distractor_size)
+
+    proximity_reward = near_target + near_distractor * self.distractor_scale
+
     control_reward = rewards.tolerance(physics.control(), margin=1,
                                        value_at_margin=0,
                                        sigmoid='quadratic').mean()
     small_control = (control_reward + 4) / 5
-    return near_target * small_control
+    return (proximity_reward) * small_control
 
 
 import sys
 module = sys.modules[__name__]
-suite._DOMAINS['point'] = module
+suite._DOMAINS['hallway'] = module
 
 if __name__ == '__main__':
-  env = suite.load('point', 'velocity')
+  env = suite.load('hallway', 'velocity_4')
   print(env.reset())
-  for i in range(100):
-    print(env.step(np.ones(2)).observation)
+
+#   for i in range(100):
+#     print(env.step(np.ones(2)).observation)
   # step = env.step(np.zeros(2))
   # pass
