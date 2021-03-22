@@ -3,6 +3,10 @@
   <include file="./common/visual.xml"/>
   <include file="./common/materials.xml"/>
 
+  <visual>
+    <global offwidth="800" offheight="800" />
+  </visual>
+
   <option timestep="0.02">
     <flag contact="disable"/>
   </option>

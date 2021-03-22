@@ -55,6 +55,17 @@ def velocity_1(time_limit=_DEFAULT_TIME_LIMIT, random=None,
       physics, task, time_limit=time_limit, **environment_kwargs)
 
 @SUITE.add()
+def velocity_2(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=2, distractor_scale=0,
+                 random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+@SUITE.add()
 def velocity_4(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
@@ -70,7 +81,20 @@ def velocity_1_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
   physics = Physics.from_xml_string(*get_model_and_assets())
-  task = Hallway(velocity=True, vel_gain=1.0, length=1, distractor_scale=0.1,
+  task = Hallway(velocity=True, vel_gain=1.0, length=1, target_size=0.5,
+                 distractor_size=1, distractor_scale=0.1,
+                 random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+@SUITE.add()
+def velocity_2_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=2, target_size=0.5,
+                 distractor_size=1, distractor_scale=0.1,
                  random=random)
   environment_kwargs = environment_kwargs or {}
   return control.Environment(
@@ -81,7 +105,8 @@ def velocity_4_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
   physics = Physics.from_xml_string(*get_model_and_assets())
-  task = Hallway(velocity=True, vel_gain=1.0, length=4, distractor_scale=0.1,
+  task = Hallway(velocity=True, vel_gain=1.0, length=4, target_size=0.5,
+                 distractor_size=1, distractor_scale=0.1,
                  random=random)
   environment_kwargs = environment_kwargs or {}
   return control.Environment(
@@ -124,7 +149,8 @@ class Physics(mujoco.Physics):
 class Hallway(base.Task):
   """A point `Task` to reach target."""
 
-  def __init__(self, velocity=True, vel_gain=1, length=6, distractor_scale=0,
+  def __init__(self, velocity=True, vel_gain=1, length=6, target_size=0.05,
+               distractor_size=0.1, distractor_scale=0,
                random=None):
     """Initialize an instance of `Hallway`.
 
@@ -136,7 +162,9 @@ class Hallway(base.Task):
     """
     self.velocity = velocity
     self.vel_gain = vel_gain
-    self.length = length
+    self.max_x = length / 2
+    self.target_size = target_size
+    self.distractor_size = distractor_size
     self.distractor_scale = distractor_scale
     super(Hallway, self).__init__(random=random)
 
@@ -146,11 +174,13 @@ class Hallway(base.Task):
     Args:
       physics: An instance of `mujoco.Physics`.
     """
-    physics.named.data.qpos[:] = [-self.length + 0.2, 0]
-    physics.named.model.geom_pos['wall_x'][0] = -self.length
-    physics.named.model.geom_pos['wall_neg_x'][0] = self.length
-    physics.named.model.geom_pos['target'][0] = self.length - 0.2
-    physics.named.model.jnt_range['root_x'] = [-self.length, self.length]
+    physics.named.data.qpos[:] = [-self.max_x + 0.2, 0]
+    physics.named.model.geom_pos['wall_x'][0] = -self.max_x
+    physics.named.model.geom_pos['wall_neg_x'][0] = self.max_x
+    physics.named.model.geom_pos['target'][0] = self.max_x - 0.2
+    physics.named.model.jnt_range['root_x'] = [-self.max_x, self.max_x]
+    physics.named.model.geom_size['target', 0] = self.target_size
+    physics.named.model.geom_size['distractor', 0] = self.distractor_size
     super(Hallway, self).initialize_episode(physics)
 
   def before_step(self, action, physics):

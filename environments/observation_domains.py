@@ -186,6 +186,24 @@ DOMAINS = {
                                      minimum=np.array([-0.5, -0.1]),
                                      maximum=np.array([0.5, 0.1])),
         }),
+        'velocity_4': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2, -0.1]),
+                                     maximum=np.array([2, 0.1])),
+        }),
+        'velocity_1_distractor': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.5, -0.1]),
+                                     maximum=np.array([0.5, 0.1])),
+        }),
+        'velocity_4_distractor': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2, -0.1]),
+                                     maximum=np.array([2, 0.1])),
+        }),
         # 'mass': OrderedDict({
         #     'position': BoundedArray(name='position', shape=(2,),
         #                              dtype=np.float32,

@@ -551,7 +551,7 @@ def main(args):
         # update the task policy
         # TODO: pull this loop inside the policy.update_fn
         policy_state = agent_state.policy_state
-        for _ in range(args.max_steps):
+        for _ in range(int(args.max_steps * args.policy_updates_per_step)):
             # transitions = agent_state.replay.sample(batch_size)
             transitions = agent_state.replay.sample(1024)
             transitions = tuple((jnp.array(el) for el in transitions))
@@ -612,6 +612,7 @@ if __name__ == '__main__':
     parser.add_argument('--policy_lr', type=float, default=1e-3)
     parser.add_argument('--policy_temperature', type=float, default=3e-1)
     parser.add_argument('--policy_test_temperature', type=float, default=1e-1)
+    parser.add_argument('--policy_updates_per_step', type=float, default=1)
 
     # count settings
     parser.add_argument('--density', type=str, default='tabular')

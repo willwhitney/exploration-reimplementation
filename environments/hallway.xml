@@ -18,7 +18,7 @@
 
   <worldbody>
     <light name="light" pos="0 0 1"/>
-    <camera name="fixed" pos="0 0 10" quat="1 0 0 0"/>
+    <camera name="fixed" pos="0 0 5" quat="1 0 0 0"/>
     <geom name="ground" type="plane" pos="0 0 0" size="4 .1 .1" material="grid"/>
     <geom name="wall_x" type="plane" pos="-3 0 .02" zaxis="1 0 0"  size=".02 .1 .02" material="decoration"/>
     <geom name="wall_y" type="plane" pos="0 -.1 .02" zaxis="0 1 0"  size="3 .02 .02" material="decoration"/>

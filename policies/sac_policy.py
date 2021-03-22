@@ -60,6 +60,7 @@ def action_fn(sac_agent: sac.SACAgent, state, n=1, explore=True):
     actions, entropy = sac_agent.act_samples(state, n, sample=explore)
     if explore:
         logger.update('train/policy_entropy', entropy)
+        logger.update('train/alpha', sac_agent.alpha.item())
     else:
         logger.update('test/policy_entropy', entropy)
     return sac_agent, actions
