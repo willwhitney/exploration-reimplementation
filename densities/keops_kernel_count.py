@@ -110,8 +110,8 @@ def update_batch(density_state: DensityState, states, actions):
 
 @jax.profiler.trace_function
 def _compute_updates(density_state: DensityState, keys):
-    # if density_state.total <= 0:
-    if True:
+    if density_state.total <= 0:
+    # if True:
         weight_update = torch.zeros_like(density_state.weights)
         return keys, weight_update
 

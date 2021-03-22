@@ -43,7 +43,7 @@ def get_model_and_assets():
           common.ASSETS)
 
 
-@SUITE.add()
+@SUITE.add('exploration')
 def velocity_1(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
@@ -54,7 +54,7 @@ def velocity_1(time_limit=_DEFAULT_TIME_LIMIT, random=None,
   return control.Environment(
       physics, task, time_limit=time_limit, **environment_kwargs)
 
-@SUITE.add()
+@SUITE.add('exploration')
 def velocity_2(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
@@ -65,7 +65,7 @@ def velocity_2(time_limit=_DEFAULT_TIME_LIMIT, random=None,
   return control.Environment(
       physics, task, time_limit=time_limit, **environment_kwargs)
 
-@SUITE.add()
+@SUITE.add('exploration')
 def velocity_4(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
@@ -76,7 +76,7 @@ def velocity_4(time_limit=_DEFAULT_TIME_LIMIT, random=None,
   return control.Environment(
       physics, task, time_limit=time_limit, **environment_kwargs)
 
-@SUITE.add()
+@SUITE.add('exploration')
 def velocity_1_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
@@ -88,7 +88,7 @@ def velocity_1_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
   return control.Environment(
       physics, task, time_limit=time_limit, **environment_kwargs)
 
-@SUITE.add()
+@SUITE.add('exploration')
 def velocity_2_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
@@ -100,7 +100,7 @@ def velocity_2_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
   return control.Environment(
       physics, task, time_limit=time_limit, **environment_kwargs)
 
-@SUITE.add()
+@SUITE.add('exploration')
 def velocity_4_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
@@ -216,10 +216,6 @@ class Hallway(base.Task):
     small_control = (control_reward + 4) / 5
     return (proximity_reward) * small_control
 
-
-import sys
-module = sys.modules[__name__]
-suite._DOMAINS['hallway'] = module
 
 if __name__ == '__main__':
   env = suite.load('hallway', 'velocity_4')

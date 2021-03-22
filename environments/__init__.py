@@ -1,1 +1,13 @@
-from environments import point, reacher_explore, hallway
+import inspect
+
+from environments import point
+from environments import reacher_explore
+from environments import hallway
+from environments import ball_in_cup_explore
+
+NEW_DOMAINS = {name: module for name, module in locals().items()
+               if inspect.ismodule(module) and hasattr(module, 'SUITE')}
+
+
+from dm_control import suite
+suite._DOMAINS.update(NEW_DOMAINS)

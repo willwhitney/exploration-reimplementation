@@ -10,14 +10,14 @@ MULTIPLEX = 1
 
 excluded_flags = []
 
-basename = "reacher_explore_v3_smalltarget"
+basename = "bice_v1"
 grid = [
     {
         # define the task
         "_main": ["main.py"],
         "eval_every": [1],
-        "env": ["reacher_explore"],
-        "task": ["hard", "hard_fixed_init"],
+        "env": ["ball_in_cup", "ball_in_cup_explore"],
+        "task": ["catch"],
         "max_steps": [1000],
         "no_exploration": [True, False],
         "seed": [0],
@@ -38,6 +38,36 @@ grid = [
         "update_target_every": [2],
     },
 ]
+
+
+# basename = "reacher_explore_v3_smalltarget"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["reacher_explore"],
+#         "task": ["hard", "hard_fixed_init"],
+#         "max_steps": [1000],
+#         "no_exploration": [True, False],
+#         "seed": [0],
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**16],
+#         "density_tolerance": [0.5],
+
+#         # task policy settings
+#         "policy": ["sac"],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+# ]
 
 # basename = "hallway_v4_checkalpha"
 # grid = [
@@ -71,7 +101,7 @@ grid = [
 
 
 
-# basename = "pv100_keops_v2_updates"
+# basename = "pv100_keops_v3_test"
 # grid = [
 #     {
 #         # define the task
@@ -84,18 +114,19 @@ grid = [
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
-#         "density_state_scale": [1e-2],
+#         "density_state_scale": [1e-1],
 #         "density_action_scale": [1],
-#         "density_max_obs": [8192],
-#         "density_tolerance": [0.95],
-#         "n_updates_per_step": [2],
-#         "update_target_every": [2],
+#         "density_max_obs": [2**16],
+#         "density_tolerance": [0.1],
 
 #         # task policy settings
 #         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
 
 #         # novelty Q settings
 #         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
 #     },
 # ]
 

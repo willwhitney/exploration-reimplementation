@@ -140,10 +140,6 @@ class Point(base.Task):
     return near_target * small_control
 
 
-import sys
-module = sys.modules[__name__]
-suite._DOMAINS['point'] = module
-
 if __name__ == '__main__':
   env = suite.load('point', 'velocity')
   print(env.reset())

@@ -63,6 +63,7 @@ def action_fn(sac_agent: sac.SACAgent, state, n=1, explore=True):
         logger.update('train/alpha', sac_agent.alpha.item())
     else:
         logger.update('test/policy_entropy', entropy)
+        logger.update('test/alpha', sac_agent.alpha.item())
     return sac_agent, actions
 
 

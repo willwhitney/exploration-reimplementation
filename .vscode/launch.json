@@ -17,19 +17,18 @@
                 "CUDA_VISIBLE_DEVICES": "3",
                 "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
             }
-
         },
         {
             "name": "sac",
             "type": "python",
             "request": "launch",
-            "program": "main_jit_density.py",
+            "program": "main.py",
             "console": "internalConsole",
             "args": [
-                "--env", "manipulator",
-                "--task", "bring_ball",
+                "--env", "point",
+                "--task", "velocity",
                 "--max_steps", "100",
-                "--density", "kernel_count",
+                "--density", "keops_kernel_count",
                 "--policy", "sac",
                 "--debug"
             ],

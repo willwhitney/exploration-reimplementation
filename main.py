@@ -362,8 +362,9 @@ def run_episode(agent_state: AgentState, rng, env,
             action_spec = jax_specs.convert_dm_spec(env.action_spec())
             a = utils.sample_uniform_actions(action_spec, action_rng, 1)[0]
             flag = 'train' if train else 'test'
-            logger.update(f'{flag}/policy_entropy', 0)
-            logger.update(f'{flag}/explore_entropy', 0)
+            logger.update(f'{flag}/policy_entropy', np.nan)
+            logger.update(f'{flag}/explore_entropy', np.nan)
+            logger.update(f'{flag}/alpha', np.nan)
         else:
             agent_state, a = sample_exploration_action(
                 agent_state, action_rng, s, train)

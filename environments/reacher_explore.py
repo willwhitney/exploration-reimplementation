@@ -45,7 +45,7 @@ def get_model_and_assets():
           common.ASSETS)
 
 
-@SUITE.add('benchmarking', 'easy')
+@SUITE.add()
 def easy(time_limit=_DEFAULT_TIME_LIMIT, random=None, environment_kwargs=None):
   """Returns reacher with sparse reward with 5e-2 tol and randomized target."""
   physics = Physics.from_xml_string(*get_model_and_assets())
@@ -55,7 +55,7 @@ def easy(time_limit=_DEFAULT_TIME_LIMIT, random=None, environment_kwargs=None):
       physics, task, time_limit=time_limit, **environment_kwargs)
 
 
-@SUITE.add('benchmarking')
+@SUITE.add()
 def hard(time_limit=_DEFAULT_TIME_LIMIT, random=None, environment_kwargs=None):
   """Returns reacher with sparse reward with 1e-2 tol and randomized target."""
   physics = Physics.from_xml_string(*get_model_and_assets())
@@ -136,11 +136,6 @@ class ReacherExplore(base.Task):
   def get_reward(self, physics):
     radii = physics.named.model.geom_size[['target', 'finger'], 0].sum()
     return rewards.tolerance(physics.finger_to_target_dist(), (0, radii))
-
-
-import sys
-module = sys.modules[__name__]
-suite._DOMAINS['reacher_explore'] = module
 
 
 if __name__ == '__main__':

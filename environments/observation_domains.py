@@ -204,16 +204,18 @@ DOMAINS = {
                                      minimum=np.array([-2, -0.1]),
                                      maximum=np.array([2, 0.1])),
         }),
-        # 'mass': OrderedDict({
-        #     'position': BoundedArray(name='position', shape=(2,),
-        #                              dtype=np.float32,
-        #                              minimum=np.array([-0.3, -0.3]),
-        #                              maximum=np.array([0.3, 0.3])),
-        #     'velocity': BoundedArray(name='velocity', shape=(2,),
-        #                              dtype=np.float32,
-        #                              minimum=np.array([-0.5, -0.5]),
-        #                              maximum=np.array([0.5, 0.5])),
-        # }),
+    },
+    'ball_in_cup_explore': {
+        'catch': OrderedDict({
+            'position': BoundedArray(name='position', shape=(4,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.25, -0.3, -0.2, -0.2]),
+                                     maximum=np.array([0.25, 0.2, 0.5, 0.25])),
+            'velocity': BoundedArray(name='velocity', shape=(4,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-1.5, -1.5, -1.5, -3.0]),
+                                     maximum=np.array([1.5, 1.5, 1.5, 1])),
+        }),
     },
 
 }
