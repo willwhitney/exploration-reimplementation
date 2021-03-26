@@ -81,8 +81,8 @@ def velocity_1_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
   physics = Physics.from_xml_string(*get_model_and_assets())
-  task = Hallway(velocity=True, vel_gain=1.0, length=1, target_size=0.5,
-                 distractor_size=1, distractor_scale=0.1,
+  task = Hallway(velocity=True, vel_gain=1.0, length=1, target_size=0.2,
+                 distractor_size=0.2, distractor_scale=0.1, sigmoid='gaussian',
                  random=random)
   environment_kwargs = environment_kwargs or {}
   return control.Environment(
@@ -93,8 +93,8 @@ def velocity_2_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
   physics = Physics.from_xml_string(*get_model_and_assets())
-  task = Hallway(velocity=True, vel_gain=1.0, length=2, target_size=0.5,
-                 distractor_size=1, distractor_scale=0.1,
+  task = Hallway(velocity=True, vel_gain=1.0, length=2, target_size=0.2,
+                 distractor_size=0.4, distractor_scale=0.1, sigmoid='gaussian',
                  random=random)
   environment_kwargs = environment_kwargs or {}
   return control.Environment(
@@ -105,8 +105,22 @@ def velocity_4_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
              environment_kwargs=None):
   """Returns the easy point_mass task."""
   physics = Physics.from_xml_string(*get_model_and_assets())
-  task = Hallway(velocity=True, vel_gain=1.0, length=4, target_size=0.5,
-                 distractor_size=1, distractor_scale=0.1,
+  task = Hallway(velocity=True, vel_gain=1.0, length=4, target_size=0.2,
+                 distractor_size=1.0, distractor_scale=0.1, sigmoid='gaussian',
+                 random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+
+@SUITE.add('exploration')
+def velocity_4_inverse_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=4, target_scale=0.0,
+                 distractor_size=0.01, distractor_scale=1.0,
+                 distractor_offset=-1.5, sigmoid='gaussian',
                  random=random)
   environment_kwargs = environment_kwargs or {}
   return control.Environment(
@@ -149,9 +163,10 @@ class Physics(mujoco.Physics):
 class Hallway(base.Task):
   """A point `Task` to reach target."""
 
-  def __init__(self, velocity=True, vel_gain=1, length=6, target_size=0.05,
-               distractor_size=0.1, distractor_scale=0,
-               random=None):
+  def __init__(self, velocity=True, vel_gain=1, length=6,
+               target_size=0.05, target_scale=1,
+               distractor_size=0.1, distractor_scale=0, distractor_offset=0.0,
+               sigmoid='gaussian', random=None):
     """Initialize an instance of `Hallway`.
 
     Args:
@@ -164,8 +179,11 @@ class Hallway(base.Task):
     self.vel_gain = vel_gain
     self.max_x = length / 2
     self.target_size = target_size
+    self.target_scale = target_scale
     self.distractor_size = distractor_size
     self.distractor_scale = distractor_scale
+    self.distractor_offset = distractor_offset
+    self.sigmoid = sigmoid
     super(Hallway, self).__init__(random=random)
 
   def initialize_episode(self, physics):
@@ -174,10 +192,11 @@ class Hallway(base.Task):
     Args:
       physics: An instance of `mujoco.Physics`.
     """
-    physics.named.data.qpos[:] = [-self.max_x + 0.2, 0]
+    physics.named.data.qpos[:] = [-self.max_x + 0.1, 0]
     physics.named.model.geom_pos['wall_x'][0] = -self.max_x
     physics.named.model.geom_pos['wall_neg_x'][0] = self.max_x
     physics.named.model.geom_pos['target'][0] = self.max_x - 0.2
+    physics.named.model.geom_pos['distractor'][0] = self.distractor_offset
     physics.named.model.jnt_range['root_x'] = [-self.max_x, self.max_x]
     physics.named.model.geom_size['target', 0] = self.target_size
     physics.named.model.geom_size['distractor', 0] = self.distractor_size
@@ -201,14 +220,18 @@ class Hallway(base.Task):
     """Returns a reward to the agent."""
     target_size = physics.named.model.geom_size['target', 0]
     near_target = rewards.tolerance(physics.mass_to_target_dist(),
-                                    bounds=(0, target_size), margin=target_size)
+                                    bounds=(0, target_size),
+                                    margin=target_size,
+                                    sigmoid=self.sigmoid)
 
     distractor_size = physics.named.model.geom_size['distractor', 0]
     near_distractor = rewards.tolerance(physics.mass_to_distractor_dist(),
                                         bounds=(0, distractor_size),
-                                        margin=distractor_size)
+                                        margin=distractor_size,
+                                        sigmoid=self.sigmoid)
 
-    proximity_reward = near_target + near_distractor * self.distractor_scale
+    proximity_reward = (near_target * self.target_scale +
+                        near_distractor * self.distractor_scale)
 
     control_reward = rewards.tolerance(physics.control(), margin=1,
                                        value_at_margin=0,

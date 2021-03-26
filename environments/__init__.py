@@ -4,6 +4,7 @@ from environments import point
 from environments import reacher_explore
 from environments import hallway
 from environments import ball_in_cup_explore
+from environments import manipulator_explore
 
 NEW_DOMAINS = {name: module for name, module in locals().items()
                if inspect.ismodule(module) and hasattr(module, 'SUITE')}

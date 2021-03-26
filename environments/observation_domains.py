@@ -17,28 +17,16 @@ DOMAINS = {
                                      maximum=np.array([0.5, 0.5])),
         }),
     },
-    'point': {
-        'velocity': OrderedDict({
-            'position': BoundedArray(name='position', shape=(2,),
+    'ball_in_cup': {
+        'catch': OrderedDict({
+            'position': BoundedArray(name='position', shape=(4,),
                                      dtype=np.float32,
-                                     minimum=np.array([-0.3, -0.3]),
-                                     maximum=np.array([0.3, 0.3])),
-        }),
-        'velocity_slow': OrderedDict({
-            'position': BoundedArray(name='position', shape=(2,),
+                                     minimum=np.array([-0.25, -0.3, -0.2, -0.2]),
+                                     maximum=np.array([0.25, 0.2, 0.5, 0.25])),
+            'velocity': BoundedArray(name='velocity', shape=(4,),
                                      dtype=np.float32,
-                                     minimum=np.array([-0.3, -0.3]),
-                                     maximum=np.array([0.3, 0.3])),
-        }),
-        'mass': OrderedDict({
-            'position': BoundedArray(name='position', shape=(2,),
-                                     dtype=np.float32,
-                                     minimum=np.array([-0.3, -0.3]),
-                                     maximum=np.array([0.3, 0.3])),
-            'velocity': BoundedArray(name='velocity', shape=(2,),
-                                     dtype=np.float32,
-                                     minimum=np.array([-0.5, -0.5]),
-                                     maximum=np.array([0.5, 0.5])),
+                                     minimum=np.array([-1.5, -1.5, -1.5, -3.0]),
+                                     maximum=np.array([1.5, 1.5, 1.5, 1])),
         }),
     },
     'cartpole': {
@@ -134,7 +122,30 @@ DOMAINS = {
         }),
     },
 
-
+    'point': {
+        'velocity': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.3, -0.3]),
+                                     maximum=np.array([0.3, 0.3])),
+        }),
+        'velocity_slow': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.3, -0.3]),
+                                     maximum=np.array([0.3, 0.3])),
+        }),
+        'mass': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.3, -0.3]),
+                                     maximum=np.array([0.3, 0.3])),
+            'velocity': BoundedArray(name='velocity', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.5, -0.5]),
+                                     maximum=np.array([0.5, 0.5])),
+        }),
+    },
     'reacher_explore': {
         'easy': OrderedDict({
             'position': BoundedArray(name='position', shape=(2,),
@@ -204,6 +215,12 @@ DOMAINS = {
                                      minimum=np.array([-2, -0.1]),
                                      maximum=np.array([2, 0.1])),
         }),
+        'velocity_4_inverse_distractor': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2, -0.1]),
+                                     maximum=np.array([2, 0.1])),
+        }),
     },
     'ball_in_cup_explore': {
         'catch': OrderedDict({
@@ -217,6 +234,35 @@ DOMAINS = {
                                      maximum=np.array([1.5, 1.5, 1.5, 1])),
         }),
     },
+    'manipulator_explore': {
+        'reach_lift_ball': OrderedDict({
+            'arm_pos': BoundedArray(name='arm_pos', shape=(8, 2),
+                                     dtype=np.float32,
+                                     minimum=-np.ones((8, 2)),
+                                     maximum=np.ones((8, 2)),),
+            'arm_vel': BoundedArray(name='arm_vel', shape=(8,),
+                                     dtype=np.float32,
+                                     minimum=-10 * np.ones((8,)),
+                                     maximum=10 * np.ones((8,)),),
+            'touch': BoundedArray(name='touch', shape=(5,),
+                                     dtype=np.float32,
+                                     minimum=np.zeros((5,)),
+                                     maximum=5 * np.ones((5,)),),
+            'hand_pos': BoundedArray(name='hand_pos', shape=(4,),
+                                     dtype=np.float32,
+                                     minimum=-np.ones((4,)),
+                                     maximum=np.ones((4,)),),
+            'object_pos': BoundedArray(name='object_pos', shape=(4,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.5, 0, -1, 0]),
+                                     maximum=np.array([0.5, 1, 1, 1]),),
+            'object_vel': BoundedArray(name='object_vel', shape=(3,),
+                                     dtype=np.float32,
+                                     minimum=-10 * np.ones((3,)),
+                                     maximum=10 * np.ones((3,)),),
+        }),
+    },
+
 
 }
 

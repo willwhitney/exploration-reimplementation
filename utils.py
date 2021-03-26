@@ -261,9 +261,19 @@ def sample_grid(spec, dims, bins):
     return grid
 
 
+def select_observations(ospec, elements, flat_obs):
+    dims = []
+    start_dim = 0
+    for name, component in ospec.items():
+        end_dim = start_dim + np.prod(component.shape)
+        if name in elements:
+            dims += list(range(start_dim, end_dim))
+        start_dim = end_dim
+    return flat_obs[..., dims]
+
 @jax.profiler.trace_function
-def render_function(fn, replay, ospec, aspec, reduction=np.max,
-                    vis_dims=(0, 1), bins=20, use_uniform_states=False):
+def render_function(fn, replay, ospec, aspec, reduction=np.max, vis_elem=None,
+                    vis_dims=(1, 0), bins=20, use_uniform_states=False):
     """Renders a given function at sampled (state, action) pairs.
 
     Arguments:
@@ -317,8 +327,11 @@ def render_function(fn, replay, ospec, aspec, reduction=np.max,
         discrete_states = np.array(discretize(states, flat_ospec, bins))
         discrete_actions = np.array(discretize(actions, aspec, bins))
 
-        xs = np.concatenate([discrete_states, discrete_actions],
-                            axis=1)
+        if vis_elem is not None:
+            discrete_states = select_observations(ospec, vis_elem,
+                                                  discrete_states)
+
+        xs = np.concatenate([discrete_states, discrete_actions], axis=1)
 
     with jax.profiler.TraceContext("render value lists"):
         value_lists = [[[] for _ in range(bins)] for _ in range(bins)]

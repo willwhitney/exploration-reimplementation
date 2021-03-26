@@ -6,38 +6,38 @@ import copy
 import numpy as np
 
 GPUS = [0, 1, 2, 3]
-MULTIPLEX = 1
+MULTIPLEX = 2
 
 excluded_flags = []
 
-basename = "bice_v1"
-grid = [
-    {
-        # define the task
-        "_main": ["main.py"],
-        "eval_every": [1],
-        "env": ["ball_in_cup", "ball_in_cup_explore"],
-        "task": ["catch"],
-        "max_steps": [1000],
-        "no_exploration": [True, False],
-        "seed": [0],
+# basename = "bice_v1"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["ball_in_cup", "ball_in_cup_explore"],
+#         "task": ["catch"],
+#         "max_steps": [1000],
+#         "no_exploration": [True, False],
+#         "seed": [0],
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.1],
-        "density_action_scale": [1],
-        "density_max_obs": [2**16],
-        "density_tolerance": [0.5],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**16],
+#         "density_tolerance": [0.5],
 
-        # task policy settings
-        "policy": ["sac"],
+#         # task policy settings
+#         "policy": ["sac"],
 
-        # novelty Q settings
-        "uniform_update_candidates": [True],
-        "n_updates_per_step": [2],
-        "update_target_every": [2],
-    },
-]
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+# ]
 
 
 # basename = "reacher_explore_v3_smalltarget"
@@ -69,39 +69,68 @@ grid = [
 #     },
 # ]
 
-# basename = "hallway_v4_checkalpha"
+# basename = "hallway_inverse_distractor_v2_closer"
 # grid = [
 #     {
 #         # define the task
 #         "_main": ["main.py"],
 #         "eval_every": [1],
 #         "env": ["hallway"],
-#         "task": ["velocity_4"],
+#         "task": ["velocity_4_inverse_distractor"],
 #         "max_steps": [1000],
-#         "no_exploration": [False],
-#         "seed": [0, 1, 2, 3],
+#         "no_exploration": [False, True],
+#         "seed": [0, 1],
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
 #         "density_state_scale": [0.01],
 #         "density_action_scale": [1],
-#         "density_max_obs": [2**16],
+#         "density_max_obs": [2**15],
 #         "density_tolerance": [0.5],
 
 #         # task policy settings
 #         "policy": ["sac"],
-#         "policy_updates_per_step": [1],
+#         "policy_updates_per_step": [4],
 
 #         # novelty Q settings
 #         "uniform_update_candidates": [True],
 #         "n_updates_per_step": [2],
 #         "update_target_every": [2],
+#         "novelty_discount": [0.99],
 #     },
 # ]
 
+basename = "manipulator_explore_v1_reachlift"
+grid = [
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [1],
+        "env": ["manipulator_explore"],
+        "task": ["reach_lift_ball"],
+        "max_steps": [1000],
+        "no_exploration": [True, False],
+        "seed": [0, 1],
 
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.1],
+        "density_action_scale": [1],
+        "density_max_obs": [2**16],
+        "density_tolerance": [0.5],
 
-# basename = "pv100_keops_v3_test"
+        # task policy settings
+        "policy": ["sac"],
+        "policy_updates_per_step": [2],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
+    },
+]
+
+# basename = "pv100_v4_sacupdates"
 # grid = [
 #     {
 #         # define the task
@@ -111,17 +140,18 @@ grid = [
 #         "task": ["velocity"],
 #         "max_steps": [100],
 #         "seed": [0],
+#         "no_exploration": [True, False],
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
-#         "density_state_scale": [1e-1],
+#         "density_state_scale": [1e-2],
 #         "density_action_scale": [1],
 #         "density_max_obs": [2**16],
-#         "density_tolerance": [0.1],
+#         "density_tolerance": [0.95],
 
 #         # task policy settings
 #         "policy": ["sac"],
-#         "policy_updates_per_step": [1],
+#         "policy_updates_per_step": [1, 4],
 
 #         # novelty Q settings
 #         "uniform_update_candidates": [True],

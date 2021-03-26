@@ -397,25 +397,32 @@ def display_state(agent_state: AgentState, ospec, aspec,
     exploration_state = agent_state.exploration_state
     policy_state = agent_state.policy_state
 
+    if 'object_pos' in ospec:
+        vis_elem = {'object_pos'}
+    else:
+        vis_elem = None
+
+    render_function = jax.partial(utils.render_function, vis_elem=vis_elem)
+
     # min_count_map = dmcontrol_gridworld.render_function(
     #     jax.partial(density.get_count_batch, exploration_state.density_state),
     #     env, reduction=jnp.min)
-    count_map = utils.render_function(
+    count_map = render_function(
         jax.partial(density.get_count_batch, exploration_state.density_state),
         agent_state.replay,
         ospec, aspec, bins=bins)
-    novq_map = utils.render_function(
+    novq_map = render_function(
         jax.partial(q_learning.predict_value, exploration_state.novq_state),
         agent_state.replay,
         ospec, aspec, bins=bins)
-    optimistic_novq_map = utils.render_function(
+    optimistic_novq_map = render_function(
         jax.partial(predict_optimistic_value_batch,
                     exploration_state.novq_state,
                     exploration_state.density_state,
                     exploration_state.prior_count),
         agent_state.replay,
         ospec, aspec, bins=bins)
-    novelty_reward_map = utils.render_function(
+    novelty_reward_map = render_function(
         jax.partial(compute_novelty_reward, exploration_state),
         agent_state.replay,
         ospec, aspec, bins=bins)
@@ -434,7 +441,7 @@ def display_state(agent_state: AgentState, ospec, aspec,
 
     q_policies = ['policies.deep_q_policy', 'policies.tabular_q_policy']
     if policy.__name__ in q_policies:
-        taskq_map = utils.render_function(
+        taskq_map = render_function(
             jax.partial(q_learning.predict_value, policy_state.q_state),
             agent_state.replay,
             ospec, aspec, bins=bins)
@@ -447,7 +454,7 @@ def display_state(agent_state: AgentState, ospec, aspec,
             with torch.no_grad():
                 v = policy_state.critic.Q1(torch.cat([s, a], dim=-1))
             return v.cpu().detach().numpy()
-        taskq_map = utils.render_function(
+        taskq_map = render_function(
             get_task_value,
             agent_state.replay,
             ospec, aspec, bins=bins)
@@ -496,7 +503,7 @@ def main(args):
     novq_state = q_functions.init_fn(args.seed,
                                      observation_spec,
                                      action_spec,
-                                     discount=0.97,
+                                     discount=args.novelty_discount,
                                      max_value=R_MAX)
 
     density_state = density.new(observation_spec, action_spec,
@@ -535,7 +542,7 @@ def main(args):
                              uniform_update_candidates=args.uniform_update_candidates,
                              batch_size=args.batch_size)
 
-    current_time = time.time()
+    current_time = np.nan
     for episode in range(1, args.max_episodes + 1):
         last_time = current_time
         current_time = time.time()
@@ -624,6 +631,7 @@ if __name__ == '__main__':
 
     # novelty q learning
     parser.add_argument('--novelty_q_function', type=str, default='deep')
+    parser.add_argument('--novelty_discount', type=float, default=0.97)
     parser.add_argument('--temperature', type=float, default=1e-1)
     parser.add_argument('--update_temperature', type=float, default=None)
     parser.add_argument('--prior_count', type=float, default=1e-3)
