@@ -124,7 +124,7 @@ def load(path):
 
 # ----- Visualizations for gridworld ---------------------------------
 @profiler.trace_function
-def render_trajectory(replay, n, ospec, bins, vis_elem=None, vis_dims=(0, 1)):
+def render_trajectory(replay, n, ospec, bins, vis_elem=None, vis_dims=(1, 0)):
     x_dim, y_dim = vis_dims
     end = replay.next_slot if replay.next_slot > 0 else replay.length
     start = max(0, end - n)
@@ -142,9 +142,9 @@ def render_trajectory(replay, n, ospec, bins, vis_elem=None, vis_dims=(0, 1)):
 
     discrete_states = np.array(discrete_states)
     for state in discrete_states:
-        # loc = state.argmax(axis=1)
-        # discrete_state = utils.discretize_observation(state, flat_spec, bins)
-        render[state[x_dim], state[y_dim]] += 1
+        i, j = state[x_dim], state[y_dim]
+        flip_i = (bins - 1) - i
+        render[flip_i, j] += 1
     return render
 
 

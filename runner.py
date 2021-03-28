@@ -1,12 +1,20 @@
 import itertools
 import os
 import subprocess
+import sys
 import asyncio
 import copy
 import numpy as np
+import glob
+import shutil
+from pathlib import Path
+
+
+local = '--local' in sys.argv
 
 GPUS = [0, 1, 2, 3]
 MULTIPLEX = 2
+CODE_DIR = '..'
 
 excluded_flags = []
 
@@ -100,7 +108,7 @@ excluded_flags = []
 #     },
 # ]
 
-basename = "manipulator_explore_v1_reachlift"
+basename = "manipulator_explore_v8_reachlift"
 grid = [
     {
         # define the task
@@ -109,19 +117,20 @@ grid = [
         "env": ["manipulator_explore"],
         "task": ["reach_lift_ball"],
         "max_steps": [1000],
+        "max_episodes": [10000],
         "no_exploration": [True, False],
-        "seed": [0, 1],
+        "seed": [0],
 
         # density settings
         "density": ["keops_kernel_count"],
-        "density_state_scale": [0.1],
+        "density_state_scale": [0.3, 1],
         "density_action_scale": [1],
-        "density_max_obs": [2**16],
+        "density_max_obs": [2**15],
         "density_tolerance": [0.5],
 
         # task policy settings
         "policy": ["sac"],
-        "policy_updates_per_step": [2],
+        "policy_updates_per_step": [1, 2],
 
         # novelty Q settings
         "uniform_update_candidates": [True],
@@ -294,9 +303,9 @@ def construct_jobs(grids):
     return jobs
 
 
-def construct_job_string(job):
+def construct_job_string(job, name, source_dir=''):
     """construct the string to execute the job"""
-    flagstring = f"python {job['_main']}"
+    flagstring = f"python -u {source_dir}{job['_main']}"
     for flag in job:
         if flag not in excluded_flags and not flag.startswith('_'):
             if isinstance(job[flag], bool):
@@ -306,36 +315,92 @@ def construct_job_string(job):
                     print("WARNING: Excluding 'False' flag " + flag)
             else:
                 flagstring = flagstring + " --" + flag + " " + str(job[flag])
-    return flagstring
+    return flagstring + ' --name ' + name
 
 
 def construct_name(job, varying_keys):
     """construct the job's name out of the varying keys in this sweep"""
-    jobname = basename
+    job_name = basename
     for flag in job:
         if flag in varying_keys and not flag.startswith('_'):
-            jobname = jobname + "_" + flag + str(job[flag])
-    return jobname
+            job_name = job_name + "_" + flag + str(job[flag])
+    return job_name
 
 
-jobs = construct_jobs(grid)
-varying_keys = construct_varying_keys(grid)
-job_strings = []
-for job in jobs:
-    jobname = construct_name(job, varying_keys)
-    job_string = construct_job_string(job)
-    job_string = job_string + " --name " + jobname
-    job_strings.append(job_string)
+def copy_job_source(target_dir):
+    # exclude the results dir since it's large and scanning takes forever
+    # note that this syntax is extremely dumb!
+    # [!r] will exclude every directory that starts with 'r'
+    patterns = ['*.xml', '[!r]*/**/*.xml',
+                '*.py', '[!r]*/**/*.py']
+
+    for pattern in patterns:
+        for f in Path('.').glob(pattern):
+            target_path = f'{target_dir}{f}'
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            # print(f"Copying {f} to {target_path}.")
+            shutil.copy(f, target_path)
+
+
+def run_job_slurm(job):
+    # construct job name
+    job_name = construct_name(job, varying_keys)
+
+    # create slurm dirs if needed
+    slurm_log_dir = 'slurm_logs'
+    slurm_script_dir = 'slurm_scripts'
+    os.makedirs(slurm_script_dir, exist_ok=True)
+    os.makedirs(slurm_log_dir, exist_ok=True)
+
+    # copy code to a temp directory
+    true_source_dir = '.'
+    job_source_dir = f'{CODE_DIR}/exploration-reimplement-clones/{job_name}/'
+    os.makedirs(job_source_dir, exist_ok=True)
+    copy_job_source(job_source_dir)
+
+    # make the job command
+    job_string = construct_job_string(job, job_name, source_dir=job_source_dir)
+
+    # write a slurm script
+    slurm_script_path = f'{slurm_script_dir}/{job_name}.slurm'
+    with open(slurm_script_path, 'w') as slurmfile:
+        slurmfile.write("#!/bin/bash\n")
+        slurmfile.write(f"#SBATCH --job-name={job_name}\n")
+        slurmfile.write("#SBATCH --open-mode=append\n")
+        slurmfile.write(f"#SBATCH --output=slurm_logs/{job_name}.out\n")
+        slurmfile.write(f"#SBATCH --error=slurm_logs/{job_name}.err\n")
+        slurmfile.write("#SBATCH --export=ALL\n")
+        # slurmfile.write("#SBATCH --signal=USR1@600\n")
+        slurmfile.write("#SBATCH --time=2-00\n")
+        slurmfile.write("#SBATCH -N 1\n")
+        slurmfile.write("#SBATCH --mem=32gb\n")
+
+        slurmfile.write("#SBATCH -c 4\n")
+        slurmfile.write("#SBATCH --gres=gpu:1\n")
+        slurmfile.write("#SBATCH --constraint=turing|volta\n")
+        slurmfile.write("#SBATCH --exclude=lion[1-26]\n")
+
+        slurmfile.write("cd " + true_source_dir + '\n')
+        slurmfile.write(f"{job_string} &\n")
+        slurmfile.write("wait\n")
+
+    # run the slurm script
+    print("Dispatching `{}`".format(job_string))
+    os.system(f'sbatch {slurm_script_path} &')
 
 
 async def run_job(gpu_id, job):
-    print("Dispatching `{}`".format(job))
+    job_name = construct_name(job, varying_keys)
+    job_string = construct_job_string(job, job_name)
+    job_string = job_string + " --name " + job_name
+
+    print("Dispatching `{}`".format(job_string))
     env = {
         **os.environ,
         'CUDA_VISIBLE_DEVICES': str(gpu_id),
         'XLA_PYTHON_CLIENT_PREALLOCATE': 'false',
     }
-    proc = await asyncio.create_subprocess_shell(job, env=env)
+    proc = await asyncio.create_subprocess_shell(job_string, env=env)
     stdout, stderr = await proc.communicate()
 
 
@@ -348,7 +413,7 @@ async def worker_fn(gpu_id, queue):
 
 async def main():
     queue = asyncio.Queue()
-    for job in job_strings:
+    for job in jobs:
         queue.put_nowait(job)
 
     n_parallel = MULTIPLEX * len(GPUS)
@@ -364,4 +429,14 @@ async def main():
     await asyncio.gather(*workers, return_exceptions=True)
 
 
-asyncio.run(main())
+def slurm_main():
+    for job in jobs:
+        run_job_slurm(job)
+
+if __name__ == '__main__':
+    jobs = construct_jobs(grid)
+    varying_keys = construct_varying_keys(grid)
+    if local:
+        asyncio.run(main())
+    else:
+        slurm_main()

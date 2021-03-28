@@ -159,10 +159,10 @@ class ManipulatorExplore(base.Task):
 
       # Randomise object location.
       if self._reset == 'ground':
-          object_x = uniform(-.5, .5)
+          object_x = uniform(-.1, .1)
           object_z = uniform(0, .08)
           object_angle = uniform(0, 2*np.pi)
-          data.qvel[self._object + '_x'] = uniform(-1, 1)
+          data.qvel[self._object + '_x'] = uniform(-0.5, 0.5)
       else:
         raise ValueError('ManipulatorExplore reset arg is invalid.')
       data.qpos[self._object_joints] = object_x, object_z, object_angle

@@ -9,7 +9,10 @@ from torch.utils import dlpack as tdlpack
 from jax import dlpack as jdlpack
 
 from flax import struct
+
+import uuid
 import pykeops
+pykeops.set_bin_folder(f'/scratch/wwhitney/pykeops_bin/{uuid.uuid4()}')
 from pykeops.torch import LazyTensor
 
 from environments import jax_specs

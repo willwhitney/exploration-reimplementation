@@ -427,7 +427,7 @@ def display_state(agent_state: AgentState, ospec, aspec,
         agent_state.replay,
         ospec, aspec, bins=bins)
     traj_map = replay_buffer.render_trajectory(
-        agent_state.replay, max_steps, ospec, bins=bins)
+        agent_state.replay, max_steps, ospec, bins=bins, vis_elem=vis_elem)
 
 
     subfigs = [

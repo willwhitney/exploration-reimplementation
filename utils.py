@@ -346,7 +346,8 @@ def render_function(fn, replay, ospec, aspec, reduction=np.max, vis_elem=None,
                 l = value_lists[i][j]
                 if len(l) > 0:
                     with jax.profiler.TraceContext("render assign reduction"):
-                        rendered_values[i, j] = reduction(np.stack(l))
+                        flip_i = (bins - 1) - i
+                        rendered_values[flip_i, j] = reduction(np.stack(l))
     return rendered_values
 
 
