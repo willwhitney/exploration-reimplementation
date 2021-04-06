@@ -6,7 +6,7 @@ from jax import numpy as jnp, random, lax
 from flax import struct
 
 import utils
-import jax_specs
+from environments import jax_specs
 
 
 DTYPE = jnp.float16

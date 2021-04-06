@@ -19,7 +19,7 @@ import q_learning
 import utils
 from environments.observation_domains import DOMAINS
 from environments import jax_specs
-
+from policies.pytorch_sac.video import VideoRecorder
 
 R_MAX = 100
 
@@ -345,12 +345,14 @@ def update_agent(agent_state: AgentState, rng, transition):
 
 
 def run_episode(agent_state: AgentState, rng, env,
-                train=True, max_steps=None):
+                train=True, max_steps=None, video_recorder=None):
     timestep = env.reset()
     score, novelty_score = 0, 0
 
     i = 0
     while not timestep.last():
+        if video_recorder is not None:
+            video_recorder.record(env)
         rng, action_rng = random.split(rng)
         s = utils.flatten_observation(timestep.observation)
 
@@ -550,8 +552,13 @@ def main(args):
 
         # run an episode
         rng, episode_rng = random.split(rng)
+        video_recorder = VideoRecorder(args.save_dir, fps=args.max_steps/10)
+        video_recorder.init(enabled=(episode % args.video_every == 0))
         agent_state, env, score, novelty_score = run_episode(
-            agent_state, episode_rng, env, train=True, max_steps=args.max_steps)
+            agent_state, episode_rng, env,
+            train=True, max_steps=args.max_steps,
+            video_recorder=video_recorder)
+        video_recorder.save(f'train_{episode}.mp4')
         logger.update('train/episode', episode)
         logger.update('train/score', score)
         logger.update('train/novelty_score', novelty_score)
@@ -570,9 +577,13 @@ def main(args):
         # output / visualize
         if episode % args.eval_every == 0:
             rng, episode_rng = random.split(rng)
+            video_recorder = VideoRecorder(args.save_dir, fps=120)
+            video_recorder.init(enabled=(episode % args.video_every == 0))
             _, _, test_score, test_novelty_score = run_episode(
                 agent_state, episode_rng, env,
-                train=False, max_steps=args.max_steps)
+                train=False, max_steps=args.max_steps,
+                video_recorder=video_recorder)
+            video_recorder.save(f'test_{episode}.mp4')
             logger.update('test/episode', episode)
             logger.update('test/score', test_score)
             logger.update('test/novelty_score', test_novelty_score)
@@ -612,6 +623,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true', default=False)
     parser.add_argument('--vis', default='disk')
     parser.add_argument('--eval_every', type=int, default=10)
+    parser.add_argument('--video_every', type=int, default=10)
     parser.add_argument('--save_replay_every', type=int, default=10)
 
     # policy settings
@@ -631,7 +643,7 @@ if __name__ == '__main__':
 
     # novelty q learning
     parser.add_argument('--novelty_q_function', type=str, default='deep')
-    parser.add_argument('--novelty_discount', type=float, default=0.97)
+    parser.add_argument('--novelty_discount', type=float, default=0.99)
     parser.add_argument('--temperature', type=float, default=1e-1)
     parser.add_argument('--update_temperature', type=float, default=None)
     parser.add_argument('--prior_count', type=float, default=1e-3)

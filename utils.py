@@ -271,6 +271,7 @@ def select_observations(ospec, elements, flat_obs):
         start_dim = end_dim
     return flat_obs[..., dims]
 
+
 @jax.profiler.trace_function
 def render_function(fn, replay, ospec, aspec, reduction=np.max, vis_elem=None,
                     vis_dims=(1, 0), bins=20, use_uniform_states=False):

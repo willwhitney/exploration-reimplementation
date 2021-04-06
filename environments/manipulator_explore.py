@@ -44,79 +44,139 @@ SUITE = containers.TaggedTasks()
 
 
 def make_model(required_props):
-  """Returns a tuple containing the model XML string and a dict of assets."""
-  current_dir = pathlib.Path(__file__).parent.absolute()
-  xml_string = resources.GetResource(f'{current_dir}/manipulator_explore.xml')
-  parser = etree.XMLParser(remove_blank_text=True)
-  mjcf = etree.XML(xml_string, parser)
+    """Returns a tuple containing the model XML string and a dict of assets."""
+    current_dir = pathlib.Path(__file__).parent.absolute()
+    xml_string = resources.GetResource(f'{current_dir}/manipulator_explore.xml')
+    parser = etree.XMLParser(remove_blank_text=True)
+    mjcf = etree.XML(xml_string, parser)
 
-  # Select the desired prop.
-#   if use_peg:
-#     required_props = ['peg', 'target_peg']
-#     if insert:
-#       required_props += ['slot']
-#   else:
-#     required_props = ['ball', 'target_ball']
-#     if insert:
-#       required_props += ['cup']
+    # Select the desired prop.
+    #   if use_peg:
+    #     required_props = ['peg', 'target_peg']
+    #     if insert:
+    #       required_props += ['slot']
+    #   else:
+    #     required_props = ['ball', 'target_ball']
+    #     if insert:
+    #       required_props += ['cup']
 
-  # Remove unused props
-  for unused_prop in _ALL_PROPS.difference(required_props):
-    prop = xml_tools.find_element(mjcf, 'body', unused_prop)
-    prop.getparent().remove(prop)
+    # Remove unused props
+    for unused_prop in _ALL_PROPS.difference(required_props):
+        prop = xml_tools.find_element(mjcf, 'body', unused_prop)
+        prop.getparent().remove(prop)
 
-  return etree.tostring(mjcf, pretty_print=True), common.ASSETS
+    return etree.tostring(mjcf, pretty_print=True), common.ASSETS
 
 
 @SUITE.add('exploration')
 def reach_lift_ball(time_limit=_TIME_LIMIT, random=None,
-               environment_kwargs=None):
-  """Returns manipulator bring task with the ball prop."""
-  physics = Physics.from_xml_string(*make_model({'ball'}))
-  task = ManipulatorExplore('ball', random=random)
-  environment_kwargs = environment_kwargs or {}
-  return control.Environment(
-      physics, task, control_timestep=_CONTROL_TIMESTEP, time_limit=time_limit,
-      **environment_kwargs)
+                    environment_kwargs=None):
+    """Returns manipulator bring task with the ball prop."""
+    physics = Physics.from_xml_string(*make_model({'ball'}))
+    task = ManipulatorExplore('ball', random=random)
+    environment_kwargs = environment_kwargs or {}
+    return control.Environment(
+        physics, task, control_timestep=_CONTROL_TIMESTEP, time_limit=time_limit,
+        **environment_kwargs)
+
+@SUITE.add('exploration')
+def reach_lift_ball_narrow(time_limit=_TIME_LIMIT, random=None,
+                    environment_kwargs=None):
+    """Returns manipulator bring task with the ball prop."""
+    physics = Physics.from_xml_string(*make_model({'ball'}))
+    task = ManipulatorExplore('ball', reset='narrow', random=random)
+    environment_kwargs = environment_kwargs or {}
+    return control.Environment(
+        physics, task, control_timestep=_CONTROL_TIMESTEP, time_limit=time_limit,
+        **environment_kwargs)
+
+@SUITE.add('exploration')
+def reach_lift_ball_fixed(time_limit=_TIME_LIMIT, random=None,
+                    environment_kwargs=None):
+    """Returns manipulator bring task with the ball prop."""
+    physics = Physics.from_xml_string(*make_model({'ball'}))
+    task = ManipulatorExplore('ball', reset='fixed', random=random)
+    environment_kwargs = environment_kwargs or {}
+    return control.Environment(
+        physics, task, control_timestep=_CONTROL_TIMESTEP, time_limit=time_limit,
+        **environment_kwargs)
+
+
+@SUITE.add('exploration')
+def reach_shaped_lift_ball(time_limit=_TIME_LIMIT, random=None,
+                           environment_kwargs=None):
+    """Returns manipulator bring task with the ball prop."""
+    physics = Physics.from_xml_string(*make_model({'ball'}))
+    task = ManipulatorExplore('ball', reach_margin=0.1, random=random)
+    environment_kwargs = environment_kwargs or {}
+    return control.Environment(
+        physics, task, control_timestep=_CONTROL_TIMESTEP, time_limit=time_limit,
+        **environment_kwargs)
+
+@SUITE.add('exploration')
+def reach_shaped_lift_ball_narrow(time_limit=_TIME_LIMIT, random=None,
+                                 environment_kwargs=None):
+    """Returns manipulator bring task with the ball prop."""
+    physics = Physics.from_xml_string(*make_model({'ball'}))
+    task = ManipulatorExplore('ball', reset='narrow', reach_margin=0.1,
+                              random=random)
+    environment_kwargs = environment_kwargs or {}
+    return control.Environment(
+        physics, task, control_timestep=_CONTROL_TIMESTEP, time_limit=time_limit,
+        **environment_kwargs)
+
+@SUITE.add('exploration')
+def reach_shaped_lift_ball_fixed(time_limit=_TIME_LIMIT, random=None,
+                                 environment_kwargs=None):
+    """Returns manipulator bring task with the ball prop."""
+    physics = Physics.from_xml_string(*make_model({'ball'}))
+    task = ManipulatorExplore('ball', reset='fixed', reach_margin=0.1,
+                              random=random)
+    environment_kwargs = environment_kwargs or {}
+    return control.Environment(
+        physics, task, control_timestep=_CONTROL_TIMESTEP, time_limit=time_limit,
+        **environment_kwargs)
 
 
 class Physics(mujoco.Physics):
-  """Physics with additional features for the Planar Manipulator domain."""
+    """Physics with additional features for the Planar Manipulator domain."""
 
-  def bounded_joint_pos(self, joint_names):
-    """Returns joint positions as (sin, cos) values."""
-    joint_pos = self.named.data.qpos[joint_names]
-    return np.vstack([np.sin(joint_pos), np.cos(joint_pos)]).T
+    def bounded_joint_pos(self, joint_names):
+        """Returns joint positions as (sin, cos) values."""
+        joint_pos = self.named.data.qpos[joint_names]
+        return np.vstack([np.sin(joint_pos), np.cos(joint_pos)]).T
 
-  def joint_vel(self, joint_names):
-    """Returns joint velocities."""
-    return self.named.data.qvel[joint_names]
+    def joint_vel(self, joint_names):
+        """Returns joint velocities."""
+        return self.named.data.qvel[joint_names]
 
-  def body_2d_pose(self, body_names, orientation=True):
-    """Returns positions and/or orientations of bodies."""
-    if not isinstance(body_names, str):
-      body_names = np.array(body_names).reshape(-1, 1)  # Broadcast indices.
-    pos = self.named.data.xpos[body_names, ['x', 'z']]
-    if orientation:
-      ori = self.named.data.xquat[body_names, ['qw', 'qy']]
-      return np.hstack([pos, ori])
-    else:
-      return pos
+    def body_2d_pose(self, body_names, orientation=True):
+        """Returns positions and/or orientations of bodies."""
+        if not isinstance(body_names, str):
+            body_names = np.array(body_names).reshape(-1, 1)  # Broadcast indices.
+        pos = self.named.data.xpos[body_names, ['x', 'z']]
+        if orientation:
+            ori = self.named.data.xquat[body_names, ['qw', 'qy']]
+            return np.hstack([pos, ori])
+        else:
+            return pos
 
-  def touch(self):
-    return np.log1p(self.data.sensordata)
+    def touch(self):
+        return np.log1p(self.data.sensordata)
 
-  def site_distance(self, site1, site2):
-    site1_to_site2 = np.diff(self.named.data.site_xpos[[site2, site1]], axis=0)
-    return np.linalg.norm(site1_to_site2)
+    def site_distance(self, site1, site2):
+        site1_to_site2 = np.diff(self.named.data.site_xpos[[site2, site1]], axis=0)
+        return np.linalg.norm(site1_to_site2)
 
 
 class ManipulatorExplore(base.Task):
-  """A ManipulatorExplore `Task`."""
+    """A ManipulatorExplore `Task`."""
 
-  def __init__(self, obj, reset='ground', reach_scale=0.1, lift_scale=0.9,
-               fully_observable=True, random=None):
-    """Initialize an instance of the `ManipulatorExplore` task.
+    def __init__(self, obj, reset='wide',
+                 reach_scale=0.1, reach_margin=0.0,
+                 lift_scale=0.9,
+                 fully_observable=True, random=None):
+        """Initialize an instance of the `ManipulatorExplore` task.
     Args:
       obj: 'ball' or 'peg'
       fully_observable: A `bool`, whether the observation should contain the
@@ -126,87 +186,131 @@ class ManipulatorExplore(base.Task):
         integer seed for creating a new `RandomState`, or None to select a seed
         automatically (default).
     """
-    self._object = obj
-    self._reset = reset
-    self._reach_scale = reach_scale
-    self._lift_scale = lift_scale
-    self._object_joints = ['_'.join([self._object, dim]) for dim in 'xzy']
-    self._fully_observable = fully_observable
-    super().__init__(random=random)
+        self._object = obj
+        self._reset = reset
+        self._reach_scale = reach_scale
+        self._reach_margin = reach_margin
+        self._lift_scale = lift_scale
+        self._object_joints = ['_'.join([self._object, dim]) for dim in 'xzy']
+        self._fully_observable = fully_observable
+        super().__init__(random=random)
 
-  def initialize_episode(self, physics):
-    """Sets the state of the environment at the start of each episode."""
-    # Local aliases
-    choice = self.random.choice
-    uniform = self.random.uniform
-    model = physics.named.model
-    data = physics.named.data
+    def initialize_episode(self, physics):
+        """Sets the state of the environment at the start of each episode."""
+        # Local aliases
+        choice = self.random.choice
+        uniform = self.random.uniform
+        model = physics.named.model
+        data = physics.named.data
 
-    # Find a collision-free random initial configuration.
-    penetrating = True
-    while penetrating:
+        # Find a collision-free random initial configuration.
+        penetrating = True
+        while penetrating:
+            if self._reset == 'wide':
+                # Randomise angles of arm joints.
+                is_limited = model.jnt_limited[_ARM_JOINTS].astype(np.bool)
+                joint_range = model.jnt_range[_ARM_JOINTS]
+                lower_limits = np.where(is_limited, joint_range[:, 0], -np.pi)
+                upper_limits = np.where(is_limited, joint_range[:, 1], np.pi)
+                angles = uniform(lower_limits, upper_limits)
+                data.qpos[_ARM_JOINTS] = angles
 
-      # Randomise angles of arm joints.
-      is_limited = model.jnt_limited[_ARM_JOINTS].astype(np.bool)
-      joint_range = model.jnt_range[_ARM_JOINTS]
-      lower_limits = np.where(is_limited, joint_range[:, 0], -np.pi)
-      upper_limits = np.where(is_limited, joint_range[:, 1], np.pi)
-      angles = uniform(lower_limits, upper_limits)
-      data.qpos[_ARM_JOINTS] = angles
+                # Symmetrize hand.
+                data.qpos['finger'] = data.qpos['thumb']
 
-      # Symmetrize hand.
-      data.qpos['finger'] = data.qpos['thumb']
+                # Randomise object location.
+                object_x = uniform(-.1, .1)
+                object_z = uniform(0, .08)
+                object_angle = uniform(0, 2*np.pi)
+                data.qvel[self._object + '_x'] = uniform(-0.5, 0.5)
+                data.qpos[self._object_joints] = object_x, object_z, object_angle
 
-      # Randomise object location.
-      if self._reset == 'ground':
-          object_x = uniform(-.1, .1)
-          object_z = uniform(0, .08)
-          object_angle = uniform(0, 2*np.pi)
-          data.qvel[self._object + '_x'] = uniform(-0.5, 0.5)
-      else:
-        raise ValueError('ManipulatorExplore reset arg is invalid.')
-      data.qpos[self._object_joints] = object_x, object_z, object_angle
+            elif self._reset == 'narrow':
+                # Randomise angles of arm joints.
+                is_limited = model.jnt_limited[_ARM_JOINTS].astype(np.bool)
+                joint_range = model.jnt_range[_ARM_JOINTS]
 
-      # Check for collisions.
-      physics.after_reset()
-      penetrating = physics.data.ncon > 0
+                desired_upper_limit = np.pi / 6
+                desired_lower_limit = - np.pi / 6
 
-    super().initialize_episode(physics)
+                joint_upper_limit = np.minimum(joint_range[:, 1],
+                                               desired_upper_limit)
+                joint_lower_limit = np.maximum(joint_range[:, 0],
+                                               desired_lower_limit)
 
-  def get_observation(self, physics):
-    """Returns either features or only sensors (to be used with pixels)."""
-    obs = collections.OrderedDict()
-    obs['arm_pos'] = physics.bounded_joint_pos(_ARM_JOINTS)
-    obs['arm_vel'] = physics.joint_vel(_ARM_JOINTS)
-    obs['touch'] = physics.touch()
-    if self._fully_observable:
-      obs['hand_pos'] = physics.body_2d_pose('hand')
-      obs['object_pos'] = physics.body_2d_pose(self._object)
-      obs['object_vel'] = physics.joint_vel(self._object_joints)
-    return obs
+                upper_limits = np.where(is_limited, joint_upper_limit, desired_upper_limit)
+                lower_limits = np.where(is_limited, joint_lower_limit, desired_lower_limit)
+                angles = uniform(lower_limits, upper_limits)
 
-  def _is_close(self, distance):
-    return rewards.tolerance(distance, (0, _CLOSE), _CLOSE*2)
+                data.qpos[_ARM_JOINTS] = angles
 
-  def _peg_reward(self, physics):
-    """Returns a reward for bringing the peg prop to the target."""
-    grasp = self._is_close(physics.site_distance('peg_grasp', 'grasp'))
-    pinch = self._is_close(physics.site_distance('peg_pinch', 'pinch'))
-    grasping = (grasp + pinch) / 2
-    bring = self._is_close(physics.site_distance('peg', 'target_peg'))
-    bring_tip = self._is_close(physics.site_distance('target_peg_tip',
-                                                     'peg_tip'))
-    bringing = (bring + bring_tip) / 2
-    return max(bringing, grasping/3)
+                # Symmetrize hand.
+                data.qpos['finger'] = data.qpos['thumb']
 
-  def _ball_reward(self, physics):
-    """Returns a reward for bringing the ball prop to the target."""
-    return self._is_close(physics.site_distance('ball', 'target_ball'))
+                # Randomise object location.
+                object_x = uniform(-.01, .01)
+                object_z = uniform(.02, .06)
+                object_angle = uniform(0, 2*np.pi)
+                data.qvel[self._object + '_x'] = uniform(0, 0)
+                data.qpos[self._object_joints] = object_x, object_z, object_angle
 
-  def get_reward(self, physics):
-    """Returns a reward to the agent."""
-    grasp_distance = physics.site_distance(self._object, 'grasp')
-    grasping = rewards.tolerance(grasp_distance, (0, _CLOSE), _CLOSE*2)
-    lifting = rewards.tolerance(physics.named.data.qpos[self._object_joints[1]],
-                                bounds=(0.2, 2))
-    return float(self._reach_scale * grasping + self._lift_scale * lifting)
+            elif self._reset == 'fixed':
+                # Randomise angles of arm joints.
+                data.qpos[_ARM_JOINTS] = 0
+
+                # Randomise object location.
+                object_x = 0
+                object_z = 0.025
+                object_angle = 0
+                data.qvel[self._object + '_x'] = 0
+                data.qpos[self._object_joints] = object_x, object_z, object_angle
+            else:
+                raise ValueError('ManipulatorExplore reset arg is invalid.')
+
+            # Check for collisions.
+            physics.after_reset()
+            penetrating = physics.data.ncon > 0
+
+        super().initialize_episode(physics)
+
+    def get_observation(self, physics):
+        """Returns either features or only sensors (to be used with pixels)."""
+        obs = collections.OrderedDict()
+        obs['arm_pos'] = physics.bounded_joint_pos(_ARM_JOINTS)
+        obs['arm_vel'] = physics.joint_vel(_ARM_JOINTS)
+        obs['touch'] = physics.touch()
+        if self._fully_observable:
+            obs['hand_pos'] = physics.body_2d_pose('hand')
+            obs['object_pos'] = physics.body_2d_pose(self._object)
+            obs['object_vel'] = physics.joint_vel(self._object_joints)
+        return obs
+
+    def _is_close(self, distance):
+        return rewards.tolerance(distance, (0, _CLOSE), _CLOSE*2)
+
+    # def _peg_reward(self, physics):
+    #   """Returns a reward for bringing the peg prop to the target."""
+    #   grasp = self._is_close(physics.site_distance('peg_grasp', 'grasp'))
+    #   pinch = self._is_close(physics.site_distance('peg_pinch', 'pinch'))
+    #   grasping = (grasp + pinch) / 2
+    #   bring = self._is_close(physics.site_distance('peg', 'target_peg'))
+    #   bring_tip = self._is_close(physics.site_distance('target_peg_tip',
+    #                                                    'peg_tip'))
+    #   bringing = (bring + bring_tip) / 2
+    #   return max(bringing, grasping/3)
+
+    # def _ball_reward(self, physics):
+    #   """Returns a reward for bringing the ball prop to the target."""
+    #   return self._is_close(physics.site_distance('ball', 'target_ball'))
+
+    def get_reward(self, physics):
+        """Returns a reward to the agent."""
+        grasp_distance = physics.site_distance(self._object, 'grasp')
+        grasping = rewards.tolerance(grasp_distance, (0, _CLOSE),
+                                     self._reach_margin)
+
+        ball_x, ball_z = physics.named.data.qpos[self._object_joints[:2]]
+        above_floor = -0.35 < ball_x < 0.35
+        in_air = 0.2 < ball_z < 2
+        lifting = int(above_floor and in_air)
+        return float(self._reach_scale * grasping + self._lift_scale * lifting)

@@ -77,17 +77,18 @@ excluded_flags = []
 #     },
 # ]
 
-# basename = "hallway_inverse_distractor_v2_closer"
+# basename = "hallway_vis_v2"
 # grid = [
 #     {
 #         # define the task
 #         "_main": ["main.py"],
 #         "eval_every": [1],
 #         "env": ["hallway"],
-#         "task": ["velocity_4_inverse_distractor"],
+#         "task": ["velocity_4"],
 #         "max_steps": [1000],
+#         "video_every": [1],
 #         "no_exploration": [False, True],
-#         "seed": [0, 1],
+#         # "seed": [0, 1],
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
@@ -104,18 +105,48 @@ excluded_flags = []
 #         "uniform_update_candidates": [True],
 #         "n_updates_per_step": [2],
 #         "update_target_every": [2],
-#         "novelty_discount": [0.99],
 #     },
 # ]
 
-basename = "manipulator_explore_v8_reachlift"
+# basename = "manipulator_explore_v11_noslide"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["manipulator_explore"],
+#         "task": ["reach_lift_ball"],
+#         "max_steps": [1000],
+#         "max_episodes": [10000],
+#         "no_exploration": [True, False],
+#         "seed": [0],
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.3, 0.6, 1, 1.3],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.1],
+
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+# ]
+
+basename = "manipulator_rlb_fixed_v1"
 grid = [
     {
         # define the task
         "_main": ["main.py"],
         "eval_every": [1],
         "env": ["manipulator_explore"],
-        "task": ["reach_lift_ball"],
+        "task": ["reach_lift_ball_fixed"],
         "max_steps": [1000],
         "max_episodes": [10000],
         "no_exploration": [True, False],
@@ -123,14 +154,14 @@ grid = [
 
         # density settings
         "density": ["keops_kernel_count"],
-        "density_state_scale": [0.3, 1],
+        "density_state_scale": [0.6, 1.0],
         "density_action_scale": [1],
         "density_max_obs": [2**15],
-        "density_tolerance": [0.5],
+        "density_tolerance": [0.1],
 
         # task policy settings
         "policy": ["sac"],
-        "policy_updates_per_step": [1, 2],
+        "policy_updates_per_step": [1],
 
         # novelty Q settings
         "uniform_update_candidates": [True],
@@ -379,6 +410,7 @@ def run_job_slurm(job):
         slurmfile.write("#SBATCH --gres=gpu:1\n")
         slurmfile.write("#SBATCH --constraint=turing|volta\n")
         slurmfile.write("#SBATCH --exclude=lion[1-26]\n")
+        slurmfile.write("#SBATCH --exclude=vine[3-14]\n")
 
         slurmfile.write("cd " + true_source_dir + '\n')
         slurmfile.write(f"{job_string} &\n")

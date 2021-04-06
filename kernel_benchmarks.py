@@ -8,100 +8,103 @@ from jax import numpy as jnp, random, lax
 
 from dm_control import suite
 
-from observation_domains import DOMAINS
-import jax_specs
-import point
+import environments
+from environments.observation_domains import DOMAINS
+from environments import jax_specs
 import utils
 
 
-env_name = 'manipulator'
-task_name = 'bring_ball'
-env = suite.load(env_name, task_name)
-ospec = DOMAINS[env_name][task_name]
+for env_name, task_name in [('point', 'velocity'),
+                            ('hopper', 'hop'),
+                            ('manipulator', 'bring_ball')]:
+    # env_name = 'point'
+    # task_name = 'velocity'
+    env = suite.load(env_name, task_name)
+    ospec = DOMAINS[env_name][task_name]
 
-aspec = env.action_spec()
-j_aspec = jax_specs.convert_dm_spec(aspec)
-j_ospec = jax_specs.convert_dm_spec(ospec)
-flat_ospec = utils.flatten_observation_spec(ospec)
-j_flat_ospec = jax_specs.convert_dm_spec(flat_ospec)
-
-
-def profile_write(density, density_state, n=1000):
-    rng = random.PRNGKey(0)
-    states = utils.sample_uniform_actions(j_flat_ospec, rng, n)
-    actions = utils.sample_uniform_actions(j_aspec, rng, n)
-    states = np.array(jnp.expand_dims(states, axis=1))
-    actions = np.array(jnp.expand_dims(actions, axis=1))
-
-    start = time.time()
-    for i in range(n):
-        density_state = density.update_batch(density_state, states[i], actions[i])
-    end = time.time()
-    elapsed = end - start
-    return density_state, elapsed
+    aspec = env.action_spec()
+    j_aspec = jax_specs.convert_dm_spec(aspec)
+    j_ospec = jax_specs.convert_dm_spec(ospec)
+    flat_ospec = utils.flatten_observation_spec(ospec)
+    j_flat_ospec = jax_specs.convert_dm_spec(flat_ospec)
 
 
-def profile_read(density, density_state, n=100, qsize=128*64):
-    rng = random.PRNGKey(0)
-    query_states = utils.sample_uniform_actions(j_flat_ospec, rng, qsize)
-    query_actions = utils.sample_uniform_actions(j_aspec, rng, qsize)
-    query_states = np.array(query_states)
-    query_actions = np.array(query_actions)
+    def profile_write(density, density_state, n=1000):
+        rng = random.PRNGKey(0)
+        states = utils.sample_uniform_actions(j_flat_ospec, rng, n)
+        actions = utils.sample_uniform_actions(j_aspec, rng, n)
+        states = np.array(jnp.expand_dims(states, axis=1))
+        actions = np.array(jnp.expand_dims(actions, axis=1))
 
-    counts = []
-    start = time.time()
-    for i in range(n):
-        count = density.get_count_batch(density_state, query_states, query_actions)
-        counts.append(float(count.sum()))
-    end = time.time()
-    elapsed = end - start
-    return elapsed, np.array(counts).mean()
+        start = time.time()
+        for i in range(n):
+            density_state = density.update_batch(density_state, states[i], actions[i])
+        end = time.time()
+        elapsed = end - start
+        return density_state, elapsed
 
 
-def fill(density, density_state, n=50000, bsize=1):
-    for i in range(math.ceil(n / bsize)):
-        rng = random.PRNGKey(i)
-        extra_states = utils.sample_uniform_actions(j_flat_ospec, rng, bsize)
-        extra_actions = utils.sample_uniform_actions(j_aspec, rng, bsize)
-        density_state = density.update_batch(density_state, extra_states, extra_actions)
-    return density_state
+    def profile_read(density, density_state, n=100, qsize=128*64):
+        rng = random.PRNGKey(0)
+        query_states = utils.sample_uniform_actions(j_flat_ospec, rng, qsize)
+        query_actions = utils.sample_uniform_actions(j_aspec, rng, qsize)
+        query_states = np.array(query_states)
+        query_actions = np.array(query_actions)
+
+        counts = []
+        start = time.time()
+        for i in range(n):
+            count = density.get_count_batch(density_state, query_states, query_actions)
+            counts.append(float(count.sum()))
+        end = time.time()
+        elapsed = end - start
+        return elapsed, np.array(counts).mean()
 
 
-from densities import kernel_count
-from densities import faiss_kernel_count
-from densities import keops_kernel_count
-
-# for density in [kernel_count, keops_kernel_count]:
-for density in [keops_kernel_count]:
-    fill_bsize = 4096
-    tolerance = 1.0
-    for max_obs in [16384]:
-    # max_obs =
-    # for tolerance in [0.99]:
-        print((f"{env_name} {task_name} {density.__name__} "
-               f"with max_obs={max_obs} and tolerance={tolerance}"))
-        density_state = density.new(ospec, aspec,
-                                        state_std_scale=1e-1, action_std_scale=1,
-                                        max_obs=max_obs, tolerance=tolerance)
-
-        density_state, elapsed_write_empty = profile_write(density,
-                                                        density_state)
-        elapsed_read_empty, mean_count_empty = profile_read(density, density_state)
-
-        density_state = fill(density, density_state,
-                            n=min(50000, max_obs), bsize=fill_bsize)
-        # print(density_state.total)
-
-        density_state, elapsed_write_full = profile_write(density,
-                                                        density_state)
-        elapsed_read_full, mean_count_full = profile_read(density, density_state)
+    def fill(density, density_state, n=50000, bsize=1):
+        for i in range(math.ceil(n / bsize)):
+            rng = random.PRNGKey(i)
+            extra_states = utils.sample_uniform_actions(j_flat_ospec, rng, bsize)
+            extra_actions = utils.sample_uniform_actions(j_aspec, rng, bsize)
+            density_state = density.update_batch(density_state, extra_states, extra_actions)
+        return density_state
 
 
-        print(f"Write empty: {elapsed_write_empty :.2f}")
-        print(f"Read empty: {elapsed_read_empty :.2f}, Count: {mean_count_empty :.8f}")
-        print(f"Write full: {elapsed_write_full :.2f}")
-        print(f"Read full: {elapsed_read_full :.2f}, Count: {mean_count_full :.8f}")
-        print()
+    from densities import kernel_count
+    from densities import faiss_kernel_count
+    from densities import keops_kernel_count
+
+    # for density in [kernel_count, faiss_kernel_count]:
+    for density in [keops_kernel_count]:
+        fill_bsize = 4096
+        tolerance = 1.0
+        for max_obs in [4096, 16384, 65536]:
+        # max_obs =
+        # for tolerance in [0.99]:
+            print((f"{env_name} {task_name} {density.__name__} "
+                f"with max_obs={max_obs} and tolerance={tolerance}"))
+            density_state = density.new(ospec, aspec,
+                                            state_std_scale=1e-1, action_std_scale=1,
+                                            max_obs=max_obs, tolerance=tolerance)
+
+            # density_state, elapsed_write_empty = profile_write(density,
+            #                                                 density_state)
+            # elapsed_read_empty, mean_count_empty = profile_read(density, density_state)
+
+            density_state = fill(density, density_state,
+                                n=min(65536, max_obs), bsize=fill_bsize)
+            # print(density_state.total)
+
+            density_state, elapsed_write_full = profile_write(density,
+                                                            density_state)
+            elapsed_read_full, mean_count_full = profile_read(density, density_state)
+
+
+            # print(f"Write empty: {elapsed_write_empty :.2f}")
+            # print(f"Read empty: {elapsed_read_empty :.2f}, Count: {mean_count_empty :.8f}")
+            print(f"Write full: {elapsed_write_full :.2f}")
+            print(f"Read full: {elapsed_read_full :.2f}, Count: {mean_count_full :.8f}")
+            print()
 
 """
 # Point env
