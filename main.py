@@ -577,7 +577,7 @@ def main(args):
         # output / visualize
         if episode % args.eval_every == 0:
             rng, episode_rng = random.split(rng)
-            video_recorder = VideoRecorder(args.save_dir, fps=120)
+            video_recorder = VideoRecorder(args.save_dir, fps=args.max_steps/10)
             video_recorder.init(enabled=(episode % args.video_every == 0))
             _, _, test_score, test_novelty_score = run_episode(
                 agent_state, episode_rng, env,

@@ -139,36 +139,69 @@ excluded_flags = []
 #     },
 # ]
 
-basename = "manipulator_rlb_fixed_v1"
+basename = "mex_fixed_v3_tempcheck"
 grid = [
     {
         # define the task
         "_main": ["main.py"],
         "eval_every": [1],
         "env": ["manipulator_explore"],
-        "task": ["reach_lift_ball_fixed"],
+        "task": ["reach_shaped_lift_ball_fixed"],
         "max_steps": [1000],
         "max_episodes": [10000],
-        "no_exploration": [True, False],
+        "no_exploration": [False],
         "seed": [0],
 
         # density settings
         "density": ["keops_kernel_count"],
-        "density_state_scale": [0.6, 1.0],
+        "density_state_scale": [1.0],
         "density_action_scale": [1],
         "density_max_obs": [2**15],
         "density_tolerance": [0.1],
-
-        # task policy settings
-        "policy": ["sac"],
-        "policy_updates_per_step": [1],
 
         # novelty Q settings
         "uniform_update_candidates": [True],
         "n_updates_per_step": [2],
         "update_target_every": [2],
+        "update_temperature": [1e-1],
+        "temperature": [3e-2, 1e-1, 3e-1, 1],
+
+        # task policy settings
+        "policy": ["sac"],
+        "policy_updates_per_step": [1],
     },
 ]
+
+# basename = "mex_narrow_v1"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["manipulator_explore"],
+#         "task": ["reach_lift_ball_narrow"],
+#         "max_steps": [1000],
+#         "max_episodes": [10000],
+#         "no_exploration": [True, False],
+#         "seed": [0],
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.6, 1.0],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.1],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+#     },
+# ]
 
 # basename = "pv100_v4_sacupdates"
 # grid = [

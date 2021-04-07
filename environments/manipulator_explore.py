@@ -313,4 +313,6 @@ class ManipulatorExplore(base.Task):
         above_floor = -0.35 < ball_x < 0.35
         in_air = 0.2 < ball_z < 2
         lifting = int(above_floor and in_air)
-        return float(self._reach_scale * grasping + self._lift_scale * lifting)
+        grasp_reward = grasping * self._reach_scale
+        lift_reward = grasping * lifting * self._lift_scale  # only if grasping
+        return float(grasp_reward + lift_reward)
