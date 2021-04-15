@@ -248,7 +248,7 @@ class ManipulatorExplore(base.Task):
                 data.qpos['finger'] = data.qpos['thumb']
 
                 # Randomise object location.
-                object_x = uniform(-.01, .01)
+                object_x = uniform(-.1, .1)
                 object_z = uniform(.02, .06)
                 object_angle = uniform(0, 2*np.pi)
                 data.qvel[self._object + '_x'] = uniform(0, 0)

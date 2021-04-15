@@ -34,12 +34,16 @@ class DensityState:
     action_shift: jnp.ndarray
     max_obs: int = 100000
     tolerance: float = 0.95
+    reweight_dropped: bool = False
+    conserve_weight: bool = False
     total: int = 0
     next_slot: int = 0
 
 
+
 def new(observation_spec, action_spec, max_obs=100000,
         state_scale=1, action_scale=1, tolerance=0.95,
+        reweight_dropped=False, conserve_weight=False,
         **kwargs):
     flat_ospec = utils.flatten_observation_spec(observation_spec)
     j_flat_ospec = jax_specs.convert_dm_spec(flat_ospec)
@@ -79,7 +83,9 @@ def new(observation_spec, action_spec, max_obs=100000,
     return DensityState(observations, weights, device,
                         state_rescale, action_rescale,
                         state_shift, action_shift,
-                        max_obs=max_obs, tolerance=tolerance)
+                        max_obs=max_obs, tolerance=tolerance,
+                        reweight_dropped=reweight_dropped,
+                        conserve_weight=conserve_weight)
 
 
 @jax.profiler.trace_function
@@ -99,14 +105,14 @@ def update_batch(density_state: DensityState, states, actions):
     keys = _make_key_batch(density_state, states, actions)
     new_keys, weight_updates = _compute_updates(density_state, keys)
 
-    # add all the new observations to the index
-    if len(new_keys) > 0:
-        density_state = _add_observations(density_state, new_keys)
-
     # update weights
     if weight_updates.sum() > 0:
         weights = density_state.weights + weight_updates.to(density_state.device)
         density_state = density_state.replace(weights=weights)
+
+    # add all the new observations to the index
+    if len(new_keys) > 0:
+        density_state = _add_observations(density_state, new_keys)
 
     return density_state
 
@@ -158,17 +164,22 @@ def _add_observations(density_state: DensityState, keys):
     observations = density_state.observations
     weights = density_state.weights
 
-    if density_state.total == density_state.max_obs:
+    if density_state.total >= density_state.max_obs:
         indices = torch.randint(low=0, high=int(density_state.max_obs - 1),
                                 size=(bsize,))
     else:
         indices = torch.arange(next_slot, next_slot + bsize)
         indices = indices % density_state.max_obs
 
+    if density_state.conserve_weight:
+        removed_weight = weights[indices].sum()
+        max_key = min(density_state.total, density_state.max_obs)
+        weights[:int(max_key)] += removed_weight / max_key
+
     # update the observations
     observations[indices] = keys
     weights[indices] = 1
-    total = min(density_state.total + bsize, observations.shape[0])
+    total = density_state.total + bsize
     next_slot = (next_slot + bsize) % observations.shape[0]
     return density_state.replace(observations=observations, weights=weights,
                                  total=total, next_slot=next_slot)
@@ -223,6 +234,10 @@ def get_count_batch(density_state: DensityState, states, actions):
 
     with jax.profiler.TraceContext("do keops computation"):
         counts = C_oq.sum(dim=0)  # batch_size
+
+    # reweight counts to account for dropped entries
+    if density_state.reweight_dropped:
+        counts = counts * (density_state.total / weights.sum())
 
     with jax.profiler.TraceContext("convert types"):
         counts = utils.t_to_j(counts.reshape(-1))

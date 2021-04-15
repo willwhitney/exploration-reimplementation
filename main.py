@@ -514,7 +514,9 @@ def main(args):
                                 state_scale=args.density_state_scale,
                                 action_scale=args.density_action_scale,
                                 max_obs=args.density_max_obs,
-                                tolerance=args.density_tolerance,)
+                                tolerance=args.density_tolerance,
+                                reweight_dropped=args.density_reweight_dropped,
+                                conserve_weight=args.density_conserve_weight)
 
     replay = replay_buffer.Replay(state_shape, action_shape)
 
@@ -640,6 +642,8 @@ if __name__ == '__main__':
     parser.add_argument('--density_action_scale', type=float, default=1.)
     parser.add_argument('--density_max_obs', type=float, default=1e5)
     parser.add_argument('--density_tolerance', type=float, default=0.95)
+    parser.add_argument('--density_reweight_dropped', action='store_true')
+    parser.add_argument('--density_conserve_weight', action='store_true')
 
     # novelty q learning
     parser.add_argument('--novelty_q_function', type=str, default='deep')

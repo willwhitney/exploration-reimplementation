@@ -392,6 +392,64 @@ DOMAINS = {
                                      maximum=10 * np.ones((3,)),),
         }),
     },
+    'walker_explore': {
+        'stand_narrow': OrderedDict({
+            'orientations': BoundedArray(name='orientations', shape=(14,),
+                                     dtype=np.float32,
+                                     minimum=-np.ones((14,)),
+                                     maximum=np.ones((14,))),
+            'height': BoundedArray(name='height', shape=(1,),
+                                   dtype=np.float32,
+                                   minimum=np.array([0.3,]),
+                                   maximum=np.array([1.3,])),
+            'velocity': BoundedArray(name='velocity', shape=(9,),
+                                   dtype=np.float32,
+                                   minimum=np.array([-5, -5, -20, -40, -40, -40, -40, -40, -40]),
+                                   maximum=np.array([5, 5, 20, 40, 40, 40, 40, 40, 40])),
+        }),
+        'stand_narrow_sparse': OrderedDict({
+            'orientations': BoundedArray(name='orientations', shape=(14,),
+                                     dtype=np.float32,
+                                     minimum=-np.ones((14,)),
+                                     maximum=np.ones((14,))),
+            'height': BoundedArray(name='height', shape=(1,),
+                                   dtype=np.float32,
+                                   minimum=np.array([0.3,]),
+                                   maximum=np.array([1.3,])),
+            'velocity': BoundedArray(name='velocity', shape=(9,),
+                                   dtype=np.float32,
+                                   minimum=np.array([-5, -5, -20, -40, -40, -40, -40, -40, -40]),
+                                   maximum=np.array([5, 5, 20, 40, 40, 40, 40, 40, 40])),
+        }),
+        'walk_narrow_sparse': OrderedDict({
+            'orientations': BoundedArray(name='orientations', shape=(14,),
+                                     dtype=np.float32,
+                                     minimum=-np.ones((14,)),
+                                     maximum=np.ones((14,))),
+            'height': BoundedArray(name='height', shape=(1,),
+                                   dtype=np.float32,
+                                   minimum=np.array([0.3,]),
+                                   maximum=np.array([1.3,])),
+            'velocity': BoundedArray(name='velocity', shape=(9,),
+                                   dtype=np.float32,
+                                   minimum=np.array([-5, -5, -20, -40, -40, -40, -40, -40, -40]),
+                                   maximum=np.array([5, 5, 20, 40, 40, 40, 40, 40, 40])),
+        }),
+        'run_narrow_sparse': OrderedDict({
+            'orientations': BoundedArray(name='orientations', shape=(14,),
+                                     dtype=np.float32,
+                                     minimum=-np.ones((14,)),
+                                     maximum=np.ones((14,))),
+            'height': BoundedArray(name='height', shape=(1,),
+                                   dtype=np.float32,
+                                   minimum=np.array([0.3,]),
+                                   maximum=np.array([1.3,])),
+            'velocity': BoundedArray(name='velocity', shape=(9,),
+                                   dtype=np.float32,
+                                   minimum=np.array([-5, -5, -20, -40, -40, -40, -40, -40, -40]),
+                                   maximum=np.array([5, 5, 20, 40, 40, 40, 40, 40, 40])),
+        }),
+    },
 
 
 }
@@ -418,7 +476,7 @@ def estimate_domains(env_name, task_name):
 
     for policy in policies:
         timestep = env.reset()
-        for i in range(100):
+        for i in range(1000):
             observations.append(timestep.observation)
             a = policy()
             timestep = env.step(a)

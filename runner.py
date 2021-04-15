@@ -139,32 +139,33 @@ excluded_flags = []
 #     },
 # ]
 
-basename = "mex_fixed_v3_tempcheck"
+basename = "mex_fixed_v7_conserve"
 grid = [
     {
         # define the task
         "_main": ["main.py"],
-        "eval_every": [1],
+        "eval_every": [5],
         "env": ["manipulator_explore"],
         "task": ["reach_shaped_lift_ball_fixed"],
         "max_steps": [1000],
         "max_episodes": [10000],
         "no_exploration": [False],
-        "seed": [0],
+        "seed": list(range(4)),
 
         # density settings
         "density": ["keops_kernel_count"],
-        "density_state_scale": [1.0],
+        "density_state_scale": [0.6],
         "density_action_scale": [1],
         "density_max_obs": [2**15],
         "density_tolerance": [0.1],
+        "density_conserve_weight": [True],
 
         # novelty Q settings
         "uniform_update_candidates": [True],
         "n_updates_per_step": [2],
         "update_target_every": [2],
         "update_temperature": [1e-1],
-        "temperature": [3e-2, 1e-1, 3e-1, 1],
+        "temperature": [0.1],
 
         # task policy settings
         "policy": ["sac"],
@@ -203,7 +204,7 @@ grid = [
 #     },
 # ]
 
-# basename = "pv100_v4_sacupdates"
+# basename = "pv100_v8_conserve"
 # grid = [
 #     {
 #         # define the task
@@ -212,19 +213,20 @@ grid = [
 #         "env": ["point"],
 #         "task": ["velocity"],
 #         "max_steps": [100],
-#         "seed": [0],
-#         "no_exploration": [True, False],
+#         "seed": list(range(2)),
+#         "no_exploration": [False],
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
 #         "density_state_scale": [1e-2],
 #         "density_action_scale": [1],
-#         "density_max_obs": [2**16],
+#         "density_max_obs": [2**10, 2**15],
 #         "density_tolerance": [0.95],
+#         "density_conserve_weight": [True, False],
 
 #         # task policy settings
 #         "policy": ["sac"],
-#         "policy_updates_per_step": [1, 4],
+#         "policy_updates_per_step": [4],
 
 #         # novelty Q settings
 #         "uniform_update_candidates": [True],
