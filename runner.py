@@ -18,6 +18,70 @@ CODE_DIR = '..'
 
 excluded_flags = []
 
+
+# basename = "wex_stand_narrow_sparse_v1"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["walker_explore"],
+#         "task": ["stand_narrow_sparse"],
+#         "max_steps": [1000],
+#         "seed": list(range(1)),
+#         "no_exploration": [True, False],
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [1e-1, 1e-2],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
+
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+# ]
+
+basename = "fex_hard_v1"
+grid = [
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [5],
+        "env": ["finger_explore"],
+        "task": ["turn_hard_narrow"],
+        "max_steps": [1000],
+        "seed": list(range(2)),
+        "no_exploration": [True, False],
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [1e-1, 1e-2],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.5],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac"],
+        "policy_updates_per_step": [1],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
+    },
+]
+
+
 # basename = "bice_v1"
 # grid = [
 #     {
@@ -139,39 +203,39 @@ excluded_flags = []
 #     },
 # ]
 
-basename = "mex_fixed_v7_conserve"
-grid = [
-    {
-        # define the task
-        "_main": ["main.py"],
-        "eval_every": [5],
-        "env": ["manipulator_explore"],
-        "task": ["reach_shaped_lift_ball_fixed"],
-        "max_steps": [1000],
-        "max_episodes": [10000],
-        "no_exploration": [False],
-        "seed": list(range(4)),
+# basename = "mex_fixed_v7_conserve"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [5],
+#         "env": ["manipulator_explore"],
+#         "task": ["reach_shaped_lift_ball_fixed"],
+#         "max_steps": [1000],
+#         "max_episodes": [10000],
+#         "no_exploration": [False],
+#         "seed": list(range(4)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.6],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.1],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.6],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.1],
+#         "density_conserve_weight": [True],
 
-        # novelty Q settings
-        "uniform_update_candidates": [True],
-        "n_updates_per_step": [2],
-        "update_target_every": [2],
-        "update_temperature": [1e-1],
-        "temperature": [0.1],
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#         "update_temperature": [1e-1],
+#         "temperature": [0.1],
 
-        # task policy settings
-        "policy": ["sac"],
-        "policy_updates_per_step": [1],
-    },
-]
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+#     },
+# ]
 
 # basename = "mex_narrow_v1"
 # grid = [
@@ -236,115 +300,6 @@ grid = [
 # ]
 
 
-# basename = "acrobot_swingup"
-# grid = [
-#     {
-#         # define the task
-#         "_main": ["main_jit_density.py"],
-#         "eval_every": [1],
-#         "env": ["acrobot"],
-#         "task": ["swingup"],
-#         "max_steps": [1000],
-
-#         # density settings
-#         "density": ["kernel_count"],
-#         "density_state_scale": [3e-1],
-#         "density_action_scale": [1],
-#         "density_max_obs": [4096],
-#         "density_tolerance": [0.4],
-
-#         # task policy settings
-#         "policy": ["sac"],
-
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#     },
-# ]
-
-# basename = "hopper_keops_5update_density_state_scale0.3_seeds"
-# grid = [
-    # {
-    #     # define the task
-    #     "_main": ["main.py"],
-    #     "eval_every": [5],
-    #     "env": ["hopper"],
-    #     "task": ["hop"],
-    #     "max_steps": [1000],
-    #     "no_exploration": [False],
-    #     "seed": [0],
-
-    #     # density settings
-    #     "density": ["keops_kernel_count"],
-    #     "density_state_scale": [0.1],
-    #     "density_action_scale": [1],
-    #     "density_max_obs": [2**15],
-    #     "density_tolerance": [0.2, 0.5],
-
-    #     # task policy settings
-    #     "policy": ["sac"],
-
-    #     # novelty Q settings
-    #     "uniform_update_candidates": [True],
-    #     "n_updates_per_step": [5],
-    #     "update_target_every": [5],
-    # },
-    # {
-    #     # define the task
-    #     "_main": ["main.py"],
-    #     "eval_every": [5],
-    #     "env": ["hopper"],
-    #     "task": ["hop"],
-    #     "max_steps": [1000],
-    #     "no_exploration": [False],
-    #     "seed": [0, 1, 2, 3],
-
-    #     # density settings
-    #     "density": ["keops_kernel_count"],
-    #     "density_state_scale": [0.3],
-    #     "density_action_scale": [1],
-    #     "density_max_obs": [2**15],
-    #     "density_tolerance": [0.4],
-
-    #     # task policy settings
-    #     "policy": ["sac"],
-
-    #     # novelty Q settings
-    #     "uniform_update_candidates": [True],
-    #     "n_updates_per_step": [5],
-    #     "update_target_every": [5],
-    # },
-# ]
-
-
-# basename = "manipulator_keops_v4_updates1"
-# grid = [
-#     {
-#         # define the task
-#         "_main": ["main.py"],
-#         "eval_every": [1],
-#         "env": ["manipulator"],
-#         "task": ["bring_ball"],
-#         "max_steps": [1000],
-#         "max_episodes": [10000],
-#         "no_exploration": [False],
-#         "seed": [0],
-
-#         # density settings
-#         "density": ["keops_kernel_count"],
-#         "density_state_scale": [1, 0.5],
-#         "density_action_scale": [1],
-#         "density_max_obs": [2**15],
-#         "density_tolerance": [0.1],
-
-#         # task policy settings
-#         "policy": ["sac"],
-
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#         "n_updates_per_step": [1],
-#         "update_target_every": [1],
-#     },
-# ]
 
 
 def construct_varying_keys(grids):

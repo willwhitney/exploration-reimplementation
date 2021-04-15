@@ -450,6 +450,52 @@ DOMAINS = {
                                    maximum=np.array([5, 5, 20, 40, 40, 40, 40, 40, 40])),
         }),
     },
+    'finger_explore': {
+        'turn_easy_narrow': OrderedDict({
+            'position': BoundedArray(name='position', shape=(4,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2, -2, -.1, -.1]),
+                                     maximum=np.array([2, 2, .1, .1])),
+            'velocity': BoundedArray(name='velocity', shape=(3,),
+                                     dtype=np.float32,
+                                     minimum=-12 * np.ones((3,)),
+                                     maximum=12 * np.ones((3,))),
+            'touch': BoundedArray(name='touch', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.zeros((2,)),
+                                     maximum=5 * np.ones((2,))),
+            'target_position': BoundedArray(name='target_position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.13, -0.13]),
+                                     maximum=np.array([0.13, 0.13])),
+            'dist_to_target': BoundedArray(name='dist_to_target', shape=(1,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.2]),
+                                     maximum=np.array([0.23])),
+        }),
+        'turn_hard_narrow': OrderedDict({
+            'position': BoundedArray(name='position', shape=(4,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2, -2, -.1, -.1]),
+                                     maximum=np.array([2, 2, .1, .1])),
+            'velocity': BoundedArray(name='velocity', shape=(3,),
+                                     dtype=np.float32,
+                                     minimum=-12 * np.ones((3,)),
+                                     maximum=12 * np.ones((3,))),
+            'touch': BoundedArray(name='touch', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.zeros((2,)),
+                                     maximum=5 * np.ones((2,))),
+            'target_position': BoundedArray(name='target_position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.13, -0.13]),
+                                     maximum=np.array([0.13, 0.13])),
+            'dist_to_target': BoundedArray(name='dist_to_target', shape=(1,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.2]),
+                                     maximum=np.array([0.23])),
+        }),
+    },
 
 
 }
@@ -475,11 +521,12 @@ def estimate_domains(env_name, task_name):
     observations = []
 
     for policy in policies:
-        timestep = env.reset()
-        for i in range(1000):
-            observations.append(timestep.observation)
-            a = policy()
-            timestep = env.step(a)
+        for _ in range(10):
+            timestep = env.reset()
+            for i in range(1000):
+                observations.append(timestep.observation)
+                a = policy()
+                timestep = env.step(a)
 
     obs_stack = utils.tree_stack(observations)
     min_values = jax.tree_map(lambda x: x.min(axis=0), obs_stack)
