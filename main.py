@@ -401,6 +401,8 @@ def display_state(agent_state: AgentState, ospec, aspec,
 
     if 'object_pos' in ospec:
         vis_elem = {'object_pos'}
+    elif 'orientations' in ospec and 'height' in ospec:
+        vis_elem = {'height', 'orientations'}
     else:
         vis_elem = None
 
@@ -626,7 +628,7 @@ if __name__ == '__main__':
     parser.add_argument('--vis', default='disk')
     parser.add_argument('--eval_every', type=int, default=10)
     parser.add_argument('--video_every', type=int, default=10)
-    parser.add_argument('--save_replay_every', type=int, default=10)
+    parser.add_argument('--save_replay_every', type=int, default=10000000)
 
     # policy settings
     parser.add_argument('--policy', type=str, default='deep_q')

@@ -4,13 +4,13 @@ import subprocess
 import sys
 import asyncio
 import copy
-import numpy as np
 import glob
 import shutil
 from pathlib import Path
 
 
 local = '--local' in sys.argv
+greene = '--greene' in sys.argv
 
 GPUS = [0, 1, 2, 3]
 MULTIPLEX = 2
@@ -19,21 +19,52 @@ CODE_DIR = '..'
 excluded_flags = []
 
 
-# basename = "wex_stand_narrow_sparse_v1"
+# basename = "pv100_kernel_guidance_v2_10steps"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["point"],
+#         "task": ["velocity"],
+#         "max_steps": [100],
+#         "seed": list(range(1)),
+#         "no_exploration": [False],
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [1e-2, 3e-2, 6e-2, 1e-1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.95],
+#         "density_conserve_weight": [True],
+
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [2],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [10],
+#         "update_target_every": [10],
+#     },
+# ]
+
+# basename = "wex_walk_narrow_sparse_v3_seeds"
 # grid = [
 #     {
 #         # define the task
 #         "_main": ["main.py"],
 #         "eval_every": [1],
 #         "env": ["walker_explore"],
-#         "task": ["stand_narrow_sparse"],
+#         "task": ["walk_narrow_sparse"],
 #         "max_steps": [1000],
-#         "seed": list(range(1)),
+#         "seed": list(range(4)),
 #         "no_exploration": [True, False],
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
-#         "density_state_scale": [1e-1, 1e-2],
+#         "density_state_scale": [5e-1],
 #         "density_action_scale": [1],
 #         "density_max_obs": [2**15],
 #         "density_tolerance": [0.5],
@@ -50,21 +81,21 @@ excluded_flags = []
 #     },
 # ]
 
-basename = "fex_hard_v1"
+basename = "walker_walk_v1_seeds"
 grid = [
     {
         # define the task
         "_main": ["main.py"],
-        "eval_every": [5],
-        "env": ["finger_explore"],
-        "task": ["turn_hard_narrow"],
+        "eval_every": [1],
+        "env": ["walker"],
+        "task": ["walk"],
         "max_steps": [1000],
-        "seed": list(range(2)),
+        "seed": list(range(4)),
         "no_exploration": [True, False],
 
         # density settings
         "density": ["keops_kernel_count"],
-        "density_state_scale": [1e-1, 1e-2],
+        "density_state_scale": [5e-1],
         "density_action_scale": [1],
         "density_max_obs": [2**15],
         "density_tolerance": [0.5],
@@ -81,8 +112,70 @@ grid = [
     },
 ]
 
+# basename = "fex_hard_v3_seeds"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [5],
+#         "env": ["finger_explore"],
+#         "task": ["turn_hard_narrow"],
+#         "max_steps": [1000],
+#         "seed": list(range(4)),
+#         "no_exploration": [True, False],
 
-# basename = "bice_v1"
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [1e-1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
+
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+# ]
+
+# basename = "finger_v2"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [5],
+#         "env": ["finger"],
+#         "task": ["turn_hard"],
+#         "max_steps": [1000],
+#         "seed": list(range(4)),
+#         "no_exploration": [True, False],
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [1e-1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
+
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+# ]
+
+
+# basename = "bice_v6_seeds"
 # grid = [
 #     {
 #         # define the task
@@ -92,14 +185,15 @@ grid = [
 #         "task": ["catch"],
 #         "max_steps": [1000],
 #         "no_exploration": [True, False],
-#         "seed": [0],
+#         "seed": list(range(4)),
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
-#         "density_state_scale": [0.1],
+#         "density_state_scale": [0.24],
 #         "density_action_scale": [1],
-#         "density_max_obs": [2**16],
-#         "density_tolerance": [0.5],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
 
 #         # task policy settings
 #         "policy": ["sac"],
@@ -112,7 +206,7 @@ grid = [
 # ]
 
 
-# basename = "reacher_explore_v3_smalltarget"
+# basename = "reacher_explore_v4_seeds"
 # grid = [
 #     {
 #         # define the task
@@ -121,15 +215,17 @@ grid = [
 #         "env": ["reacher_explore"],
 #         "task": ["hard", "hard_fixed_init"],
 #         "max_steps": [1000],
+#         "max_episodes": [500],
 #         "no_exploration": [True, False],
-#         "seed": [0],
+#         "seed": list(range(4)),
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
-#         "density_state_scale": [0.1],
+#         "density_state_scale": [0.18],
 #         "density_action_scale": [1],
-#         "density_max_obs": [2**16],
-#         "density_tolerance": [0.5],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
 
 #         # task policy settings
 #         "policy": ["sac"],
@@ -172,103 +268,7 @@ grid = [
 #     },
 # ]
 
-# basename = "manipulator_explore_v11_noslide"
-# grid = [
-#     {
-#         # define the task
-#         "_main": ["main.py"],
-#         "eval_every": [1],
-#         "env": ["manipulator_explore"],
-#         "task": ["reach_lift_ball"],
-#         "max_steps": [1000],
-#         "max_episodes": [10000],
-#         "no_exploration": [True, False],
-#         "seed": [0],
-
-#         # density settings
-#         "density": ["keops_kernel_count"],
-#         "density_state_scale": [0.3, 0.6, 1, 1.3],
-#         "density_action_scale": [1],
-#         "density_max_obs": [2**15],
-#         "density_tolerance": [0.1],
-
-#         # task policy settings
-#         "policy": ["sac"],
-#         "policy_updates_per_step": [1],
-
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#         "n_updates_per_step": [2],
-#         "update_target_every": [2],
-#     },
-# ]
-
-# basename = "mex_fixed_v7_conserve"
-# grid = [
-#     {
-#         # define the task
-#         "_main": ["main.py"],
-#         "eval_every": [5],
-#         "env": ["manipulator_explore"],
-#         "task": ["reach_shaped_lift_ball_fixed"],
-#         "max_steps": [1000],
-#         "max_episodes": [10000],
-#         "no_exploration": [False],
-#         "seed": list(range(4)),
-
-#         # density settings
-#         "density": ["keops_kernel_count"],
-#         "density_state_scale": [0.6],
-#         "density_action_scale": [1],
-#         "density_max_obs": [2**15],
-#         "density_tolerance": [0.1],
-#         "density_conserve_weight": [True],
-
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#         "n_updates_per_step": [2],
-#         "update_target_every": [2],
-#         "update_temperature": [1e-1],
-#         "temperature": [0.1],
-
-#         # task policy settings
-#         "policy": ["sac"],
-#         "policy_updates_per_step": [1],
-#     },
-# ]
-
-# basename = "mex_narrow_v1"
-# grid = [
-#     {
-#         # define the task
-#         "_main": ["main.py"],
-#         "eval_every": [1],
-#         "env": ["manipulator_explore"],
-#         "task": ["reach_lift_ball_narrow"],
-#         "max_steps": [1000],
-#         "max_episodes": [10000],
-#         "no_exploration": [True, False],
-#         "seed": [0],
-
-#         # density settings
-#         "density": ["keops_kernel_count"],
-#         "density_state_scale": [0.6, 1.0],
-#         "density_action_scale": [1],
-#         "density_max_obs": [2**15],
-#         "density_tolerance": [0.1],
-
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#         "n_updates_per_step": [2],
-#         "update_target_every": [2],
-
-#         # task policy settings
-#         "policy": ["sac"],
-#         "policy_updates_per_step": [1],
-#     },
-# ]
-
-# basename = "pv100_v8_conserve"
+# basename = "pv100_v10_greene"
 # grid = [
 #     {
 #         # define the task
@@ -278,15 +278,15 @@ grid = [
 #         "task": ["velocity"],
 #         "max_steps": [100],
 #         "seed": list(range(2)),
-#         "no_exploration": [False],
+#         "no_exploration": [True, False],
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
-#         "density_state_scale": [1e-2],
+#         "density_state_scale": [6e-2],
 #         "density_action_scale": [1],
-#         "density_max_obs": [2**10, 2**15],
+#         "density_max_obs": [2**15],
 #         "density_tolerance": [0.95],
-#         "density_conserve_weight": [True, False],
+#         "density_conserve_weight": [True],
 
 #         # task policy settings
 #         "policy": ["sac"],
@@ -363,7 +363,7 @@ def copy_job_source(target_dir):
             shutil.copy(f, target_path)
 
 
-def run_job_slurm(job):
+def run_job_slurm(job, greene=False):
     # construct job name
     job_name = construct_name(job, varying_keys)
 
@@ -398,13 +398,29 @@ def run_job_slurm(job):
 
         slurmfile.write("#SBATCH -c 4\n")
         slurmfile.write("#SBATCH --gres=gpu:1\n")
-        slurmfile.write("#SBATCH --constraint=turing|volta\n")
-        slurmfile.write("#SBATCH --exclude=lion[1-26]\n")
-        slurmfile.write("#SBATCH --exclude=vine[3-14]\n")
 
-        slurmfile.write("cd " + true_source_dir + '\n')
-        slurmfile.write(f"{job_string} &\n")
-        slurmfile.write("wait\n")
+        if not greene:
+            slurmfile.write("#SBATCH --constraint=turing|volta\n")
+            slurmfile.write("#SBATCH --exclude=lion[1-26]\n")
+            slurmfile.write("#SBATCH --exclude=vine[3-14]\n")
+            slurmfile.write("cd " + true_source_dir + '\n')
+            slurmfile.write(f'{job_string} &\n')
+            slurmfile.write('wait\n')
+
+        if greene:
+            slurmfile.write("cd " + true_source_dir + '\n')
+            slurmfile.write('singularity exec --nv --overlay /scratch/work/public/singularity/mujoco200-dep-cuda11.1-cudnn8-ubunutu18.04.sqf:ro,$SCRATCH/overlay-50G-10M.ext3:ro /scratch/work/public/singularity/cuda11.1-cudnn8-devel-ubuntu18.04.sif /bin/bash -c "')
+            slurmfile.write('source /home/ww1114/.bashrc\n')
+            slurmfile.write('echo XLA_PYTHON_CLIENT_PREALLOCATE $XLA_PYTHON_CLIENT_PREALLOCATE\n')
+            slurmfile.write('echo `hostname`\n')
+            slurmfile.write('nvidia-smi > /tmp/`hostname`.txt\n')
+            slurmfile.write('cat /tmp/`hostname`.txt\n')
+            # slurmfile.write('source /ext3/env.sh\n')
+            slurmfile.write('fish\n')
+            slurmfile.write('conda activate jax\n')
+            slurmfile.write(f'{job_string} &\n')
+            slurmfile.write('wait\n')
+            slurmfile.write('"')
 
     # run the slurm script
     print("Dispatching `{}`".format(job_string))
@@ -453,7 +469,7 @@ async def main():
 
 def slurm_main():
     for job in jobs:
-        run_job_slurm(job)
+        run_job_slurm(job, greene=greene)
 
 if __name__ == '__main__':
     jobs = construct_jobs(grid)

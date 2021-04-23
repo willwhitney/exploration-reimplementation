@@ -12,7 +12,10 @@ from flax import struct
 
 import uuid
 import pykeops
-pykeops.set_bin_folder(f'/scratch/wwhitney/pykeops_bin/{uuid.uuid4()}')
+try:
+    pykeops.set_bin_folder(f'/scratch/wwhitney/pykeops_bin/{uuid.uuid4()}')
+except:
+    pykeops.set_bin_folder(f'/scratch/ww1114/pykeops_bin/{uuid.uuid4()}')
 from pykeops.torch import LazyTensor
 
 from environments import jax_specs
@@ -170,6 +173,7 @@ def _add_observations(density_state: DensityState, keys):
     else:
         indices = torch.arange(next_slot, next_slot + bsize)
         indices = indices % density_state.max_obs
+    indices = indices.long()
 
     if density_state.conserve_weight:
         removed_weight = weights[indices].sum()
