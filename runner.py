@@ -11,6 +11,7 @@ from pathlib import Path
 
 local = '--local' in sys.argv
 greene = '--greene' in sys.argv
+dry_run = '--dry-run' in sys.argv
 
 GPUS = [0, 1, 2, 3]
 MULTIPLEX = 2
@@ -19,7 +20,7 @@ CODE_DIR = '..'
 excluded_flags = []
 
 
-# basename = "pv100_kernel_guidance_v2_10steps"
+# basename = "pv100_clustercheck_v3_scale_zaan"
 # grid = [
 #     {
 #         # define the task
@@ -27,13 +28,14 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["point"],
 #         "task": ["velocity"],
+#         "max_episodes": [500],
 #         "max_steps": [100],
-#         "seed": list(range(1)),
+#         "seed": list(range(8)),
 #         "no_exploration": [False],
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
-#         "density_state_scale": [1e-2, 3e-2, 6e-2, 1e-1],
+#         "density_state_scale": [0.03],
 #         "density_action_scale": [1],
 #         "density_max_obs": [2**15],
 #         "density_tolerance": [0.95],
@@ -41,12 +43,12 @@ excluded_flags = []
 
 #         # task policy settings
 #         "policy": ["sac"],
-#         "policy_updates_per_step": [2],
+#         "policy_updates_per_step": [1],
 
 #         # novelty Q settings
 #         "uniform_update_candidates": [True],
-#         "n_updates_per_step": [10],
-#         "update_target_every": [10],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
 #     },
 # ]
 
@@ -81,21 +83,79 @@ excluded_flags = []
 #     },
 # ]
 
-basename = "walker_walk_v1_seeds"
+# basename = "walker_walk_v1_seeds"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["walker"],
+#         "task": ["walk"],
+#         "max_steps": [1000],
+#         "seed": list(range(4)),
+#         "no_exploration": [True, False],
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [5e-1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
+
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+# ]
+
+basename = "finger_all_v6_scale_low"
 grid = [
     {
         # define the task
         "_main": ["main.py"],
         "eval_every": [1],
-        "env": ["walker"],
-        "task": ["walk"],
+        "env": ["finger_explore"],
+        "task": ["turn_hard_narrow"],
         "max_steps": [1000],
-        "seed": list(range(4)),
+        "seed": list(range(8)),
         "no_exploration": [True, False],
 
         # density settings
         "density": ["keops_kernel_count"],
-        "density_state_scale": [5e-1],
+        "density_state_scale": [0.1],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.5],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac"],
+        "policy_updates_per_step": [1],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
+    },
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [1],
+        "env": ["finger"],
+        "task": ["turn_hard"],
+        "max_steps": [1000],
+        "seed": list(range(8)),
+        "no_exploration": [True, False],
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.1],
         "density_action_scale": [1],
         "density_max_obs": [2**15],
         "density_tolerance": [0.5],
@@ -111,6 +171,38 @@ grid = [
         "update_target_every": [2],
     },
 ]
+
+# finger_all_v1arrow_seed0_no_explorationTrue--rrow_seed0_no_explorationFalse.slurm
+# basename = "finger_all_v2_rerun"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [5],
+#         "env": ["finger_explore"],
+#         "task": ["turn_hard_narrow"],
+#         "max_steps": [1000],
+#         "seed": [0],
+#         "no_exploration": [True, False],
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.34],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
+
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+# ]
 
 # basename = "fex_hard_v3_seeds"
 # grid = [
@@ -206,7 +298,7 @@ grid = [
 # ]
 
 
-# basename = "reacher_explore_v4_seeds"
+# basename = "reacher_explore_v8_seeds"
 # grid = [
 #     {
 #         # define the task
@@ -217,7 +309,7 @@ grid = [
 #         "max_steps": [1000],
 #         "max_episodes": [500],
 #         "no_exploration": [True, False],
-#         "seed": list(range(4)),
+#         "seed": list(range(4, 8)),
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
@@ -236,6 +328,99 @@ grid = [
 #         "update_target_every": [2],
 #     },
 # ]
+
+# reacher_explore_v8_seedshard_no_explorationFalse_seed4--hard_no_explorationFalse_seed5
+# basename = "reacher_explore_v9_rerun"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["reacher_explore"],
+#         "task": ["hard"],
+#         "max_steps": [1000],
+#         "max_episodes": [500],
+#         "no_exploration": [False],
+#         "seed": [4, 5],
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.18],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
+
+#         # task policy settings
+#         "policy": ["sac"],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+# ]
+
+
+# basename = "hallway_all_v4"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["hallway"],
+#         "task": ["velocity_1", "velocity_4_inverse_distractor"],
+#         "max_steps": [1000],
+#         "max_episodes": [100],
+#         "no_exploration": [True, False],
+#         "seed": list(range(4)),
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.068],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
+
+#         # task policy settings
+#         "policy": ["sac"],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["hallway"],
+#         "task": ["velocity_4", "velocity_4_distractor"],
+#         "max_steps": [1000],
+#         "max_episodes": [300],
+#         "no_exploration": [True, False],
+#         "seed": list(range(4)),
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.068],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
+
+#         # task policy settings
+#         "policy": ["sac"],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+# ]
+
+
 
 # basename = "hallway_vis_v2"
 # grid = [
@@ -363,24 +548,32 @@ def copy_job_source(target_dir):
             shutil.copy(f, target_path)
 
 
-def run_job_slurm(job, greene=False):
-    # construct job name
-    job_name = construct_name(job, varying_keys)
-
+def run_job_slurm(step_jobs, greene=False):
+    if len(step_jobs) == 0:
+        return
     # create slurm dirs if needed
     slurm_log_dir = 'slurm_logs'
     slurm_script_dir = 'slurm_scripts'
     os.makedirs(slurm_script_dir, exist_ok=True)
     os.makedirs(slurm_log_dir, exist_ok=True)
 
-    # copy code to a temp directory
-    true_source_dir = '.'
-    job_source_dir = f'{CODE_DIR}/exploration-reimplement-clones/{job_name}/'
-    os.makedirs(job_source_dir, exist_ok=True)
-    copy_job_source(job_source_dir)
+    job_names = []
+    job_strings = []
+    for job in step_jobs:
+        # construct job name
+        job_name = construct_name(job, varying_keys)
 
-    # make the job command
-    job_string = construct_job_string(job, job_name, source_dir=job_source_dir)
+        # copy code to a temp directory
+        true_source_dir = '.'
+        job_source_dir = f'{CODE_DIR}/exploration-reimplement-clones/{job_name}/'
+        os.makedirs(job_source_dir, exist_ok=True)
+        copy_job_source(job_source_dir)
+
+        # make the job command
+        job_string = construct_job_string(job, job_name, source_dir=job_source_dir)
+        job_names.append(job_name[-40:])
+        job_strings.append(job_string)
+    job_name = basename + '--'.join(job_names)
 
     # write a slurm script
     slurm_script_path = f'{slurm_script_dir}/{job_name}.slurm'
@@ -393,21 +586,24 @@ def run_job_slurm(job, greene=False):
         slurmfile.write("#SBATCH --export=ALL\n")
         # slurmfile.write("#SBATCH --signal=USR1@600\n")
         slurmfile.write("#SBATCH --time=2-00\n")
+        # slurmfile.write("#SBATCH --time=4:00:00\n")
         slurmfile.write("#SBATCH -N 1\n")
         slurmfile.write("#SBATCH --mem=32gb\n")
 
-        slurmfile.write("#SBATCH -c 4\n")
         slurmfile.write("#SBATCH --gres=gpu:1\n")
 
         if not greene:
+            slurmfile.write("#SBATCH -c 8\n")
             slurmfile.write("#SBATCH --constraint=turing|volta\n")
             slurmfile.write("#SBATCH --exclude=lion[1-26]\n")
             slurmfile.write("#SBATCH --exclude=vine[3-14]\n")
             slurmfile.write("cd " + true_source_dir + '\n')
-            slurmfile.write(f'{job_string} &\n')
+            for job_string in job_strings:
+                slurmfile.write(f'{job_string} &\n')
             slurmfile.write('wait\n')
 
         if greene:
+            slurmfile.write("#SBATCH -c 8\n")
             slurmfile.write("cd " + true_source_dir + '\n')
             slurmfile.write('singularity exec --nv --overlay /scratch/work/public/singularity/mujoco200-dep-cuda11.1-cudnn8-ubunutu18.04.sqf:ro,$SCRATCH/overlay-50G-10M.ext3:ro /scratch/work/public/singularity/cuda11.1-cudnn8-devel-ubuntu18.04.sif /bin/bash -c "')
             slurmfile.write('source /home/ww1114/.bashrc\n')
@@ -418,13 +614,17 @@ def run_job_slurm(job, greene=False):
             # slurmfile.write('source /ext3/env.sh\n')
             slurmfile.write('fish\n')
             slurmfile.write('conda activate jax\n')
-            slurmfile.write(f'{job_string} &\n')
+            for job_string in job_strings:
+                slurmfile.write(f'{job_string} &\n')
             slurmfile.write('wait\n')
-            slurmfile.write('"')
+            slurmfile.write('"\n')
 
     # run the slurm script
-    print("Dispatching `{}`".format(job_string))
-    os.system(f'sbatch {slurm_script_path} &')
+    for job_string in job_strings:
+        print("Dispatching `{}`".format(job_string))
+
+    if not dry_run:
+        os.system(f'sbatch {slurm_script_path} &')
 
 
 async def run_job(gpu_id, job):
@@ -438,8 +638,9 @@ async def run_job(gpu_id, job):
         'CUDA_VISIBLE_DEVICES': str(gpu_id),
         'XLA_PYTHON_CLIENT_PREALLOCATE': 'false',
     }
-    proc = await asyncio.create_subprocess_shell(job_string, env=env)
-    stdout, stderr = await proc.communicate()
+    if not dry_run:
+        proc = await asyncio.create_subprocess_shell(job_string, env=env)
+        stdout, stderr = await proc.communicate()
 
 
 async def worker_fn(gpu_id, queue):
@@ -468,8 +669,11 @@ async def main():
 
 
 def slurm_main():
-    for job in jobs:
-        run_job_slurm(job, greene=greene)
+    for i in range(0, len(jobs), MULTIPLEX):
+        step_jobs = jobs[i: i + MULTIPLEX]
+        run_job_slurm(step_jobs, greene=greene)
+    # for job in jobs:
+        # run_job_slurm(job, greene=greene)
 
 if __name__ == '__main__':
     jobs = construct_jobs(grid)

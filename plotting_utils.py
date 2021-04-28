@@ -198,12 +198,12 @@ def make_base_chart(data, title, window=5, **kwargs):
         sort=[{'field': 'episode', 'order': 'ascending'}],
     ).transform_window(
         rolling_mean_score='mean(score)',
-        frame=[-window, 0],
+        frame=[-window//2, window//2],
         groupby=['name', 'test'],
         sort=[{'field': 'episode', 'order': 'ascending'}]
     ).transform_window(
         rolling_mean_novelty='mean(novelty_score)',
-        frame=[-window, 0],
+        frame=[-window//2, window//2],
         groupby=['name', 'test'],
         sort=[{'field': 'episode', 'order': 'ascending'}],
     ).transform_calculate(
@@ -239,6 +239,8 @@ def plot_with_bars(base_chart, y_col, test, extent='ci', strip=True, title_flag=
     chart = legend_chart + err_chart + mean_chart
     if title_flag is None:
         title_flag = ' [test]' if test else ' [train]'
+    else:
+        title_flag = f' [{title_flag}]'
     chart.title = base_chart.title + title_flag
     if strip:
         return strip_columns(chart, included_fields)

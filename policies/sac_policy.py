@@ -6,8 +6,7 @@ from experiment_logging import default_logger as logger
 from policies.pytorch_sac.agent import sac
 
 
-def init_fn(state_spec, action_spec, seed,
-            lr=1e-4, **kwargs):
+def init_fn(state_spec, action_spec, seed, **kwargs):
     flat_state_spec = utils.flatten_observation_spec(state_spec)
     state_shape = flat_state_spec.shape
     torch.manual_seed(seed)
