@@ -114,63 +114,63 @@ excluded_flags = []
 #     },
 # ]
 
-basename = "finger_all_v6_scale_low"
-grid = [
-    {
-        # define the task
-        "_main": ["main.py"],
-        "eval_every": [1],
-        "env": ["finger_explore"],
-        "task": ["turn_hard_narrow"],
-        "max_steps": [1000],
-        "seed": list(range(8)),
-        "no_exploration": [True, False],
+# basename = "finger_all_v6_scale_low"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["finger_explore"],
+#         "task": ["turn_hard_narrow"],
+#         "max_steps": [1000],
+#         "seed": list(range(8)),
+#         "no_exploration": [True, False],
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.1],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.5],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-        "policy_updates_per_step": [1],
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
 
-        # novelty Q settings
-        "uniform_update_candidates": [True],
-        "n_updates_per_step": [2],
-        "update_target_every": [2],
-    },
-    {
-        # define the task
-        "_main": ["main.py"],
-        "eval_every": [1],
-        "env": ["finger"],
-        "task": ["turn_hard"],
-        "max_steps": [1000],
-        "seed": list(range(8)),
-        "no_exploration": [True, False],
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["finger"],
+#         "task": ["turn_hard"],
+#         "max_steps": [1000],
+#         "seed": list(range(8)),
+#         "no_exploration": [True, False],
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.1],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.5],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.1],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-        "policy_updates_per_step": [1],
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
 
-        # novelty Q settings
-        "uniform_update_candidates": [True],
-        "n_updates_per_step": [2],
-        "update_target_every": [2],
-    },
-]
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+# ]
 
 # finger_all_v1arrow_seed0_no_explorationTrue--rrow_seed0_no_explorationFalse.slurm
 # basename = "finger_all_v2_rerun"
@@ -298,36 +298,63 @@ grid = [
 # ]
 
 
-# basename = "reacher_explore_v8_seeds"
-# grid = [
-#     {
-#         # define the task
-#         "_main": ["main.py"],
-#         "eval_every": [1],
-#         "env": ["reacher_explore"],
-#         "task": ["hard", "hard_fixed_init"],
-#         "max_steps": [1000],
-#         "max_episodes": [500],
-#         "no_exploration": [True, False],
-#         "seed": list(range(4, 8)),
+basename = "reacher_v10_correct"
+grid = [
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [1],
+        "env": ["reacher_explore"],
+        "task": ["hard_narrow_init"],
+        "max_steps": [1000],
+        "max_episodes": [500],
+        "no_exploration": [True, False],
+        "seed": list(range(8)),
 
-#         # density settings
-#         "density": ["keops_kernel_count"],
-#         "density_state_scale": [0.18],
-#         "density_action_scale": [1],
-#         "density_max_obs": [2**15],
-#         "density_tolerance": [0.9],
-#         "density_conserve_weight": [True],
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.06],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.9],
+        "density_conserve_weight": [True],
 
-#         # task policy settings
-#         "policy": ["sac"],
+        # task policy settings
+        "policy": ["sac"],
 
-#         # novelty Q settings
-#         "uniform_update_candidates": [True],
-#         "n_updates_per_step": [2],
-#         "update_target_every": [2],
-#     },
-# ]
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
+    },
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [1],
+        "env": ["reacher"],
+        "task": ["hard"],
+        "max_steps": [1000],
+        "max_episodes": [500],
+        "no_exploration": [True, False],
+        "seed": list(range(8)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.06],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.9],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac"],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
+    },
+]
 
 # reacher_explore_v8_seedshard_no_explorationFalse_seed4--hard_no_explorationFalse_seed5
 # basename = "reacher_explore_v9_rerun"

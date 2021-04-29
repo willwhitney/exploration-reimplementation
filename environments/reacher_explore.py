@@ -44,27 +44,6 @@ def get_model_and_assets():
   return (resources.GetResource(f'{current_dir}/reacher_explore.xml'),
           common.ASSETS)
 
-
-@SUITE.add()
-def easy(time_limit=_DEFAULT_TIME_LIMIT, random=None, environment_kwargs=None):
-  """Returns reacher with sparse reward with 5e-2 tol and randomized target."""
-  physics = Physics.from_xml_string(*get_model_and_assets())
-  task = ReacherExplore(target_size=_BIG_TARGET, random=random)
-  environment_kwargs = environment_kwargs or {}
-  return control.Environment(
-      physics, task, time_limit=time_limit, **environment_kwargs)
-
-
-@SUITE.add()
-def hard(time_limit=_DEFAULT_TIME_LIMIT, random=None, environment_kwargs=None):
-  """Returns reacher with sparse reward with 1e-2 tol and randomized target."""
-  physics = Physics.from_xml_string(*get_model_and_assets())
-  task = ReacherExplore(target_size=_SMALL_TARGET, random=random)
-  environment_kwargs = environment_kwargs or {}
-  return control.Environment(
-      physics, task, time_limit=time_limit, **environment_kwargs)
-
-
 @SUITE.add('exploration')
 def hard_fixed_init(time_limit=_DEFAULT_TIME_LIMIT, random=None,
                     environment_kwargs=None):
@@ -72,6 +51,18 @@ def hard_fixed_init(time_limit=_DEFAULT_TIME_LIMIT, random=None,
   but no random resets."""
   physics = Physics.from_xml_string(*get_model_and_assets())
   task = ReacherExplore(target_size=_SMALL_TARGET, random_resets=False,
+                        random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+@SUITE.add('exploration')
+def hard_narrow_init(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+                    environment_kwargs=None):
+  """Returns reacher with sparse reward with 1e-2 tol and randomized target,
+  but no random resets."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = ReacherExplore(target_size=_SMALL_TARGET, random_resets=True,
                         random=random)
   environment_kwargs = environment_kwargs or {}
   return control.Environment(
@@ -113,9 +104,10 @@ class ReacherExplore(base.Task):
     physics.named.model.geom_size['target', 0] = self._target_size
 
     if self._random_resets:
-        randomizers.randomize_limited_and_rotational_joints(physics, self.random)
+      arm_angles = np.random.uniform(-np.pi / 4, np.pi / 4, size=(2,))
+      physics.data.qpos[:] = arm_angles
     else:
-        physics.data.qpos[:] = 0
+      physics.data.qpos[:] = 0
 
     # Randomize target position
     angle = self.random.uniform(1.25 * np.pi, 1.75 * np.pi)
