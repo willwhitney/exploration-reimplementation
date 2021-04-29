@@ -571,7 +571,6 @@ def main(args):
         # TODO: pull this loop inside the policy.update_fn
         policy_state = agent_state.policy_state
         for _ in range(int(args.max_steps * args.policy_updates_per_step)):
-            # transitions = agent_state.replay.sample(batch_size)
             transitions = agent_state.replay.sample(1024)
             transitions = tuple((jnp.array(el) for el in transitions))
             policy_state = policy.update_fn(
@@ -629,6 +628,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval_every', type=int, default=10)
     parser.add_argument('--video_every', type=int, default=10)
     parser.add_argument('--save_replay_every', type=int, default=10000000)
+    parser.add_argument('--warmup_steps', type=int, default=128)
 
     # policy settings
     parser.add_argument('--policy', type=str, default='deep_q')
@@ -646,17 +646,16 @@ if __name__ == '__main__':
     parser.add_argument('--density_tolerance', type=float, default=0.95)
     parser.add_argument('--density_reweight_dropped', action='store_true')
     parser.add_argument('--density_conserve_weight', action='store_true')
+    parser.add_argument('--prior_count', type=float, default=1e-3)
 
     # novelty q learning
     parser.add_argument('--novelty_q_function', type=str, default='deep')
     parser.add_argument('--novelty_discount', type=float, default=0.99)
     parser.add_argument('--temperature', type=float, default=1e-1)
     parser.add_argument('--update_temperature', type=float, default=None)
-    parser.add_argument('--prior_count', type=float, default=1e-3)
     parser.add_argument('--n_update_candidates', type=int, default=64)
     parser.add_argument('--n_updates_per_step', type=int, default=10)
     parser.add_argument('--update_target_every', type=int, default=10)
-    parser.add_argument('--warmup_steps', type=int, default=128)
     parser.add_argument('--uniform_update_candidates', action='store_true')
     parser.add_argument('--batch_size', type=int, default=128)
 

@@ -21,14 +21,12 @@ from flax import nn, optim, struct
 
 from dm_control import suite
 
-import dmcontrol_gridworld
 import replay_buffer
 import q_learning
-import tabular_density as density
 import utils
-from observation_domains import DOMAINS
-import jax_specs
-import point
+from environments.observation_domains import DOMAINS
+from environments import jax_specs
+from policies.pytorch_sac.video import VideoRecorder
 
 
 R_MAX = 100
@@ -40,13 +38,10 @@ class ExplorationState():
     """
     novq_state: q_learning.QLearnerState
     target_novq_state: q_learning.QLearnerState
-    density_state: density.DensityState
+    density_state: Any
     temperature: float
     update_temperature: float
     prior_count: float
-    optimistic_updates: bool
-    target_network: bool
-    # density_fns: Any
 
 
 @struct.dataclass
@@ -56,26 +51,35 @@ class AgentState():
     exploration_state: ExplorationState
     policy_state: Any = struct.field(pytree_node=False)
     replay: Any = struct.field(pytree_node=False)
+    j_action_spec: Any
     n_candidates: int
     n_update_candidates: int
-    prioritized_update: bool
+    n_updates_per_step: int
     update_target_every: int
     warmup_steps: int
+    optimistic_actions: bool
+    uniform_update_candidates: bool
+    batch_size: int
     steps_since_tupdate: int = 0
-    # policy_fns: Any = struct.field(pytree_node=False)
 
 
 @jax.jit
-def compute_novelty_reward(exploration_state, states, actions):
-    """Returns a novelty reward in [0, 1] for each (s, a) pair."""
-    counts = density.get_count_batch(
-        exploration_state.density_state, states, actions)
+def _novelty_given_counts(counts):
     ones = jnp.ones(jnp.array(counts).shape)
     rewards = (counts + 1e-8) ** (-0.5)
     options = jnp.stack([ones, rewards], axis=1)
 
     # Clip rewards to be at most 1 (when count is 0)
     return jnp.min(options, axis=1)
+
+
+@jax.profiler.trace_function
+def compute_novelty_reward(exploration_state, states, actions):
+    """Returns a novelty reward in [0, 1] for each (s, a) pair."""
+    counts = density.get_count_batch(
+        exploration_state.density_state, states, actions)
+
+    return _novelty_given_counts(counts)
 
 
 @jax.profiler.trace_function
@@ -117,22 +121,29 @@ def update_agent(agent_state: AgentState, rng, transition):
 
 
 def run_episode(agent_state: AgentState, rng, env,
-                train=True, max_steps=None, explore_only=False):
+                train=True, max_steps=None, video_recorder=None,
+                explore_only=False, bonus_scale=1):
     timestep = env.reset()
     score, novelty_score = 0, 0
 
     i = 0
     while not timestep.last():
+        if video_recorder is not None:
+            video_recorder.record(env)
         rng, action_rng = random.split(rng)
         s = utils.flatten_observation(timestep.observation)
 
+        replay = agent_state.replay
+        warmup_steps = agent_state.warmup_steps
+
         # put some random steps in the replay buffer
-        if len(agent_state.replay) < agent_state.warmup_steps:
+        if len(replay) < warmup_steps:
             action_spec = jax_specs.convert_dm_spec(env.action_spec())
             a = utils.sample_uniform_actions(action_spec, action_rng, 1)[0]
             flag = 'train' if train else 'test'
-            logger.update(f'{flag}/policy_entropy', 0)
-            logger.update(f'{flag}/explore_entropy', 0)
+            logger.update(f'{flag}/policy_entropy', np.nan)
+            logger.update(f'{flag}/explore_entropy', np.nan)
+            logger.update(f'{flag}/alpha', np.nan)
         else:
             agent_state, a = sample_action(
                 agent_state, action_rng, s, train)
@@ -151,7 +162,7 @@ def run_episode(agent_state: AgentState, rng, env,
             if explore_only:
                 train_r = novelty_reward
             else:
-                train_r = r + novelty_reward
+                train_r = r + bonus_scale * novelty_reward
             transition = (s, a, sp, train_r)
             rng, update_rng = random.split(rng)
             agent_state = update_agent(agent_state, update_rng, transition)
@@ -168,14 +179,23 @@ def display_state(agent_state: AgentState, ospec, aspec,
     exploration_state = agent_state.exploration_state
     policy_state = agent_state.policy_state
 
+    if 'object_pos' in ospec:
+        vis_elem = {'object_pos'}
+    elif 'orientations' in ospec and 'height' in ospec:
+        vis_elem = {'height', 'orientations'}
+    else:
+        vis_elem = None
+
+    render_function = jax.partial(utils.render_function, vis_elem=vis_elem)
+
     # min_count_map = dmcontrol_gridworld.render_function(
     #     jax.partial(density.get_count_batch, exploration_state.density_state),
     #     env, reduction=jnp.min)
-    count_map = utils.render_function(
+    count_map = render_function(
         jax.partial(density.get_count_batch, exploration_state.density_state),
         agent_state.replay,
         ospec, aspec, reduction=jnp.max, bins=bins)
-    novelty_reward_map = utils.render_function(
+    novelty_reward_map = render_function(
         jax.partial(compute_novelty_reward, exploration_state),
         agent_state.replay,
         ospec, aspec, reduction=jnp.max, bins=bins)
@@ -192,10 +212,23 @@ def display_state(agent_state: AgentState, ospec, aspec,
 
     q_policies = ['policies.deep_q_policy', 'policies.tabular_q_policy']
     if policy.__name__ in q_policies:
-        taskq_map = utils.render_function(
+        taskq_map = render_function(
             jax.partial(q_learning.predict_value, policy_state.q_state),
             agent_state.replay,
             ospec, aspec, reduction=jnp.max, bins=bins)
+        subfigs.append((taskq_map, "Task value (max)"))
+    elif policy.__name__ == 'policies.sac_policy':
+        import torch
+        def get_task_value(s, a):
+            s = torch.FloatTensor(np.array(s)).to(policy_state.device)
+            a = torch.FloatTensor(np.array(a)).to(policy_state.device)
+            with torch.no_grad():
+                v = policy_state.critic.Q1(torch.cat([s, a], dim=-1))
+            return v.cpu().detach().numpy()
+        taskq_map = render_function(
+            get_task_value,
+            agent_state.replay,
+            ospec, aspec, bins=bins)
         subfigs.append((taskq_map, "Task value (max)"))
 
     # dump the raw data for later rendering
@@ -212,7 +245,7 @@ def display_state(agent_state: AgentState, ospec, aspec,
         ax.set_title(title)
     fig.set_size_inches(4 * len(subfigs), 3)
 
-    fig_path = f"{savedir}/{episode}.png"
+    fig_path = f"{savedir}/vis/{episode}.png"
     utils.display_figure(fig, rendering, savepath=fig_path)
 # -------------------------------------------------------------------
 
@@ -232,61 +265,70 @@ def main(args):
 
     state_shape = utils.flatten_spec_shape(j_observation_spec)
     action_shape = action_spec.shape
-    batch_size = 128
-
-    # drawing only one candidate action sample from the policy
-    # will result in following the policy directly
-    n_candidates = None
-
-    novq_state = None
 
     density_state = density.new(observation_spec, action_spec,
                                 state_bins=args.n_state_bins,
-                                action_bins=args.n_action_bins)
+                                action_bins=args.n_action_bins,
+                                state_scale=args.density_state_scale,
+                                action_scale=args.density_action_scale,
+                                max_obs=args.density_max_obs,
+                                tolerance=args.density_tolerance,
+                                reweight_dropped=args.density_reweight_dropped,
+                                conserve_weight=args.density_conserve_weight)
 
-    # for gridworld we can discretize with one bit per dimension
-    replay = replay_buffer.LowPrecisionTracingReplay(
-        state_shape, action_shape, min_s=0, max_s=1, n_bins=2)
+    replay = replay_buffer.Replay(state_shape, action_shape)
 
     policy_state = policy.init_fn(observation_spec, action_spec, args.seed,
                                   lr=args.policy_lr,
-                                  update_rule=args.policy_update)
+                                  update_rule=args.policy_update,
+                                  temp=args.policy_temperature,
+                                  test_temp=args.policy_test_temperature)
 
     exploration_state = ExplorationState(
-        novq_state=novq_state,
-        target_novq_state=novq_state,
+        novq_state=None,
+        target_novq_state=None,
         density_state=density_state,
         temperature=None,
         update_temperature=None,
-        prior_count=args.prior_count,
-        optimistic_updates=None,
-        target_network=None)
+        prior_count=None)
     agent_state = AgentState(exploration_state=exploration_state,
                              policy_state=policy_state,
                              replay=replay,
-                             n_candidates=n_candidates,
+                             j_action_spec=j_action_spec,
+                             n_candidates=None,
                              n_update_candidates=None,
-                             prioritized_update=None,
+                             n_updates_per_step=None,
                              update_target_every=None,
-                             warmup_steps=args.warmup_steps)
+                             warmup_steps=args.warmup_steps,
+                             optimistic_actions=None,
+                             uniform_update_candidates=None,
+                             batch_size=None)
 
-    for episode in range(1, 1000):
+    current_time = np.nan
+    for episode in range(1, args.max_episodes + 1):
+        last_time = current_time
+        current_time = time.time()
+        logger.update('train/elapsed', current_time - last_time)
+
         # run an episode
         rng, episode_rng = random.split(rng)
+        video_recorder = VideoRecorder(args.save_dir, fps=args.max_steps/10)
+        video_recorder.init(enabled=(episode % args.video_every == 0))
         agent_state, env, score, novelty_score = run_episode(
             agent_state, episode_rng, env,
             train=True, max_steps=args.max_steps,
-            explore_only=args.explore_only)
+            video_recorder=video_recorder,
+            explore_only=args.explore_only, bonus_scale=args.bonus_scale)
+        video_recorder.save(f'train_{episode}.mp4')
         logger.update('train/episode', episode)
         logger.update('train/score', score)
         logger.update('train/novelty_score', novelty_score)
 
         # update the task policy
         # TODO: pull this loop inside the policy.update_fn
-        n_updates = args.max_steps // 2
         policy_state = agent_state.policy_state
-        for _ in range(n_updates):
-            transitions = agent_state.replay.sample(batch_size)
+        for _ in range(int(args.max_steps * args.policy_updates_per_step)):
+            transitions = agent_state.replay.sample(1024)
             transitions = tuple((jnp.array(el) for el in transitions))
             policy_state = policy.update_fn(
                 policy_state, transitions)
@@ -295,13 +337,21 @@ def main(args):
         # output / visualize
         if episode % args.eval_every == 0:
             rng, episode_rng = random.split(rng)
+            video_recorder = VideoRecorder(args.save_dir, fps=args.max_steps/10)
+            video_recorder.init(enabled=(episode % args.video_every == 0))
             _, _, test_score, test_novelty_score = run_episode(
                 agent_state, episode_rng, env,
                 train=False, max_steps=args.max_steps,
-                explore_only=args.explore_only)
+                video_recorder=video_recorder,
+                explore_only=args.explore_only, bonus_scale=args.bonus_scale)
+            video_recorder.save(f'test_{episode}.mp4')
             logger.update('test/episode', episode)
             logger.update('test/score', test_score)
             logger.update('test/novelty_score', test_novelty_score)
+
+            density_state = agent_state.exploration_state.density_state
+            if hasattr(density_state, "total"):
+                logger.update('train/density_size', density_state.total)
 
             logger.write_all()
 
@@ -320,32 +370,54 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
+
+    # basic environment settings
     parser.add_argument('--name', default='default')
     parser.add_argument('--env', default='gridworld')
     parser.add_argument('--task', default='default')
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--env_size', type=int, default=20)
     parser.add_argument('--max_steps', type=int, default=1000)
+    parser.add_argument('--max_episodes', type=int, default=1000)
 
+    # visualization and logging
     parser.add_argument('--debug', action='store_true', default=False)
     parser.add_argument('--vis', default='disk')
     parser.add_argument('--eval_every', type=int, default=10)
-    parser.add_argument('--save_replay_every', type=int, default=10)
-
-    parser.add_argument('--policy', type=str, default='deep')
-    parser.add_argument('--policy_update', type=str, default='ddqn')
-    parser.add_argument('--policy_lr', type=float, default=1e-3)
-
-    parser.add_argument('--prior_count', type=float, default=1e-3)
-    parser.add_argument('--n_state_bins', type=int, default=4)
-    parser.add_argument('--n_action_bins', type=int, default=2)
+    parser.add_argument('--video_every', type=int, default=10)
+    parser.add_argument('--save_replay_every', type=int, default=10000000)
     parser.add_argument('--warmup_steps', type=int, default=128)
 
+    # policy settings
+    parser.add_argument('--policy', type=str, default='deep_q')
+    parser.add_argument('--policy_update', type=str, default='ddqn')
+    parser.add_argument('--policy_lr', type=float, default=1e-3)
+    parser.add_argument('--policy_temperature', type=float, default=3e-1)
+    parser.add_argument('--policy_test_temperature', type=float, default=1e-1)
+    parser.add_argument('--policy_updates_per_step', type=float, default=1)
+
+    # count settings
+    parser.add_argument('--density', type=str, default='tabular')
+    parser.add_argument('--density_state_scale', type=float, default=1.)
+    parser.add_argument('--density_action_scale', type=float, default=1.)
+    parser.add_argument('--density_max_obs', type=float, default=1e5)
+    parser.add_argument('--density_tolerance', type=float, default=0.95)
+    parser.add_argument('--density_reweight_dropped', action='store_true')
+    parser.add_argument('--density_conserve_weight', action='store_true')
+    parser.add_argument('--prior_count', type=float, default=1e-3)
+
+    # tabular settings (also for vis)
+    parser.add_argument('--n_state_bins', type=int, default=20)
+    parser.add_argument('--n_action_bins', type=int, default=2)
+
+    # bbe settings
     parser.add_argument('--explore_only', action='store_true', default=False)
+    parser.add_argument('--bonus_scale', type=float, default=1)
+
     args = parser.parse_args()
     print(args)
 
-    args.save_dir = f"results/intrinsic/{args.name}"
+    args.save_dir = f"results/bbe/{args.name}"
     os.makedirs(args.save_dir, exist_ok=True)
     import experiment_logging
     experiment_logging.setup_default_logger(args.save_dir)
@@ -355,14 +427,33 @@ if __name__ == '__main__':
     with open(args.save_dir + '/args.json', 'w') as argfile:
         json.dump(args.__dict__, argfile, indent=4)
 
-    if args.policy == 'deep':
+    if args.policy == 'deep_q':
         import policies.deep_q_policy as policy
+    elif args.policy == 'sac':
+        import policies.sac_policy as policy
     elif args.policy == 'uniform':
         import policies.uniform_policy as policy
     elif args.policy == 'tabular':
         import policies.tabular_q_policy as policy
     else:
         raise Exception("Argument --policy was invalid.")
+
+    if args.density == 'tabular':
+        import densities.tabular_density as density
+    elif args.density == 'kernel':
+        import densities.kernel_density as density
+    elif args.density == 'kernel_count':
+        import densities.kernel_count as density
+    elif args.density == 'faiss_kernel_count':
+        from densities import faiss_kernel_count as density
+    elif args.density == 'keops_kernel_count':
+        from densities import keops_kernel_count as density
+    elif args.density == 'dummy':
+        import densities.dummy_density as density
+    else:
+        raise Exception("Argument --density was invalid.")
+
+    print(f"CUDA_VISIBLE_DEVICES={os.environ['CUDA_VISIBLE_DEVICES']}")
 
     jit = not args.debug
     if jit:
