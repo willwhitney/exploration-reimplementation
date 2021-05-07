@@ -15,6 +15,7 @@ import json
 def personal():
     return {
         'config': {
+            'font': 'sans-serif',
             'view': {
                 'height': 300,
                 'width': 400,
@@ -48,6 +49,7 @@ def publication():
 
     return {
         'config': {
+            'font': 'sans-serif',
             'view': {
                 'height': 500,
                 'width': 600,
@@ -234,6 +236,7 @@ def plot_with_bars(base_chart, y_col, test, extent='ci', strip=True, title_flag=
     ).transform_filter(alt.datum.test == test)
     err_chart = base_chart.encode(
         y=alt.Y(f'{y_col}:Q', **y_args),
+        strokeDash=None,
     ).transform_filter(alt.datum.test == test).mark_errorband(extent=extent)
 
     chart = legend_chart + err_chart + mean_chart

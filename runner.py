@@ -20,6 +20,32 @@ CODE_DIR = '..'
 excluded_flags = []
 
 
+# basename = "pv100_sacqex_v2"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main_sac_qex.py"],
+#         "eval_every": [1],
+#         "env": ["point"],
+#         "task": ["velocity"],
+#         "max_episodes": [500],
+#         "max_steps": [100],
+#         "seed": list(range(8)),
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.02],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.95],
+#         "density_conserve_weight": [True],
+
+#         # task policy settings
+#         "policy": ["sac_qex"],
+#         "policy_updates_per_step": [1],
+#     },
+# ]
+
 # basename = "pv100_bbe_v4_updates"
 # grid = [
 #     {
@@ -29,7 +55,6 @@ excluded_flags = []
 #         "env": ["point"],
 #         "task": ["velocity"],
 #         "max_episodes": [500],
-#         "max_steps": [100],
 #         "seed": list(range(8)),
 #         "no_exploration": [False],
 
@@ -57,7 +82,6 @@ excluded_flags = []
 #         "env": ["point"],
 #         "task": ["velocity"],
 #         "max_episodes": [500],
-#         "max_steps": [100],
 #         "seed": list(range(8)),
 #         "no_exploration": [False],
 
@@ -83,7 +107,6 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["walker_explore"],
 #         "task": ["walk_narrow_sparse"],
-#         "max_steps": [1000],
 #         "seed": list(range(4)),
 #         "no_exploration": [True, False],
 
@@ -114,7 +137,6 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["walker"],
 #         "task": ["walk"],
-#         "max_steps": [1000],
 #         "seed": list(range(4)),
 #         "no_exploration": [True, False],
 
@@ -145,7 +167,6 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["finger_explore"],
 #         "task": ["turn_hard_narrow"],
-#         "max_steps": [1000],
 #         "seed": list(range(8)),
 #         "no_exploration": [True, False],
 
@@ -172,7 +193,6 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["finger"],
 #         "task": ["turn_hard"],
-#         "max_steps": [1000],
 #         "seed": list(range(8)),
 #         "no_exploration": [True, False],
 
@@ -204,7 +224,6 @@ excluded_flags = []
 #         "eval_every": [5],
 #         "env": ["finger_explore"],
 #         "task": ["turn_hard_narrow"],
-#         "max_steps": [1000],
 #         "seed": [0],
 #         "no_exploration": [True, False],
 
@@ -235,7 +254,6 @@ excluded_flags = []
 #         "eval_every": [5],
 #         "env": ["finger_explore"],
 #         "task": ["turn_hard_narrow"],
-#         "max_steps": [1000],
 #         "seed": list(range(4)),
 #         "no_exploration": [True, False],
 
@@ -266,7 +284,6 @@ excluded_flags = []
 #         "eval_every": [5],
 #         "env": ["finger"],
 #         "task": ["turn_hard"],
-#         "max_steps": [1000],
 #         "seed": list(range(4)),
 #         "no_exploration": [True, False],
 
@@ -298,7 +315,6 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["ball_in_cup", "ball_in_cup_explore"],
 #         "task": ["catch"],
-#         "max_steps": [1000],
 #         "no_exploration": [True, False],
 #         "seed": list(range(4)),
 
@@ -329,7 +345,6 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["reacher_explore"],
 #         "task": ["hard_narrow_init"],
-#         "max_steps": [1000],
 #         "max_episodes": [500],
 #         "no_exploration": [True, False],
 #         "seed": list(range(8)),
@@ -356,7 +371,6 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["reacher"],
 #         "task": ["hard"],
-#         "max_steps": [1000],
 #         "max_episodes": [500],
 #         "no_exploration": [True, False],
 #         "seed": list(range(8)),
@@ -388,7 +402,6 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["reacher_explore"],
 #         "task": ["hard"],
-#         "max_steps": [1000],
 #         "max_episodes": [500],
 #         "no_exploration": [False],
 #         "seed": [4, 5],
@@ -420,7 +433,6 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["hallway"],
 #         "task": ["velocity_1", "velocity_4_inverse_distractor"],
-#         "max_steps": [1000],
 #         "max_episodes": [100],
 #         "no_exploration": [True, False],
 #         "seed": list(range(4)),
@@ -447,7 +459,6 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["hallway"],
 #         "task": ["velocity_4", "velocity_4_distractor"],
-#         "max_steps": [1000],
 #         "max_episodes": [300],
 #         "no_exploration": [True, False],
 #         "seed": list(range(4)),
@@ -480,7 +491,6 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["hallway"],
 #         "task": ["velocity_4"],
-#         "max_steps": [1000],
 #         "video_every": [1],
 #         "no_exploration": [False, True],
 #         # "seed": [0, 1],
@@ -511,7 +521,6 @@ excluded_flags = []
 #         "eval_every": [1],
 #         "env": ["point"],
 #         "task": ["velocity"],
-#         "max_steps": [100],
 #         "seed": list(range(2)),
 #         "no_exploration": [True, False],
 
@@ -534,165 +543,158 @@ excluded_flags = []
 #     },
 # ]
 
-basename = "bbe_all_v2"
-grid = [
+# basename = "bbe_all_v3_moreseeds"
+# grid = [
 
-    # reacher
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["reacher_explore"],
-        "task": ["hard_narrow_init"],
-        "max_steps": [1000],
-        "max_episodes": [500],
-        "seed": list(range(4)),
+#     # reacher
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["reacher_explore"],
+#         "task": ["hard_narrow_init"],
+#         "max_episodes": [500],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.06],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.9],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.06],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-    },
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["reacher"],
-        "task": ["hard"],
-        "max_steps": [1000],
-        "max_episodes": [500],
-        "seed": list(range(4)),
+#         # task policy settings
+#         "policy": ["sac"],
+#     },
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["reacher"],
+#         "task": ["hard"],
+#         "max_episodes": [500],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.06],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.9],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.06],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-    },
+#         # task policy settings
+#         "policy": ["sac"],
+#     },
 
-    # ball-in-cup
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["ball_in_cup", "ball_in_cup_explore"],
-        "task": ["catch"],
-        "max_steps": [1000],
-        "seed": list(range(4)),
+#     # ball-in-cup
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["ball_in_cup", "ball_in_cup_explore"],
+#         "task": ["catch"],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.078],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.9],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.078],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-    },
+#         # task policy settings
+#         "policy": ["sac"],
+#     },
 
-    # finger
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["finger_explore"],
-        "task": ["turn_hard_narrow"],
-        "max_steps": [1000],
-        "seed": list(range(4)),
+#     # finger
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["finger_explore"],
+#         "task": ["turn_hard_narrow"],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.11],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.5],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.11],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-        "policy_updates_per_step": [1],
-    },
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["finger"],
-        "task": ["turn_hard"],
-        "max_steps": [1000],
-        "seed": list(range(4)),
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+#     },
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["finger"],
+#         "task": ["turn_hard"],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.11],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.5],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.11],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-        "policy_updates_per_step": [1],
-    },
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+#     },
 
-    # walker
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["walker_explore"],
-        "task": ["walk_narrow_sparse"],
-        "max_steps": [1000],
-        "seed": list(range(4)),
+#     # walker
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["walker_explore"],
+#         "task": ["walk_narrow_sparse"],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.16],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.5],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.16],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-        "policy_updates_per_step": [1],
-    },
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["walker"],
-        "task": ["walk"],
-        "max_steps": [1000],
-        "seed": list(range(4)),
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+#     },
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["walker"],
+#         "task": ["walk"],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.16],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.5],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.16],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-        "policy_updates_per_step": [1],
-    },
-]
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+#     },
+# ]
 
-# basename = "ufo_all_v1"
+# basename = "ufo_all_v2"
 # grid = [
 
 #     # reacher
@@ -702,7 +704,6 @@ grid = [
 #         "eval_every": [1],
 #         "env": ["reacher_explore"],
 #         "task": ["hard_narrow_init"],
-#         "max_steps": [1000],
 #         "max_episodes": [500],
 #         "seed": list(range(4)),
 
@@ -729,7 +730,6 @@ grid = [
 #         "eval_every": [1],
 #         "env": ["reacher"],
 #         "task": ["hard"],
-#         "max_steps": [1000],
 #         "max_episodes": [500],
 #         "seed": list(range(4)),
 
@@ -758,7 +758,6 @@ grid = [
 #         "eval_every": [1],
 #         "env": ["ball_in_cup", "ball_in_cup_explore"],
 #         "task": ["catch"],
-#         "max_steps": [1000],
 #         "seed": list(range(4)),
 
 #         # density settings
@@ -786,7 +785,6 @@ grid = [
 #         "eval_every": [1],
 #         "env": ["finger_explore"],
 #         "task": ["turn_hard_narrow"],
-#         "max_steps": [1000],
 #         "seed": list(range(4)),
 
 #         # density settings
@@ -812,7 +810,6 @@ grid = [
 #         "eval_every": [1],
 #         "env": ["finger"],
 #         "task": ["turn_hard"],
-#         "max_steps": [1000],
 #         "seed": list(range(4)),
 
 #         # density settings
@@ -840,7 +837,6 @@ grid = [
 #         "eval_every": [1],
 #         "env": ["walker_explore"],
 #         "task": ["walk_narrow_sparse"],
-#         "max_steps": [1000],
 #         "seed": list(range(4)),
 
 #         # density settings
@@ -866,7 +862,6 @@ grid = [
 #         "eval_every": [1],
 #         "env": ["walker"],
 #         "task": ["walk"],
-#         "max_steps": [1000],
 #         "seed": list(range(4)),
 
 #         # density settings
@@ -888,6 +883,157 @@ grid = [
 #     },
 # ]
 
+
+basename = "sacqex_all_v1"
+grid = [
+
+    # reacher
+    {
+        # define the task
+        "_main": ["main_bbe.py"],
+        "eval_every": [1],
+        "env": ["reacher_explore"],
+        "task": ["hard_narrow_init"],
+        "max_episodes": [500],
+        "seed": list(range(4, 8)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.06],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.9],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac_qex"],
+    },
+    {
+        # define the task
+        "_main": ["main_bbe.py"],
+        "eval_every": [1],
+        "env": ["reacher"],
+        "task": ["hard"],
+        "max_episodes": [500],
+        "seed": list(range(4, 8)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.06],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.9],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac_qex"],
+    },
+
+    # ball-in-cup
+    {
+        # define the task
+        "_main": ["main_bbe.py"],
+        "eval_every": [1],
+        "env": ["ball_in_cup", "ball_in_cup_explore"],
+        "task": ["catch"],
+        "seed": list(range(4, 8)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.078],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.9],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac_qex"],
+    },
+
+    # finger
+    {
+        # define the task
+        "_main": ["main_bbe.py"],
+        "eval_every": [1],
+        "env": ["finger_explore"],
+        "task": ["turn_hard_narrow"],
+        "seed": list(range(4, 8)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.11],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.5],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac_qex"],
+        "policy_updates_per_step": [1],
+    },
+    {
+        # define the task
+        "_main": ["main_bbe.py"],
+        "eval_every": [1],
+        "env": ["finger"],
+        "task": ["turn_hard"],
+        "seed": list(range(4, 8)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.11],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.5],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac_qex"],
+        "policy_updates_per_step": [1],
+    },
+
+    # walker
+    {
+        # define the task
+        "_main": ["main_bbe.py"],
+        "eval_every": [1],
+        "env": ["walker_explore"],
+        "task": ["walk_narrow_sparse"],
+        "seed": list(range(4, 8)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.16],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.5],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac_qex"],
+        "policy_updates_per_step": [1],
+    },
+    {
+        # define the task
+        "_main": ["main_bbe.py"],
+        "eval_every": [1],
+        "env": ["walker"],
+        "task": ["walk"],
+        "seed": list(range(4, 8)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.16],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.5],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac_qex"],
+        "policy_updates_per_step": [1],
+    },
+]
 
 
 
