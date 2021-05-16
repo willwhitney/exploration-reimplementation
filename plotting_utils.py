@@ -236,12 +236,14 @@ def plot_with_bars(base_chart, y_col, test, extent='ci', strip=True, title_flag=
     ).transform_filter(alt.datum.test == test)
     err_chart = base_chart.encode(
         y=alt.Y(f'{y_col}:Q', **y_args),
-        strokeDash=None,
+        # strokeDash=None,
     ).transform_filter(alt.datum.test == test).mark_errorband(extent=extent)
 
     chart = legend_chart + err_chart + mean_chart
     if title_flag is None:
         title_flag = ' [test]' if test else ' [train]'
+    elif len(title_flag) == 0:
+        title_flag = ''
     else:
         title_flag = f' [{title_flag}]'
     chart.title = base_chart.title + title_flag
