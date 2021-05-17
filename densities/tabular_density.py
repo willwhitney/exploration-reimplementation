@@ -5,8 +5,8 @@ import jax
 from jax import numpy as jnp
 from flax import struct
 
-import gridworld
-import jax_specs
+from environments import gridworld, jax_specs
+# import jax_specs
 import utils
 
 
@@ -118,8 +118,8 @@ def _make_key(density_settings: DensitySettings, s, a):
     aspec = density_settings.action_spec
     state_bins = density_settings.state_bins
     action_bins = density_settings.action_bins
-    discrete_state = utils.discretize_observation(s, ospec, state_bins)
-    discrete_action = utils.discretize_observation(a, aspec, action_bins)
+    discrete_state = utils.discretize_observation(s, ospec, state_bins, False)
+    discrete_action = utils.discretize_observation(a, aspec, action_bins, False)
     discrete_trans = [discrete_state.flatten(), discrete_action.flatten()]
     return tuple(jnp.concatenate(discrete_trans).astype(int))
 _make_key_batch = jax.vmap(_make_key, in_axes=(None, 0, 0))  # noqa: E305

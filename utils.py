@@ -272,6 +272,20 @@ def select_observations(ospec, elements, flat_obs):
     return flat_obs[..., dims]
 
 
+def act_gridworld_optimal(state):
+    if state[1] > state[0]:
+        return np.zeros(1, dtype='int')
+    else:
+        return np.ones(1, dtype='int')
+
+
+def act_gridworld_epsilon_optimal(state, epsilon=0.8):
+    if np.random.random() > epsilon:
+        return np.random.randint(0, 4, size=(1,))
+    else:
+        return act_gridworld_optimal(state)
+
+
 @jax.profiler.trace_function
 def render_function(fn, replay, ospec, aspec, reduction=np.max, vis_elem=None,
                     vis_dims=(1, 0), bins=20, use_uniform_states=False):
@@ -303,7 +317,7 @@ def render_function(fn, replay, ospec, aspec, reduction=np.max, vis_elem=None,
     with jax.profiler.TraceContext("render sample actions"):
         n_random_actions = 4 * n_samples
         uniform_actions = sample_uniform_actions(j_aspec, rng, n_random_actions)
-        actions[:n_random_actions] = uniform_actions
+        actions[:n_random_actions] = uniform_actions.reshape((-1, *action_shape))
 
     if use_uniform_states:
         sampled_flat_states = np.array(

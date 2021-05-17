@@ -1035,56 +1035,114 @@ excluded_flags = []
 #     },
 # ]
 
-basename = "hallway_all_v1_lengths"
+# basename = "hallway_midstart_all_v1"
+# grid = [
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["hallway_midstart"],
+#         "task": ["velocity_4_offset_p5", "velocity_4_offset_1",
+#                  "velocity_4_offset_1p5", "velocity_4_offset_2",],
+#         "max_episodes": [500],
+#         "seed": list(range(4)),
+#         "no_exploration": [True, False],
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.02],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+
+#         # task policy settings
+#         "policy": ["sac"],
+#     },
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["hallway_midstart"],
+#         "task": ["velocity_4_offset_p5", "velocity_4_offset_1",
+#                  "velocity_4_offset_1p5", "velocity_4_offset_2",],
+#         "max_episodes": [500],
+#         "seed": list(range(4)),
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.02],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
+
+#         # bbe settings
+#         "bonus_scale": [0.1, 1,],
+
+#         # task policy settings
+#         "policy": ["sac"],
+#     },
+# ]
+
+# main_gridworld_warmstart.py --eval_every 1 --env gridworld --task default --video_every 9999999
+# --env_size 40 --max_steps 100 --n_state_bins 40 --n_action_bins 4 --uniform_update_candidates
+# --warmup_steps 1000 --name grid40_warmstart_explore
+basename = "grid40_warmstart_v2"
 grid = [
     {
         # define the task
-        "_main": ["main.py"],
+        "_main": ["main_gridworld_warmstart.py"],
         "eval_every": [1],
-        "env": ["hallway"],
-        "task": ["velocity_1", "velocity_2", "velocity_3", "velocity_4",],
+        "env": ["gridworld"],
+        "task": ["default"],
+        "env_size": [40],
+        "max_steps": [100],
         "max_episodes": [500],
+        "video_every": [99999999],
+        "warmup_steps": [1000],
         "seed": list(range(4)),
         "no_exploration": [True, False],
 
         # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.02],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.9],
-        "density_conserve_weight": [True],
+        "n_state_bins": [40],
+        "n_action_bins": [4],
 
         # novelty Q settings
         "uniform_update_candidates": [True],
-        "n_updates_per_step": [2],
-        "update_target_every": [2],
+        "n_updates_per_step": [10],
+        "update_target_every": [10],
 
         # task policy settings
-        "policy": ["sac"],
+        "policy_updates_per_step": [1],
     },
     {
         # define the task
-        "_main": ["main_bbe.py"],
+        "_main": ["main_gridworld_warmstart_bbe.py"],
         "eval_every": [1],
-        "env": ["hallway"],
-        "task": ["velocity_1", "velocity_2", "velocity_3", "velocity_4",],
+        "env": ["gridworld"],
+        "task": ["default"],
+        "env_size": [40],
+        "max_steps": [100],
         "max_episodes": [500],
+        "video_every": [99999999],
+        "warmup_steps": [1000],
         "seed": list(range(4)),
 
         # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.02],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.9],
-        "density_conserve_weight": [True],
+        "n_state_bins": [40],
+        "n_action_bins": [4],
 
         # bbe settings
         "bonus_scale": [0.1, 1,],
 
         # task policy settings
-        "policy": ["sac"],
+        "policy_updates_per_step": [1],
     },
 ]
 

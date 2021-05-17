@@ -3,6 +3,7 @@ import inspect
 from environments import point
 from environments import hallway
 from environments import hallway_distractor
+from environments import hallway_midstart
 from environments import reacher_explore
 from environments import ball_in_cup_explore
 from environments import manipulator_explore

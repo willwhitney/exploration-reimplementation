@@ -337,6 +337,43 @@ DOMAINS = {
                                      minimum=np.array([-2, -0.1]),
                                      maximum=np.array([2, 0.1])),
         }),
+
+        'velocity_1_mid': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-0.5, -0.1]),
+                                     maximum=np.array([0.5, 0.1])),
+        }),
+        'velocity_2_mid': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-1, -0.1]),
+                                     maximum=np.array([1, 0.1])),
+        }),
+        'velocity_3_mid': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-1.5, -0.1]),
+                                     maximum=np.array([1.5, 0.1])),
+        }),
+        'velocity_4_mid': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2, -0.1]),
+                                     maximum=np.array([2, 0.1])),
+        }),
+        'velocity_5_mid': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2.5, -0.1]),
+                                     maximum=np.array([2.5, 0.1])),
+        }),
+        'velocity_6_mid': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-3, -0.1]),
+                                     maximum=np.array([3, 0.1])),
+        }),
     },
     'hallway_distractor': {
         'velocity_1_distractor': OrderedDict({
@@ -418,6 +455,32 @@ DOMAINS = {
                                      dtype=np.float32,
                                      minimum=np.array([-1, -0.1]),
                                      maximum=np.array([1, 0.1])),
+        }),
+    },
+    'hallway_midstart': {
+        'velocity_4_offset_p5': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2, -0.1]),
+                                     maximum=np.array([2, 0.1])),
+        }),
+        'velocity_4_offset_1': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2, -0.1]),
+                                     maximum=np.array([2, 0.1])),
+        }),
+        'velocity_4_offset_1p5': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2, -0.1]),
+                                     maximum=np.array([2, 0.1])),
+        }),
+        'velocity_4_offset_2': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2, -0.1]),
+                                     maximum=np.array([2, 0.1])),
         }),
     },
     'ball_in_cup_explore': {

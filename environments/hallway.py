@@ -87,6 +87,84 @@ def velocity_4(time_limit=_DEFAULT_TIME_LIMIT, random=None,
   return control.Environment(
       physics, task, time_limit=time_limit, **environment_kwargs)
 
+@SUITE.add('exploration')
+def velocity_1_mid(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=1,
+                 distractor_size=0.05, distractor_scale=1,
+                 target_scale=0,
+                 random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+@SUITE.add('exploration')
+def velocity_2_mid(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=2,
+                 distractor_size=0.05, distractor_scale=1,
+                 target_scale=0,
+                 random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+@SUITE.add('exploration')
+def velocity_3_mid(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=3,
+                 distractor_size=0.05, distractor_scale=1,
+                 target_scale=0,
+                 random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+@SUITE.add('exploration')
+def velocity_4_mid(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=4,
+                 distractor_size=0.05, distractor_scale=1,
+                 target_scale=0,
+                 random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+@SUITE.add('exploration')
+def velocity_5_mid(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=5,
+                 distractor_size=0.05, distractor_scale=1,
+                 target_scale=0,
+                 random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+@SUITE.add('exploration')
+def velocity_6_mid(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=6,
+                 distractor_size=0.05, distractor_scale=1,
+                 target_scale=0,
+                 random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
 
 
 class Physics(mujoco.Physics):
