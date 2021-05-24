@@ -573,8 +573,8 @@ def main(args):
         for _ in range(int(args.max_steps * args.policy_updates_per_step)):
             transitions = agent_state.replay.sample(1024)
             transitions = tuple((jnp.array(el) for el in transitions))
-            policy_state = policy.update_fn(
-                policy_state, transitions)
+            with jax.profiler.TraceContext("policy update"):
+                policy_state = policy.update_fn(policy_state, transitions)
         agent_state = agent_state.replace(policy_state=policy_state)
 
         # output / visualize

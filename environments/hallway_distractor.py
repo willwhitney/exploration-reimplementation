@@ -202,7 +202,7 @@ def velocity_2_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
   physics = Physics.from_xml_string(*get_model_and_assets())
   task = Hallway(velocity=True, vel_gain=1.0, length=2,
                  target_size=0.1, target_scale=1.0,
-                 distractor_size=0.1, distractor_scale=0.1,
+                 distractor_offset=-0.5, distractor_size=0.1, distractor_scale=0.1,
                  sigmoid='gaussian', random=random)
   environment_kwargs = environment_kwargs or {}
   return control.Environment(
@@ -215,7 +215,33 @@ def velocity_2_inverse_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
   physics = Physics.from_xml_string(*get_model_and_assets())
   task = Hallway(velocity=True, vel_gain=1.0, length=2,
                  target_size=0.1, target_scale=0.1,
-                 distractor_size=0.1, distractor_scale=1,
+                 distractor_offset=-0.5, distractor_size=0.1, distractor_scale=1,
+                 sigmoid='gaussian', random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+@SUITE.add('exploration')
+def velocity_4_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=4,
+                 target_size=0.2, target_scale=1.0,
+                 distractor_offset=-1.0, distractor_size=0.1, distractor_scale=0.1,
+                 sigmoid='gaussian', random=random)
+  environment_kwargs = environment_kwargs or {}
+  return control.Environment(
+      physics, task, time_limit=time_limit, **environment_kwargs)
+
+@SUITE.add('exploration')
+def velocity_4_inverse_distractor(time_limit=_DEFAULT_TIME_LIMIT, random=None,
+             environment_kwargs=None):
+  """Returns the easy point_mass task."""
+  physics = Physics.from_xml_string(*get_model_and_assets())
+  task = Hallway(velocity=True, vel_gain=1.0, length=4,
+                 target_size=0.1, target_scale=0.1,
+                 distractor_offset=-1.5, distractor_size=0.01, distractor_scale=1,
                  sigmoid='gaussian', random=random)
   environment_kwargs = environment_kwargs or {}
   return control.Environment(

@@ -456,6 +456,18 @@ DOMAINS = {
                                      minimum=np.array([-1, -0.1]),
                                      maximum=np.array([1, 0.1])),
         }),
+        'velocity_4_distractor': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2, -0.1]),
+                                     maximum=np.array([2, 0.1])),
+        }),
+        'velocity_4_inverse_distractor': OrderedDict({
+            'position': BoundedArray(name='position', shape=(2,),
+                                     dtype=np.float32,
+                                     minimum=np.array([-2, -0.1]),
+                                     maximum=np.array([2, 0.1])),
+        }),
     },
     'hallway_midstart': {
         'velocity_4_offset_p5': OrderedDict({

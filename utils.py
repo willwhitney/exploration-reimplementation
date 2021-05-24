@@ -156,7 +156,7 @@ def flatten_observation(obs, preserve_batch=False):
         return jnp.concatenate(flat_elements, axis=0)
 
 
-@jax.partial(jax.jit, static_argnums=(2, 3))
+# @jax.partial(jax.jit, static_argnums=(2, 3))
 def discretize_observation(obs, spec, bins, preserve_batch=False):
     discretize_bins = jax.partial(discretize, bins=bins)
     discrete_tree_obs = jax.tree_multimap(discretize_bins, obs, spec)
@@ -279,7 +279,7 @@ def act_gridworld_optimal(state):
         return np.ones(1, dtype='int')
 
 
-def act_gridworld_epsilon_optimal(state, epsilon=0.8):
+def act_gridworld_epsilon_optimal(state, epsilon=0.75):
     if np.random.random() > epsilon:
         return np.random.randint(0, 4, size=(1,))
     else:
