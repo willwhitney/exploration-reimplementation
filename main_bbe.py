@@ -253,6 +253,7 @@ def display_state(agent_state: AgentState, ospec, aspec,
 def main(args):
     rng = random.PRNGKey(args.seed)
     if args.env == 'gridworld':
+        from environments import dmcontrol_gridworld
         env = dmcontrol_gridworld.GridWorld(args.env_size, args.max_steps)
         observation_spec = env.observation_spec()
     else:
