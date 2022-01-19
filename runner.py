@@ -481,7 +481,6 @@ MULTIPLEX = 2
 # ]
 
 
-
 # basename = "hallway_vis_v2"
 # grid = [
 #     {
@@ -542,156 +541,156 @@ MULTIPLEX = 2
 #     },
 # ]
 
-basename = "bbe_all_v3_moreseeds"
-grid = [
+# basename = "bbe_all_v3_moreseeds"
+# grid = [
 
-    # reacher
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["reacher_explore"],
-        "task": ["hard_narrow_init"],
-        "max_episodes": [500],
-        "seed": list(range(4, 8)),
+#     # reacher
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["reacher_explore"],
+#         "task": ["hard_narrow_init"],
+#         "max_episodes": [500],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.06],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.9],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.06],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-    },
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["reacher"],
-        "task": ["hard"],
-        "max_episodes": [500],
-        "seed": list(range(4, 8)),
+#         # task policy settings
+#         "policy": ["sac"],
+#     },
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["reacher"],
+#         "task": ["hard"],
+#         "max_episodes": [500],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.06],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.9],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.06],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-    },
+#         # task policy settings
+#         "policy": ["sac"],
+#     },
 
-    # ball-in-cup
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["ball_in_cup", "ball_in_cup_explore"],
-        "task": ["catch"],
-        "seed": list(range(4, 8)),
+#     # ball-in-cup
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["ball_in_cup", "ball_in_cup_explore"],
+#         "task": ["catch"],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.078],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.9],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.078],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-    },
+#         # task policy settings
+#         "policy": ["sac"],
+#     },
 
-    # finger
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["finger_explore"],
-        "task": ["turn_hard_narrow"],
-        "seed": list(range(4, 8)),
+#     # finger
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["finger_explore"],
+#         "task": ["turn_hard_narrow"],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.11],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.5],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.11],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-        "policy_updates_per_step": [1],
-    },
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["finger"],
-        "task": ["turn_hard"],
-        "seed": list(range(4, 8)),
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+#     },
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["finger"],
+#         "task": ["turn_hard"],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.11],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.5],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.11],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-        "policy_updates_per_step": [1],
-    },
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+#     },
 
-    # walker
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["walker_explore"],
-        "task": ["walk_narrow_sparse"],
-        "seed": list(range(4, 8)),
+#     # walker
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["walker_explore"],
+#         "task": ["walk_narrow_sparse"],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.16],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.5],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.16],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-        "policy_updates_per_step": [1],
-    },
-    {
-        # define the task
-        "_main": ["main_bbe.py"],
-        "eval_every": [1],
-        "env": ["walker"],
-        "task": ["walk"],
-        "seed": list(range(4, 8)),
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+#     },
+#     {
+#         # define the task
+#         "_main": ["main_bbe.py"],
+#         "eval_every": [1],
+#         "env": ["walker"],
+#         "task": ["walk"],
+#         "seed": list(range(4, 8)),
 
-        # density settings
-        "density": ["keops_kernel_count"],
-        "density_state_scale": [0.16],
-        "density_action_scale": [1],
-        "density_max_obs": [2**15],
-        "density_tolerance": [0.5],
-        "density_conserve_weight": [True],
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.16],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.5],
+#         "density_conserve_weight": [True],
 
-        # task policy settings
-        "policy": ["sac"],
-        "policy_updates_per_step": [1],
-    },
-]
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+#     },
+# ]
 
 # basename = "ufo_all_v3_moreseeds"
 # grid = [
@@ -1034,60 +1033,401 @@ grid = [
 #     },
 # ]
 
-# basename = "hallway_midstart_all_v1"
+# basename = "pure_explore_behavior_v1"
 # grid = [
+
+#     # reacher
 #     {
 #         # define the task
 #         "_main": ["main.py"],
 #         "eval_every": [1],
-#         "env": ["hallway_midstart"],
-#         "task": ["velocity_4_offset_p5", "velocity_4_offset_1",
-#                  "velocity_4_offset_1p5", "velocity_4_offset_2",],
+#         "env": ["reacher_explore"],
+#         "task": ["hard_narrow_init"],
 #         "max_episodes": [500],
-#         "seed": list(range(4)),
-#         "no_exploration": [True, False],
+#         "seed": list(range(8)),
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
-#         "density_state_scale": [0.02],
+#         "density_state_scale": [0.06],
 #         "density_action_scale": [1],
 #         "density_max_obs": [2**15],
 #         "density_tolerance": [0.9],
 #         "density_conserve_weight": [True],
+
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
 
 #         # novelty Q settings
 #         "uniform_update_candidates": [True],
+#         "uniform_behavior_candidates": [True],
 #         "n_updates_per_step": [2],
 #         "update_target_every": [2],
-
-#         # task policy settings
-#         "policy": ["sac"],
 #     },
 #     {
 #         # define the task
-#         "_main": ["main_bbe.py"],
+#         "_main": ["main.py"],
 #         "eval_every": [1],
-#         "env": ["hallway_midstart"],
-#         "task": ["velocity_4_offset_p5", "velocity_4_offset_1",
-#                  "velocity_4_offset_1p5", "velocity_4_offset_2",],
+#         "env": ["reacher"],
+#         "task": ["hard"],
 #         "max_episodes": [500],
-#         "seed": list(range(4)),
+#         "seed": list(range(8)),
 
 #         # density settings
 #         "density": ["keops_kernel_count"],
-#         "density_state_scale": [0.02],
+#         "density_state_scale": [0.06],
 #         "density_action_scale": [1],
 #         "density_max_obs": [2**15],
 #         "density_tolerance": [0.9],
 #         "density_conserve_weight": [True],
 
-#         # bbe settings
-#         "bonus_scale": [0.1, 1,],
+#         # task policy settings
+#         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "uniform_behavior_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
+#     },
+
+#     # ball-in-cup
+#     {
+#         # define the task
+#         "_main": ["main.py"],
+#         "eval_every": [1],
+#         "env": ["ball_in_cup", "ball_in_cup_explore"],
+#         "task": ["catch"],
+#         "seed": list(range(8)),
+
+#         # density settings
+#         "density": ["keops_kernel_count"],
+#         "density_state_scale": [0.078],
+#         "density_action_scale": [1],
+#         "density_max_obs": [2**15],
+#         "density_tolerance": [0.9],
+#         "density_conserve_weight": [True],
 
 #         # task policy settings
 #         "policy": ["sac"],
+#         "policy_updates_per_step": [1],
+
+#         # novelty Q settings
+#         "uniform_update_candidates": [True],
+#         "uniform_behavior_candidates": [True],
+#         "n_updates_per_step": [2],
+#         "update_target_every": [2],
 #     },
+
+    # # finger
+    # {
+    #     # define the task
+    #     "_main": ["main.py"],
+    #     "eval_every": [1],
+    #     "env": ["finger_explore"],
+    #     "task": ["turn_hard_narrow"],
+    #     "seed": list(range(8)),
+
+    #     # density settings
+    #     "density": ["keops_kernel_count"],
+    #     "density_state_scale": [0.11],
+    #     "density_action_scale": [1],
+    #     "density_max_obs": [2**15],
+    #     "density_tolerance": [0.5],
+    #     "density_conserve_weight": [True],
+
+    #     # task policy settings
+    #     "policy": ["sac"],
+    #     "policy_updates_per_step": [1],
+
+    #     # novelty Q settings
+    #     "uniform_update_candidates": [True],
+    #     "uniform_behavior_candidates": [True],
+    #     "n_updates_per_step": [2],
+    #     "update_target_every": [2],
+    # },
+    # {
+    #     # define the task
+    #     "_main": ["main.py"],
+    #     "eval_every": [1],
+    #     "env": ["finger"],
+    #     "task": ["turn_hard"],
+    #     "seed": list(range(8)),
+
+    #     # density settings
+    #     "density": ["keops_kernel_count"],
+    #     "density_state_scale": [0.11],
+    #     "density_action_scale": [1],
+    #     "density_max_obs": [2**15],
+    #     "density_tolerance": [0.5],
+    #     "density_conserve_weight": [True],
+
+    #     # task policy settings
+    #     "policy": ["sac"],
+    #     "policy_updates_per_step": [1],
+
+    #     # novelty Q settings
+    #     "uniform_update_candidates": [True],
+    #     "uniform_behavior_candidates": [True],
+    #     "n_updates_per_step": [2],
+    #     "update_target_every": [2],
+    # },
+
+    # # walker
+    # {
+    #     # define the task
+    #     "_main": ["main.py"],
+    #     "eval_every": [1],
+    #     "env": ["walker_explore"],
+    #     "task": ["walk_narrow_sparse"],
+    #     "seed": list(range(8)),
+
+    #     # density settings
+    #     "density": ["keops_kernel_count"],
+    #     "density_state_scale": [0.16],
+    #     "density_action_scale": [1],
+    #     "density_max_obs": [2**15],
+    #     "density_tolerance": [0.5],
+    #     "density_conserve_weight": [True],
+
+    #     # task policy settings
+    #     "policy": ["sac"],
+    #     "policy_updates_per_step": [1],
+
+    #     # novelty Q settings
+    #     "uniform_update_candidates": [True],
+    #     "uniform_behavior_candidates": [True],
+    #     "n_updates_per_step": [2],
+    #     "update_target_every": [2],
+    # },
+    # {
+    #     # define the task
+    #     "_main": ["main.py"],
+    #     "eval_every": [1],
+    #     "env": ["walker"],
+    #     "task": ["walk"],
+    #     "seed": list(range(8)),
+
+    #     # density settings
+    #     "density": ["keops_kernel_count"],
+    #     "density_state_scale": [0.16],
+    #     "density_action_scale": [1],
+    #     "density_max_obs": [2**15],
+    #     "density_tolerance": [0.5],
+    #     "density_conserve_weight": [True],
+
+    #     # task policy settings
+    #     "policy": ["sac"],
+    #     "policy_updates_per_step": [1],
+
+    #     # novelty Q settings
+    #     "uniform_update_candidates": [True],
+    #     "uniform_behavior_candidates": [True],
+    #     "n_updates_per_step": [2],
+    #     "update_target_every": [2],
+    # },
 # ]
+
+basename = 'ablation_v4_sanity'
+grid = [
+    # ball-in-cup, temperature
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [1],
+        "env": ["ball_in_cup_explore"],
+        "task": ["catch"],
+        "seed": list(range(4)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.078],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.9],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac"],
+        "policy_updates_per_step": [1],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
+        # "temperature": [1, 3e-1, 3e-2, 1e-2],
+    },
+
+    # # ball-in-cup, n_candidates
+    # {
+    #     # define the task
+    #     "_main": ["main.py"],
+    #     "eval_every": [1],
+    #     "env": ["ball_in_cup_explore"],
+    #     "task": ["catch"],
+    #     "seed": list(range(4)),
+
+    #     # density settings
+    #     "density": ["keops_kernel_count"],
+    #     "density_state_scale": [0.078],
+    #     "density_action_scale": [1],
+    #     "density_max_obs": [2**15],
+    #     "density_tolerance": [0.9],
+    #     "density_conserve_weight": [True],
+
+    #     # task policy settings
+    #     "policy": ["sac"],
+    #     "policy_updates_per_step": [1],
+
+    #     # novelty Q settings
+    #     "uniform_update_candidates": [True],
+    #     "n_updates_per_step": [2],
+    #     "update_target_every": [2],
+    #     # "n_candidates": [16, 32, 128, 256],
+    # },
+
+    # # ball-in-cup, no optimism
+    # {
+    #     # define the task
+    #     "_main": ["main.py"],
+    #     "eval_every": [1],
+    #     "env": ["ball_in_cup_explore"],
+    #     "task": ["catch"],
+    #     "seed": list(range(4)),
+
+    #     # density settings
+    #     "density": ["keops_kernel_count"],
+    #     "density_state_scale": [0.078],
+    #     "density_action_scale": [1],
+    #     "density_max_obs": [2**15],
+    #     "density_tolerance": [0.9],
+    #     "density_conserve_weight": [True],
+
+    #     # task policy settings
+    #     "policy": ["sac"],
+    #     "policy_updates_per_step": [1],
+
+    #     # novelty Q settings
+    #     "uniform_update_candidates": [True],
+    #     "n_updates_per_step": [2],
+    #     "update_target_every": [2],
+    #     # "no_optimistic_updates": [True],
+    #     # "no_optimistic_actions": [True],
+    # },
+
+    # reacher, ours
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [1],
+        "env": ["reacher_explore"],
+        "task": ["hard_narrow_init"],
+        "seed": list(range(4)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.06],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.9],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac"],
+        "policy_updates_per_step": [1],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
+    },
+
+    # reacher, temperature
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [1],
+        "env": ["reacher_explore"],
+        "task": ["hard_narrow_init"],
+        "seed": list(range(4)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.06],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.9],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac"],
+        "policy_updates_per_step": [1],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
+        "temperature": [1, 3e-1, 3e-2, 1e-2],
+    },
+
+    # reacher, n_candidates
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [1],
+        "env": ["reacher_explore"],
+        "task": ["hard_narrow_init"],
+        "seed": list(range(4)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.06],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.9],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac"],
+        "policy_updates_per_step": [1],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
+        "n_candidates": [16, 32, 128, 256],
+    },
+
+    # reacher, no optimism
+    {
+        # define the task
+        "_main": ["main.py"],
+        "eval_every": [1],
+        "env": ["reacher_explore"],
+        "task": ["hard_narrow_init"],
+        "seed": list(range(4)),
+
+        # density settings
+        "density": ["keops_kernel_count"],
+        "density_state_scale": [0.06],
+        "density_action_scale": [1],
+        "density_max_obs": [2**15],
+        "density_tolerance": [0.9],
+        "density_conserve_weight": [True],
+
+        # task policy settings
+        "policy": ["sac"],
+        "policy_updates_per_step": [1],
+
+        # novelty Q settings
+        "uniform_update_candidates": [True],
+        "n_updates_per_step": [2],
+        "update_target_every": [2],
+        "no_optimistic_updates": [True],
+        "no_optimistic_actions": [True],
+    },
+]
 
 
 

@@ -178,6 +178,11 @@ def strip_columns(chart, included_fields):
 
 
 def make_base_chart(data, title, window=5, **kwargs):
+    baselines = {'SAC', 'SUNRISE'}
+    data = data.copy()
+    data['kind'] = 'ours'
+    data.loc[data.name == 'SAC', 'kind'] = 'baseline'
+    data.loc[data.name == 'SUNRISE', 'kind'] = 'baseline'
     chart = alt.Chart(data, title=title).mark_line().encode(
         x=alt.X('episode', title='Episode'),
         **kwargs
@@ -209,8 +214,8 @@ def make_base_chart(data, title, window=5, **kwargs):
         groupby=['name', 'test'],
         sort=[{'field': 'episode', 'order': 'ascending'}],
     ).transform_calculate(
-        smoothed_score=((alt.datum.name == 'SAC') * alt.datum.score +
-                        (alt.datum.name != 'SAC') * alt.datum.rolling_mean_score)
+        smoothed_score=((alt.datum.kind == 'baseline') * alt.datum.score +
+                        (alt.datum.kind != 'baseline') * alt.datum.rolling_mean_score)
     )
     used_fields = {
         v.split(':')[0] for k, v in kwargs.items() if isinstance(v, str)

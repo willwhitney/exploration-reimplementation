@@ -53,6 +53,7 @@ class AgentState():
     uniform_update_candidates: bool
     batch_size: int
     steps_since_tupdate: int = 0
+    uniform_behavior_candidates: bool = False
 
 
 
@@ -313,13 +314,18 @@ def sample_exploration_action(agent_state: AgentState, rng, s, train=True):
     n = agent_state.n_candidates if train else 1
 
     with jax.profiler.TraceContext("sample candidate actions"):
-        s_batch = jnp.expand_dims(s, axis=0)
-        policy_state, candidate_actions = policy.action_fn(
-            agent_state.policy_state, s_batch, n, train)
+        if agent_state.uniform_behavior_candidates and train:
+            rng, candidate_rng = random.split(rng)
+            candidate_actions = utils.sample_uniform_actions(
+                agent_state.j_action_spec, candidate_rng, n)
+        else:
+            s_batch = jnp.expand_dims(s, axis=0)
+            policy_state, candidate_actions = policy.action_fn(
+                agent_state.policy_state, s_batch, n, train)
 
-    # policy.action_fn deals with batches and we only have one element
-    candidate_actions = candidate_actions[0]
-    agent_state = agent_state.replace(policy_state=policy_state)
+            # policy.action_fn deals with batches and we only have one element
+            candidate_actions = candidate_actions[0]
+            agent_state = agent_state.replace(policy_state=policy_state)
 
     with jax.profiler.TraceContext("select from candidates"):
         if agent_state.optimistic_actions:
@@ -502,7 +508,7 @@ def main(args):
 
     # drawing only one candidate action sample from the policy
     # will result in following the policy directly
-    n_candidates = 64 if args.use_exploration else 1
+    n_candidates = args.n_candidates if args.use_exploration else 1
 
     novq_state = q_functions.init_fn(args.seed,
                                      observation_spec,
@@ -546,7 +552,8 @@ def main(args):
                              warmup_steps=args.warmup_steps,
                              optimistic_actions=args.optimistic_actions,
                              uniform_update_candidates=args.uniform_update_candidates,
-                             batch_size=args.batch_size)
+                             batch_size=args.batch_size,
+                             uniform_behavior_candidates=args.uniform_behavior_candidates)
 
     current_time = np.nan
     for episode in range(1, args.max_episodes + 1):
@@ -653,10 +660,12 @@ if __name__ == '__main__':
     parser.add_argument('--novelty_discount', type=float, default=0.99)
     parser.add_argument('--temperature', type=float, default=1e-1)
     parser.add_argument('--update_temperature', type=float, default=None)
+    parser.add_argument('--n_candidates', type=int, default=64)
     parser.add_argument('--n_update_candidates', type=int, default=64)
     parser.add_argument('--n_updates_per_step', type=int, default=10)
     parser.add_argument('--update_target_every', type=int, default=10)
     parser.add_argument('--uniform_update_candidates', action='store_true')
+    parser.add_argument('--uniform_behavior_candidates', action='store_true')
     parser.add_argument('--batch_size', type=int, default=128)
 
     # tabular settings (also for vis)
