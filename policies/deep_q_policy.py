@@ -29,6 +29,7 @@ class PolicyState():
     update_count: int
     temp: float
     test_temp: float
+    last_losses: jnp.ndarray = jnp.zeros(())
 
 
 def init_fn(state_spec, action_spec, seed,
@@ -94,20 +95,24 @@ def update_fn(policy_state: PolicyState, transitions):
     candidate_actions = candidate_actions.reshape(candidate_shape)
 
     if policy_state.update_rule == 'bellman':
-        q_state, _ = q_functions.bellman_train_step(
+        q_state, losses = q_functions.bellman_train_step(
             policy_state.q_state, policy_state.targetq_state,
             transitions, candidate_actions)
     elif policy_state.update_rule == 'ddqn':
-        q_state, _ = q_functions.ddqn_train_step(
+        q_state, losses = q_functions.ddqn_train_step(
             policy_state.q_state, policy_state.targetq_state,
             transitions, candidate_actions)
     elif policy_state.update_rule == 'soft':
-        q_state, _ = q_functions.soft_bellman_train_step(
+        q_state, losses = q_functions.soft_bellman_train_step(
             policy_state.q_state, policy_state.targetq_state,
-            transitions, candidate_actions, TEST_TEMP)
+            transitions, candidate_actions, policy_state.test_temp)
 
     update_count = policy_state.update_count + 1
-    updates = dict(q_state=q_state, rng=policy_rng, update_count=update_count)
+    updates = dict(
+        q_state=q_state,
+        rng=policy_rng,
+        update_count=update_count,
+        last_losses=losses)
     if update_count % TARGET_UPDATE_FREQ == 0:
         updates['targetq_state'] = q_state
     policy_state = policy_state.replace(**updates)
